@@ -28,9 +28,27 @@ valid_json() {
   return 1
 }
 
-# Writes JSON $2 to file $1 through a temp file beside it, so a failed write leaves the file as it was.
+# The file a path names after following its links (a settings file often links into dotfiles).
+real_path() {
+  path=$1
+  while [ -L "$path" ]; do
+    link=$(readlink "$path")
+    case "$link" in
+      /*) path=$link ;;
+      *) path="$(dirname "$path")/$link" ;;
+    esac
+  done
+  echo "$path"
+}
+
+# Writes JSON $2 to file $1 through a temp file beside its real target, keeping the target's mode, so a link
+# stays a link and a failed write leaves the file as it was.
 write_json() {
-  printf '%s\n' "$2" > "$1.deskmates-tmp" && mv "$1.deskmates-tmp" "$1"
+  target=$(real_path "$1")
+  tmp="$target.deskmates-tmp"
+  cp -p "$target" "$tmp" && printf '%s\n' "$2" > "$tmp" && mv "$tmp" "$target" && return 0
+  rm -f "$tmp"
+  return 1
 }
 
 hooks_remove() {

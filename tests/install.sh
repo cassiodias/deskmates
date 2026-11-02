@@ -4,6 +4,7 @@
 cd "$(dirname "$0")/.."
 src=$(pwd)
 failed=0
+HOME_DIR=
 OURS='\.deskmates/|\.claude-puppet/'
 ours_cmd='~/.deskmates/src/harnesses/claude/translate.sh'
 
@@ -14,7 +15,7 @@ check() {
 # A new empty home in $HOME.
 fresh_home() {
   [ -n "$HOME_DIR" ] && rm -rf "$HOME_DIR"
-  HOME_DIR=$(mktemp -d)
+  HOME_DIR=$(mktemp -d) || exit 1
   export HOME="$HOME_DIR"
 }
 
@@ -61,6 +62,17 @@ check "uninstall: none of ours" '[ "$(count "$s" "$OURS")" = 0 ]'
 check "uninstall: notify hook kept" '[ "$(count "$s" "^~/bin/deskmates-notify$")" = 1 ]'
 check "uninstall: stop hook kept" '[ "$(count "$s" "^~/bin/my-stop.sh$")" = 1 ]'
 check "uninstall: empty events gone" '[ "$(jq -c ".hooks | keys" "$s")" = "[\"PreToolUse\",\"Stop\"]" ]'
+
+# A settings file linked into dotfiles stays a link; its target gets the hooks and keeps its mode.
+fresh_home
+mkdir -p "$HOME/.claude" "$HOME/dotfiles/claude"
+echo '{}' > "$HOME/dotfiles/claude/settings.json"
+chmod 600 "$HOME/dotfiles/claude/settings.json"
+ln -s ../dotfiles/claude/settings.json "$HOME/.claude/settings.json"
+"$claude/install.sh" > /dev/null
+check "link: still a link" '[ -L "$(settings)" ]'
+check "link: target has ours" '[ "$(count "$HOME/dotfiles/claude/settings.json" "$OURS")" = 10 ]'
+check "link: target mode kept" '[ "$(stat -f %Lp "$HOME/dotfiles/claude/settings.json")" = 600 ]'
 
 # Settings that are not JSON are left alone.
 fresh_home
