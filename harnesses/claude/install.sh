@@ -2,7 +2,7 @@
 # Adds Deskmates' hooks to Claude Code's user settings, replacing any already there; keeps a backup.
 here=$(dirname "$0")
 . "$here/../../hook/install-lib.sh"
-settings="$HOME/.claude/settings.json"
+settings=$("$here/config.sh")
 need_jq || exit 1
 if [ -f "$settings" ]; then
   valid_json "$settings" || exit 1

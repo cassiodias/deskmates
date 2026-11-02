@@ -1,0 +1,223 @@
+#!/bin/sh
+# Sets up Deskmates: the Spoon in Hammerspoon and each agent's hooks (harnesses/<id>/).
+# DESKMATES_NO_RELOAD=1 skips reloading Hammerspoon; DESKMATES_NO_DEFAULTS=1 keeps its settings on uninstall.
+
+usage() {
+  cat >&2 <<'EOF'
+usage: deskmates install [id…]    the Spoon, then the hooks of each agent found (or of the ids given)
+       deskmates uninstall [id…]  those agents' hooks; with no ids, everything
+       deskmates status           per agent: found, hooks, last event
+       deskmates update           git pull, install again, reload Hammerspoon
+EOF
+  exit 1
+}
+
+# The repo is the folder above this script, after following links to it.
+self=$0
+while [ -L "$self" ]; do
+  next=$(readlink "$self")
+  case "$next" in
+    /*) self=$next ;;
+    *) self="$(dirname "$self")/$next" ;;
+  esac
+done
+root=$(cd -P "$(dirname "$self")/.." && pwd) || exit 1
+. "$root/hook/install-lib.sh"
+
+data="$HOME/.deskmates"
+old="$HOME/.claude-puppet"
+spoons="$HOME/.hammerspoon/Spoons"
+init="$HOME/.hammerspoon/init.lua"
+INIT_LINES='hs.loadSpoon("Deskmates")
+spoon.Deskmates:bindHotkeys({ toggle = { { "ctrl", "alt", "cmd" }, "p" } })
+spoon.Deskmates:start()'
+
+# Every harness id, one per line.
+harnesses() {
+  for dir in "$root"/harnesses/*/; do
+    [ -f "$dir/detect.sh" ] && basename "$dir"
+  done
+}
+
+known() {
+  case "$1" in ''|*/*|.*) return 1 ;; esac
+  [ -f "$root/harnesses/$1/detect.sh" ]
+}
+
+detected() {
+  "$root/harnesses/$1/detect.sh" > /dev/null 2>&1
+}
+
+hooks_on() {
+  hooks_present "$("$root/harnesses/$1/config.sh")"
+}
+
+# Rewrites init.lua without lines matching extended regex $1, writing through a link and keeping the mode.
+init_drop() {
+  [ -f "$init" ] && grep -Eq "$1" "$init" || return 0
+  kept=$(mktemp) || exit 1
+  grep -Ev "$1" "$init" > "$kept"
+  cat "$kept" > "$init" && rm -f "$kept"
+}
+
+# An old ~/.claude-puppet install becomes ~/.deskmates; a running copy inside it moves along.
+migrate() {
+  [ -d "$old" ] || return 0
+  if [ -e "$data" ]; then
+    todo "~/.claude-puppet is left over from before; remove it once ~/.deskmates works"
+    return 0
+  fi
+  [ -d "$old/src" ] || return 0
+  real_old=$(cd -P "$old" && pwd)
+  mv "$old" "$data" || exit 1
+  case "$root" in
+    "$real_old"/*) root="$data/${root#"$real_old"/}" ;;
+  esac
+  say "moved ~/.claude-puppet to ~/.deskmates"
+}
+
+spoon_link() {
+  mkdir -p "$spoons" || exit 1
+  rm -rf "$spoons/ClaudePuppet.spoon" "$spoons/Deskmates.spoon"
+  ln -s "$root/Deskmates.spoon" "$spoons/Deskmates.spoon" || exit 1
+  say "Spoon linked: ~/.hammerspoon/Spoons/Deskmates.spoon"
+}
+
+init_lines() {
+  init_drop 'ClaudePuppet'
+  if [ -f "$init" ] && grep -qF 'hs.loadSpoon("Deskmates")' "$init"; then
+    say "~/.hammerspoon/init.lua already starts Deskmates"
+    return 0
+  fi
+  mkdir -p "$(dirname "$init")" || exit 1
+  # A last line without its newline gets one first.
+  [ -s "$init" ] && [ -n "$(tail -c 1 "$init")" ] && echo >> "$init"
+  printf '%s\n' "$INIT_LINES" >> "$init"
+  say "~/.hammerspoon/init.lua starts Deskmates"
+}
+
+# Installs the Spoon, then each harness in $1 ("all" = each one detected). $2 = "reload" when the caller reloads.
+install_with() {
+  migrate
+  spoon_link
+  init_lines
+  installed='' skipped='' failed=0
+  if [ "$1" = all ]; then
+    ids=$(harnesses)
+  else
+    ids=$1
+  fi
+  for id in $ids; do
+    if [ "$1" = all ] && ! detected "$id"; then
+      skipped="$skipped $id"
+      continue
+    fi
+    if "$root/harnesses/$id/install.sh"; then installed="$installed $id"; else failed=1; fi
+  done
+  echo
+  [ -n "$installed" ] && say "hooks installed for:$installed"
+  for id in $skipped; do echo "· $id skipped (not found on this Mac)"; done
+  todo "System Settings › Privacy & Security: allow Hammerspoon under Accessibility (to focus terminals)"
+  todo "allow Hammerspoon to control iTerm when macOS asks (Automation)"
+  [ "$2" = reload ] || todo "Hammerspoon menu: Reload Config"
+  return "$failed"
+}
+
+install() {
+  if [ $# = 0 ]; then
+    install_with all
+    return
+  fi
+  for id in "$@"; do known "$id" || usage; done
+  install_with "$*"
+}
+
+uninstall() {
+  for id in "$@"; do known "$id" || usage; done
+  failed=0
+  if [ $# -gt 0 ]; then
+    for id in "$@"; do "$root/harnesses/$id/uninstall.sh" || failed=1; done
+    return "$failed"
+  fi
+  for id in $(harnesses); do "$root/harnesses/$id/uninstall.sh" || failed=1; done
+  rm -rf "$spoons/Deskmates.spoon" "$spoons/ClaudePuppet.spoon"
+  say "Spoon link removed"
+  init_drop 'ClaudePuppet|loadSpoon\("Deskmates"\)|spoon\.Deskmates'
+  say "Deskmates lines removed from ~/.hammerspoon/init.lua"
+  if [ "${DESKMATES_NO_DEFAULTS:-}" != 1 ]; then
+    for key in Deskmates.choice Deskmates.position Deskmates.hidden ClaudePuppet.choice ClaudePuppet.position \
+      ClaudePuppet.hidden ClaudePuppet.commands ClaudePuppet.scenes ClaudePuppet.seenCommands; do
+      defaults delete org.hammerspoon.Hammerspoon "$key" > /dev/null 2>&1
+    done
+    say "Hammerspoon settings for Deskmates removed"
+  fi
+  # ~/.deskmates goes last, with ~/.deskmates/src when that is this copy; a copy elsewhere inside it stays.
+  if [ -d "$data" ] && [ ! -L "$data" ]; then
+    real_data=$(cd -P "$data" && pwd)
+    case "$root/" in
+      "$real_data"/*)
+        if [ "$root" != "$real_data/src" ]; then
+          todo "this copy is inside ~/.deskmates; remove ~/.deskmates yourself"
+          return "$failed"
+        fi ;;
+    esac
+  fi
+  rm -rf "$data"
+  say "~/.deskmates removed"
+  return "$failed"
+}
+
+status() {
+  now=$(date +%s)
+  for id in $(harnesses); do
+    if detected "$id"; then found=detected; else found="not found"; fi
+    if hooks_on "$id"; then hooks="hooks on"; else hooks="hooks off"; fi
+    # Field 12 names the harness; older lines leave it empty, and those were Claude's.
+    last=
+    [ -f "$data/events" ] && last=$(awk -F'|' -v id="$id" \
+      '$12 == id || (id == "claude" && $12 == "") { t = $1 } END { print t }' "$data/events")
+    case "$last" in
+      ''|*[!0-9]*) seen=never ;;
+      *) seen="$(((now - last) / 60))m ago" ;;
+    esac
+    printf '%-8s  %-9s  %-9s  last event %s\n' "$id" "$found" "$hooks" "$seen"
+  done
+}
+
+# Runs hs -c with Lua $1, giving up after 5 s.
+hs_run() {
+  command -v hs > /dev/null 2>&1 || return 1
+  hs -c "$1" > /dev/null 2>&1 &
+  pid=$!
+  (sleep 5; kill "$pid" 2> /dev/null) &
+  watcher=$!
+  wait "$pid"
+  rc=$?
+  kill "$watcher" 2> /dev/null
+  return "$rc"
+}
+
+update() {
+  git -C "$root" pull --ff-only || exit 1
+  ids=
+  for id in $(harnesses); do hooks_on "$id" && ids="$ids $id"; done
+  install_with "$ids" reload
+  failed=$?
+  if [ "${DESKMATES_NO_RELOAD:-}" != 1 ] && hs_run 'hs.timer.doAfter(0.2, hs.reload)'; then
+    say "Hammerspoon reloaded"
+  else
+    todo "Hammerspoon menu: Reload Config"
+  fi
+  return "$failed"
+}
+
+[ $# -gt 0 ] || usage
+command=$1
+shift
+case "$command" in
+  install) install "$@" ;;
+  uninstall) uninstall "$@" ;;
+  status) [ $# = 0 ] || usage; status ;;
+  update) [ $# = 0 ] || usage; update ;;
+  *) usage ;;
+esac

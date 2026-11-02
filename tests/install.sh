@@ -97,6 +97,109 @@ check "lib: present" '(. hook/install-lib.sh; hooks_present "$lib")'
 check "lib: absent after remove" '(. hook/install-lib.sh; hooks_remove "$lib" && ! hooks_present "$lib")'
 check "lib: remove missing file" '(. hook/install-lib.sh; hooks_remove "$HOME/none.json") && [ ! -e "$HOME/none.json" ]'
 
+# The command: bin/deskmates from this working copy, never reloading Hammerspoon or touching its settings.
+export DESKMATES_NO_RELOAD=1 DESKMATES_NO_DEFAULTS=1
+deskmates="$src/bin/deskmates"
+init() { echo "$HOME/.hammerspoon/init.lua"; }
+spoon_link() { echo "$HOME/.hammerspoon/Spoons/Deskmates.spoon"; }
+ours_init='hs.loadSpoon("Deskmates")
+spoon.Deskmates:bindHotkeys({ toggle = { { "ctrl", "alt", "cmd" }, "p" } })
+spoon.Deskmates:start()'
+mine_init='-- mine
+-- mine too'
+
+# An old ~/.claude-puppet install moves over: events kept, old Spoon link gone, init.lua lines swapped.
+fresh_home
+mkdir -p "$HOME/.claude" "$HOME/.claude-puppet/src" "$HOME/.hammerspoon/Spoons"
+echo '1|Stop|s1' > "$HOME/.claude-puppet/events"
+ln -s "$HOME/.claude-puppet/src/ClaudePuppet.spoon" "$HOME/.hammerspoon/Spoons/ClaudePuppet.spoon"
+printf -- '-- mine\nhs.loadSpoon("ClaudePuppet")\nspoon.ClaudePuppet:start()\n-- mine too\n' > "$(init)"
+"$deskmates" install claude > /dev/null
+check "migrate: events moved" '[ "$(cat "$HOME/.deskmates/events")" = "1|Stop|s1" ]'
+check "migrate: old folder gone" '[ ! -e "$HOME/.claude-puppet" ]'
+check "migrate: old link gone" '[ ! -e "$HOME/.hammerspoon/Spoons/ClaudePuppet.spoon" ] && [ ! -L "$HOME/.hammerspoon/Spoons/ClaudePuppet.spoon" ]'
+check "migrate: Spoon linked" '[ "$(readlink "$(spoon_link)")" = "$src/Deskmates.spoon" ]'
+check "migrate: init.lua swapped" '[ "$(cat "$(init)")" = "$mine_init
+$ours_init" ]'
+check "migrate: hooks on" '[ "$(count "$(settings)" "$OURS")" = 10 ]'
+
+# Installing twice adds the init.lua lines once.
+"$deskmates" install claude > /dev/null
+check "install twice: init.lua lines once" '[ "$(cat "$(init)")" = "$mine_init
+$ours_init" ]'
+
+# status: the moved line has no harness field, so it was Claude's.
+check "migrate: status counts the old line" '"$deskmates" status | grep -Eq "^claude +detected +hooks on +last event [0-9]+m ago$"'
+
+# uninstall with no ids: hooks, Spoon link, init.lua lines and ~/.deskmates go; the working copy stays.
+"$deskmates" uninstall > /dev/null
+check "uninstall all: no ~/.deskmates" '[ ! -e "$HOME/.deskmates" ]'
+check "uninstall all: no Spoon link" '[ ! -L "$(spoon_link)" ] && [ ! -e "$(spoon_link)" ]'
+check "uninstall all: init.lua mine only" '[ "$(cat "$(init)")" = "$mine_init" ]'
+check "uninstall all: no ours" '[ "$(count "$(settings)" "$OURS")" = 0 ]'
+check "uninstall all: working copy kept" '[ -x "$deskmates" ] && [ -d "$src/Deskmates.spoon" ]'
+check "uninstall all: status hooks off" '"$deskmates" status | grep -Eq "^claude +detected +hooks off +last event never$"'
+
+# Run from inside the old folder, the command follows its copy to ~/.deskmates/src.
+fresh_home
+mkdir "$HOME/.claude"
+git clone -q "$src" "$HOME/.claude-puppet/src"
+cp -R bin harnesses hook "$HOME/.claude-puppet/src/"
+"$HOME/.claude-puppet/src/bin/deskmates" install claude > /dev/null
+rc=$?
+check "migrate self: exit 0" '[ "$rc" = 0 ]'
+check "migrate self: Spoon linked to the moved copy" '[ "$(readlink "$(spoon_link)")" = "$HOME/.deskmates/src/Deskmates.spoon" ]'
+check "migrate self: hooks on" '[ "$(count "$(settings)" "$OURS")" = 10 ]'
+
+# Both folders: the old one is left alone and named.
+fresh_home
+mkdir -p "$HOME/.claude" "$HOME/.claude-puppet/src" "$HOME/.deskmates/src"
+echo '1|Stop|s1' > "$HOME/.claude-puppet/events"
+out=$("$deskmates" install claude)
+rc=$?
+check "both: exit 0" '[ "$rc" = 0 ]'
+check "both: old folder untouched" '[ "$(cat "$HOME/.claude-puppet/events")" = "1|Stop|s1" ] && [ -d "$HOME/.claude-puppet/src" ]'
+check "both: left over named" 'echo "$out" | grep -qF "~/.claude-puppet is left over"'
+
+# install with no ids: each detected harness is installed, the others are named as skipped.
+fresh_home
+mkdir "$HOME/.claude"
+out=$(PATH=/usr/bin:/bin:$(dirname "$(command -v jq)") "$deskmates" install)
+check "install all: claude hooks" '[ "$(count "$(settings)" "$OURS")" = 10 ]'
+for dir in "$src"/harnesses/*/; do
+  id=$(basename "$dir")
+  [ "$id" = claude ] || [ ! -f "$dir/detect.sh" ] && continue
+  check "install all: $id skipped" 'echo "$out" | grep -q "$id.*skipped"'
+done
+
+# status: detected, hooks on, no event yet; then a Claude event just now.
+out=$("$deskmates" status)
+check "status: claude never" 'echo "$out" | grep -Eq "^claude +detected +hooks on +last event never$"'
+mkdir -p "$HOME/.deskmates"
+echo "$(date +%s)|Stop|s2|||||x|iTerm.app|||claude|" >> "$HOME/.deskmates/events"
+out=$("$deskmates" status)
+check "status: claude 0m ago" 'echo "$out" | grep -Eq "^claude +detected +hooks on +last event 0m ago$"'
+
+# An unknown command or id: usage on stderr, exit 1.
+for args in "install nope" "nope" ""; do
+  err=$("$deskmates" $args 2>&1 > /dev/null)
+  rc=$?
+  check "usage ($args): exit 1" '[ "$rc" = 1 ]'
+  check "usage ($args): on stderr" 'echo "$err" | grep -q "^usage: deskmates"'
+done
+
+# update from a clone: pulls, then installs only harnesses whose hooks are on.
+fresh_home
+mkdir "$HOME/.claude"
+git clone -q "$src" "$HOME/clone"
+cp -R bin harnesses hook "$HOME/clone/"
+"$HOME/clone/bin/deskmates" update > /dev/null
+check "update: hooks off stay off" '! (. hook/install-lib.sh; hooks_present "$(settings)")'
+check "update: Spoon linked to the clone" '[ "$(readlink "$(spoon_link)")" = "$(cd -P "$HOME/clone" && pwd)/Deskmates.spoon" ]'
+echo '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"~/.deskmates/src/harnesses/claude/translate.sh"}]}]}}' > "$(settings)"
+"$HOME/clone/bin/deskmates" update > /dev/null
+check "update: hooks on reinstalled" '[ "$(count "$(settings)" "$OURS")" = 10 ]'
+
 rm -rf "$HOME_DIR"
 [ "$failed" = 0 ] && echo "install: ok"
 exit "$failed"

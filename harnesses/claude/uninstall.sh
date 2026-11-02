@@ -1,7 +1,8 @@
 #!/bin/sh
 # Removes Deskmates' hooks from Claude Code's user settings; keeps a backup.
-. "$(dirname "$0")/../../hook/install-lib.sh"
-settings="$HOME/.claude/settings.json"
+here=$(dirname "$0")
+. "$here/../../hook/install-lib.sh"
+settings=$("$here/config.sh")
 need_jq || exit 1
 [ -f "$settings" ] && { valid_json "$settings" || exit 1; }
 if ! hooks_present "$settings"; then
