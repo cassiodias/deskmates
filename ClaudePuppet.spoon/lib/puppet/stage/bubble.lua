@@ -25,8 +25,15 @@ function bubble.frame(top, pixel, width, height)
 end
 
 -- Draws `text` into a puppet's bubble canvas, sized and placed for it.
+-- How wide `text` draws at the bubble's size; an estimate where it cannot be measured.
+local function measure(text)
+  local size = hs.drawing and hs.drawing.getTextDrawingSize and hs.drawing.getTextDrawingSize(text, { size = 12 })
+  if size and size.w then return math.ceil(size.w) + 2 end
+  return 7 * (utf8.len(text) or #text)
+end
+
 function bubble.show(puppet, text, pixel)
-  local textWidth = 7 * (utf8.len(text) or #text)
+  local textWidth = measure(text)
   local width = math.min(config.W * pixel, textWidth + 24)
   local lines = math.min(MAX_LINES, math.ceil(textWidth / (width - 24)))
   local height = HEIGHT + (lines - 1) * 15

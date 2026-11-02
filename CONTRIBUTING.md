@@ -54,6 +54,19 @@ To try your copy for real, link it instead of the installed one and click Reload
 ln -sfn "$PWD/ClaudePuppet.spoon" ~/.hammerspoon/Spoons/ClaudePuppet.spoon
 ```
 
+## Refresh the screenshots
+
+When a change shows on screen, refresh the README's pictures too. With Hammerspoon running this working copy
+(`ln -sfn "$PWD/ClaudePuppet.spoon" ~/.hammerspoon/Spoons/ClaudePuppet.spoon`, then Reload Config) and
+`require("hs.ipc")` in `~/.hammerspoon/init.lua`:
+
+```sh
+tools/screenshots/shoot.sh
+```
+
+It plays each scene from a scratch events file, with neutral names and fake tabs, and saves it in `docs/images/`;
+your real sessions and menu choice come back at the end. A new scene is a few lines in `shoot.sh`.
+
 ## Add an agent (a harness)
 
 Use `claude` as the example; each part is small.
