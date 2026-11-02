@@ -28,6 +28,7 @@ data="$HOME/.deskmates"
 old="$HOME/.claude-puppet"
 spoons="$HOME/.hammerspoon/Spoons"
 init="$HOME/.hammerspoon/init.lua"
+init_backed='' migrated=''
 INIT_LINES='hs.loadSpoon("Deskmates")
 spoon.Deskmates:bindHotkeys({ toggle = { { "ctrl", "alt", "cmd" }, "p" } })
 spoon.Deskmates:start()'
@@ -44,6 +45,12 @@ known() {
   [ -f "$root/harnesses/$1/detect.sh" ]
 }
 
+# Whether id $1 is in the space-separated list $2.
+listed() {
+  case " $2 " in *" $1 "*) return 0 ;; esac
+  return 1
+}
+
 detected() {
   "$root/harnesses/$1/detect.sh" > /dev/null 2>&1
 }
@@ -52,33 +59,69 @@ hooks_on() {
   hooks_present "$("$root/harnesses/$1/config.sh")"
 }
 
+# Copies init.lua to init.lua.bak before this run's first change to it.
+init_backup() {
+  [ -n "$init_backed" ] && return 0
+  backup "$init" || exit 1
+  init_backed=1
+}
+
 # Rewrites init.lua without lines matching extended regex $1, writing through a link and keeping the mode.
 init_drop() {
   [ -f "$init" ] && grep -Eq "$1" "$init" || return 0
+  init_backup
   kept=$(mktemp) || exit 1
   grep -Ev "$1" "$init" > "$kept"
   cat "$kept" > "$init" && rm -f "$kept"
 }
 
-# An old ~/.claude-puppet install becomes ~/.deskmates; a running copy inside it moves along.
+# An old ~/.claude-puppet install moves into ~/.deskmates: its copy, its events ahead of any the old hooks
+# already wrote there, its tty caches; the old folder goes only when all of that worked. A running copy
+# inside it moves along.
 migrate() {
   [ -d "$old" ] || return 0
-  if [ -e "$data" ]; then
+  if [ -e "$data/src" ] || [ -L "$data/src" ]; then
     todo "~/.claude-puppet is left over from before; remove it once ~/.deskmates works"
     return 0
   fi
   [ -d "$old/src" ] || return 0
   real_old=$(cd -P "$old" && pwd)
-  mv "$old" "$data" || exit 1
+  mkdir -p "$data" && mv "$old/src" "$data/src" || exit 1
   case "$root" in
     "$real_old"/*) root="$data/${root#"$real_old"/}" ;;
   esac
+  if [ -f "$old/events" ]; then
+    merged="$data/events.deskmates-tmp"
+    if [ -f "$data/events" ]; then
+      cat "$old/events" "$data/events" > "$merged"
+    else
+      cat "$old/events" > "$merged"
+    fi && mv "$merged" "$data/events" || exit 1
+  fi
+  for cache in "$old"/tty-*; do
+    [ -f "$cache" ] || continue
+    mv "$cache" "$data/" || exit 1
+  done
+  rm -rf "$old"
+  migrated=1
   say "moved ~/.claude-puppet to ~/.deskmates"
+}
+
+# Removes Spoon entry $1 when it is a link; a real folder is someone's own copy and stays.
+spoon_unlink() {
+  if [ -L "$spoons/$1" ]; then
+    rm -f "$spoons/$1"
+  elif [ -e "$spoons/$1" ]; then
+    todo "~/.hammerspoon/Spoons/$1 is a folder, not a link; left as it was (remove it yourself)"
+    return 1
+  fi
+  return 0
 }
 
 spoon_link() {
   mkdir -p "$spoons" || exit 1
-  rm -rf "$spoons/ClaudePuppet.spoon" "$spoons/Deskmates.spoon"
+  spoon_unlink ClaudePuppet.spoon
+  spoon_unlink Deskmates.spoon || return 0
   ln -s "$root/Deskmates.spoon" "$spoons/Deskmates.spoon" || exit 1
   say "Spoon linked: ~/.hammerspoon/Spoons/Deskmates.spoon"
 }
@@ -90,6 +133,7 @@ init_lines() {
     return 0
   fi
   mkdir -p "$(dirname "$init")" || exit 1
+  init_backup
   # A last line without its newline gets one first.
   [ -s "$init" ] && [ -n "$(tail -c 1 "$init")" ] && echo >> "$init"
   printf '%s\n' "$INIT_LINES" >> "$init"
@@ -97,18 +141,26 @@ init_lines() {
 }
 
 # Installs the Spoon, then each harness in $1 ("all" = each one detected). $2 = "reload" when the caller reloads.
+# After a migration every harness with hooks on is installed again too, so none keeps the old paths.
 install_with() {
   migrate
   spoon_link
   init_lines
-  installed='' skipped='' failed=0
+  installed='' skipped='' failed=0 again=''
   if [ "$1" = all ]; then
     ids=$(harnesses)
   else
     ids=$1
   fi
+  if [ -n "$migrated" ]; then
+    for id in $(harnesses); do
+      hooks_on "$id" || continue
+      again="$again $id"
+      listed "$id" "$ids" || ids="$ids $id"
+    done
+  fi
   for id in $ids; do
-    if [ "$1" = all ] && ! detected "$id"; then
+    if [ "$1" = all ] && ! detected "$id" && ! listed "$id" "$again"; then
       skipped="$skipped $id"
       continue
     fi
@@ -140,8 +192,9 @@ uninstall() {
     return "$failed"
   fi
   for id in $(harnesses); do "$root/harnesses/$id/uninstall.sh" || failed=1; done
-  rm -rf "$spoons/Deskmates.spoon" "$spoons/ClaudePuppet.spoon"
-  say "Spoon link removed"
+  spoon_unlink Deskmates.spoon
+  spoon_unlink ClaudePuppet.spoon
+  say "Spoon links removed"
   init_drop 'ClaudePuppet|loadSpoon\("Deskmates"\)|spoon\.Deskmates'
   say "Deskmates lines removed from ~/.hammerspoon/init.lua"
   if [ "${DESKMATES_NO_DEFAULTS:-}" != 1 ]; then

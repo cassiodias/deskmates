@@ -122,6 +122,7 @@ check "migrate: Spoon linked" '[ "$(readlink "$(spoon_link)")" = "$src/Deskmates
 check "migrate: init.lua swapped" '[ "$(cat "$(init)")" = "$mine_init
 $ours_init" ]'
 check "migrate: hooks on" '[ "$(count "$(settings)" "$OURS")" = 10 ]'
+check "migrate: init.lua backed up" '[ "$(cat "$(init).bak")" = "$(printf -- "-- mine\nhs.loadSpoon(\"ClaudePuppet\")\nspoon.ClaudePuppet:start()\n-- mine too")" ]'
 
 # Installing twice adds the init.lua lines once.
 "$deskmates" install claude > /dev/null
@@ -136,6 +137,8 @@ check "migrate: status counts the old line" '"$deskmates" status | grep -Eq "^cl
 check "uninstall all: no ~/.deskmates" '[ ! -e "$HOME/.deskmates" ]'
 check "uninstall all: no Spoon link" '[ ! -L "$(spoon_link)" ] && [ ! -e "$(spoon_link)" ]'
 check "uninstall all: init.lua mine only" '[ "$(cat "$(init)")" = "$mine_init" ]'
+check "uninstall all: init.lua backed up" '[ "$(cat "$(init).bak")" = "$mine_init
+$ours_init" ]'
 check "uninstall all: no ours" '[ "$(count "$(settings)" "$OURS")" = 0 ]'
 check "uninstall all: working copy kept" '[ -x "$deskmates" ] && [ -d "$src/Deskmates.spoon" ]'
 check "uninstall all: status hooks off" '"$deskmates" status | grep -Eq "^claude +detected +hooks off +last event never$"'
@@ -150,6 +153,35 @@ rc=$?
 check "migrate self: exit 0" '[ "$rc" = 0 ]'
 check "migrate self: Spoon linked to the moved copy" '[ "$(readlink "$(spoon_link)")" = "$HOME/.deskmates/src/Deskmates.spoon" ]'
 check "migrate self: hooks on" '[ "$(count "$(settings)" "$OURS")" = 10 ]'
+
+# The old hooks already wrote ~/.deskmates/events: the copy still moves, the old lines go first.
+fresh_home
+mkdir -p "$HOME/.claude" "$HOME/.deskmates"
+echo '2|Stop|s2' > "$HOME/.deskmates/events"
+git clone -q "$src" "$HOME/.claude-puppet/src"
+cp -R bin harnesses hook "$HOME/.claude-puppet/src/"
+echo '1|Stop|s1' > "$HOME/.claude-puppet/events"
+echo /dev/ttys001 > "$HOME/.claude-puppet/tty-s1"
+"$HOME/.claude-puppet/src/bin/deskmates" install claude > /dev/null
+check "events first: src moved" '[ -x "$HOME/.deskmates/src/bin/deskmates" ]'
+check "events first: old lines first" '[ "$(cat "$HOME/.deskmates/events")" = "1|Stop|s1
+2|Stop|s2" ]'
+check "events first: tty cache moved" '[ "$(cat "$HOME/.deskmates/tty-s1")" = /dev/ttys001 ]'
+check "events first: old folder gone" '[ ! -e "$HOME/.claude-puppet" ]'
+check "events first: Spoon linked to the moved copy" '[ "$(readlink "$(spoon_link)")" = "$HOME/.deskmates/src/Deskmates.spoon" ]'
+check "events first: hooks point at ~/.deskmates/src" '[ "$(count "$(settings)" "^~/\\.deskmates/src/")" = 10 ] && [ "$(count "$(settings)" "claude-puppet")" = 0 ]'
+
+# Real Spoon folders (not our links) are left alone and named.
+fresh_home
+mkdir -p "$HOME/.claude" "$HOME/.hammerspoon/Spoons/ClaudePuppet.spoon" "$HOME/.hammerspoon/Spoons/Deskmates.spoon"
+touch "$HOME/.hammerspoon/Spoons/ClaudePuppet.spoon/init.lua" "$HOME/.hammerspoon/Spoons/Deskmates.spoon/init.lua"
+out=$("$deskmates" install claude)
+check "spoon folders: ClaudePuppet kept" '[ -f "$HOME/.hammerspoon/Spoons/ClaudePuppet.spoon/init.lua" ]'
+check "spoon folders: Deskmates kept" '[ ! -L "$(spoon_link)" ] && [ -f "$(spoon_link)/init.lua" ]'
+check "spoon folders: named" 'echo "$out" | grep -q "ClaudePuppet.spoon is a folder" && echo "$out" | grep -q "Deskmates.spoon is a folder"'
+out=$("$deskmates" uninstall)
+check "spoon folders: uninstall keeps them" '[ -f "$HOME/.hammerspoon/Spoons/ClaudePuppet.spoon/init.lua" ] && [ -f "$(spoon_link)/init.lua" ]'
+check "spoon folders: uninstall names them" 'echo "$out" | grep -q "Deskmates.spoon is a folder"'
 
 # Both folders: the old one is left alone and named.
 fresh_home
