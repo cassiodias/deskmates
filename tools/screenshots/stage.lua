@@ -3,7 +3,7 @@
 -- D.snap(path): composites every shown puppet and bubble over a dark background into one PNG.
 -- D.finish(): back to the real events file and the saved menu choice.
 local D = {}
-local P = spoon.ClaudePuppet
+local P = spoon.Deskmates
 
 function D.begin(eventsFile)
   P:stop()
@@ -59,7 +59,7 @@ end
 function D.finish()
   if D.mouse then hs.mouse.absolutePosition(D.mouse) end
   P:stop()
-  P.eventsFile = os.getenv("HOME") .. "/.claude-puppet/events"
+  P.eventsFile = os.getenv("HOME") .. "/.deskmates/events"
   P:start()
   return "restored"
 end

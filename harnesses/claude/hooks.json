@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude-puppet/src/harnesses/claude/translate.sh"
+            "command": "~/.deskmates/src/harnesses/claude/translate.sh"
           }
         ]
       }
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude-puppet/src/harnesses/claude/translate.sh"
+            "command": "~/.deskmates/src/harnesses/claude/translate.sh"
           }
         ]
       }
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude-puppet/src/harnesses/claude/translate.sh"
+            "command": "~/.deskmates/src/harnesses/claude/translate.sh"
           }
         ]
       }
@@ -38,7 +38,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude-puppet/src/harnesses/claude/translate.sh"
+            "command": "~/.deskmates/src/harnesses/claude/translate.sh"
           }
         ]
       }
@@ -49,7 +49,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude-puppet/src/harnesses/claude/translate.sh"
+            "command": "~/.deskmates/src/harnesses/claude/translate.sh"
           }
         ]
       }
@@ -59,7 +59,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude-puppet/src/harnesses/claude/translate.sh"
+            "command": "~/.deskmates/src/harnesses/claude/translate.sh"
           }
         ]
       }
@@ -69,7 +69,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude-puppet/src/harnesses/claude/translate.sh"
+            "command": "~/.deskmates/src/harnesses/claude/translate.sh"
           }
         ]
       }
@@ -79,7 +79,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude-puppet/src/harnesses/claude/translate.sh"
+            "command": "~/.deskmates/src/harnesses/claude/translate.sh"
           }
         ]
       }
@@ -89,7 +89,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude-puppet/src/harnesses/claude/translate.sh"
+            "command": "~/.deskmates/src/harnesses/claude/translate.sh"
           }
         ]
       }
@@ -99,7 +99,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude-puppet/src/harnesses/claude/translate.sh"
+            "command": "~/.deskmates/src/harnesses/claude/translate.sh"
           }
         ]
       }

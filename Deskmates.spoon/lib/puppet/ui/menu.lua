@@ -2,7 +2,7 @@
 
 local Mapping = require("puppet.model.mapping")
 
--- spoon: the running ClaudePuppet, for its stage, mapping and actions.
+-- spoon: the running Deskmates, for its stage, mapping and actions.
 return function(spoon)
   local mapping = spoon.mapping
   local function listed(commands) return #commands > 0 and table.concat(commands, ", ") or "no commands yet" end

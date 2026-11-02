@@ -3,7 +3,7 @@
 
 local root = arg[0]:match("^(.*)/tests/") or "."
 local stub = dofile(root .. "/tests/support/hs_stub.lua")
-stub.spoonPath = root .. "/ClaudePuppet.spoon/"
+stub.spoonPath = root .. "/Deskmates.spoon/"
 
 local eventsFile = os.tmpname()
 local out = {}

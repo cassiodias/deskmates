@@ -1,11 +1,11 @@
---- === ClaudePuppet ===
+--- === Deskmates ===
 ---
 --- Puppets that float over your desktop, one per busy coding-agent session, acting out what it is doing:
 --- it thinks, codes at its laptop (invaders or Matrix rain on its monitor), reads, runs tests, plays ping pong
 --- while subagents run, shows a question mark when the agent asks you something, and says what it did when it is done.
 --- Click a puppet to jump to its session's terminal.
 ---
---- Agent hooks append one line per event to `~/.claude-puppet/events`; this Spoon reads it. This file is the
+--- Agent hooks append one line per event to `~/.deskmates/events`; this Spoon reads it. This file is the
 --- Spoon's public surface and its wiring; the parts live in lib/puppet/ (see docs/architecture.md).
 
 local root = hs.spoons.scriptPath()
@@ -29,43 +29,43 @@ local menuItems = require("puppet.ui.menu")
 local obj = {}
 obj.__index = obj
 
-obj.name = "ClaudePuppet"
+obj.name = "Deskmates"
 obj.version = "0.12.1"
 obj.author = "Cassio Dias"
 obj.license = "MIT - https://opensource.org/licenses/MIT"
-obj.homepage = "https://github.com/cassiodias/claude-puppet-overlay"
+obj.homepage = "https://github.com/cassiodias/deskmates"
 
---- ClaudePuppet.coder
+--- Deskmates.coder
 --- Variable
 --- Slash commands or skills whose turns show the coder, without the slash.
 obj.coder = {}
 
---- ClaudePuppet.matrix
+--- Deskmates.matrix
 --- Variable
 --- Slash commands or skills whose turns show the coder with Matrix rain on its monitor, without the slash.
 obj.matrix = {}
 
---- ClaudePuppet.pingpong
+--- Deskmates.pingpong
 --- Variable
 --- Slash commands or skills whose turns show ping pong, without the slash.
 obj.pingpong = {}
 
---- ClaudePuppet.conversation
+--- Deskmates.conversation
 --- Variable
 --- What the main conversation shows (any turn whose command is on no list):
 --- "coder", "matrix", "auto" (ping pong while subagents run, coder otherwise) or "off".
 --- These four are the starting choice; once you change them in the menu bar, that choice is kept instead.
 obj.conversation = "auto"
 
---- ClaudePuppet.pixel
+--- Deskmates.pixel
 --- Variable
 --- Size of one puppet pixel, in screen points.
 obj.pixel = 4
 
---- ClaudePuppet.eventsFile
+--- Deskmates.eventsFile
 --- Variable
 --- The file the agent hooks append events to.
-obj.eventsFile = os.getenv("HOME") .. "/.claude-puppet/events"
+obj.eventsFile = os.getenv("HOME") .. "/.deskmates/events"
 
 -- Applies one events-file line; bubbles are skipped while replaying history.
 function obj:handle(line)
@@ -79,7 +79,7 @@ function obj:handle(line)
   for _, intent in ipairs(intents) do self:say(intent.key, intent.text, intent.seconds) end
 end
 
---- ClaudePuppet:say(key, text, seconds)
+--- Deskmates:say(key, text, seconds)
 --- Method
 --- Shows a speech bubble above a session's puppet; it stays until the next event, or for `seconds` when given.
 function obj:say(key, text, seconds)
@@ -119,7 +119,7 @@ function obj:refreshTabs()
   if self.iterm:refresh() then self.sessions:closeMissing(self.iterm.tabs) end
 end
 
---- ClaudePuppet:focus(key)
+--- Deskmates:focus(key)
 --- Method
 --- Brings forward the window running a session, as its harness knows how.
 function obj:focus(key)
@@ -235,7 +235,7 @@ function obj:showIcon()
   self.menu:setTitle(icon)
 end
 
---- ClaudePuppet:toggle()
+--- Deskmates:toggle()
 --- Method
 --- Hides the puppets, or shows them again; Hammerspoon remembers which across restarts.
 function obj:toggle()
@@ -244,19 +244,20 @@ function obj:toggle()
   self:showIcon()
 end
 
---- ClaudePuppet:bindHotkeys(mapping)
+--- Deskmates:bindHotkeys(mapping)
 --- Method
 --- Binds keys to the Spoon's actions; `toggle` hides or shows the puppets.
---- Example: `spoon.ClaudePuppet:bindHotkeys({ toggle = { { "ctrl", "alt", "cmd" }, "p" } })`
+--- Example: `spoon.Deskmates:bindHotkeys({ toggle = { { "ctrl", "alt", "cmd" }, "p" } })`
 function obj:bindHotkeys(mapping)
   hs.spoons.bindHotkeysToSpec({ toggle = function() self:toggle() end }, mapping)
   return self
 end
 
---- ClaudePuppet:start()
+--- Deskmates:start()
 --- Method
 --- Shows the puppets and starts following the agents' events.
 function obj:start()
+  config.carryOverSettings(hs.settings)
   local anchor = hs.settings.get(config.POSITION_KEY) or self:defaultPosition()
   if not self:isOnAScreen(anchor) then anchor = self:defaultPosition() end
   self.stage = Stage.new({
@@ -282,7 +283,7 @@ function obj:start()
 
   if hs.settings.get(config.HIDDEN_KEY) then self.stage:toggle() end
   -- Named, so macOS keeps the place you ⌘-drag the icon to (out from behind the notch, say).
-  self.menu = hs.menubar.new(true, "ClaudePuppet")
+  self.menu = hs.menubar.new(true, "Deskmates")
   self:showIcon()
   self.menu:setMenu(function() return menuItems(self) end)
 
@@ -296,7 +297,7 @@ function obj:start()
   return self
 end
 
---- ClaudePuppet:stop()
+--- Deskmates:stop()
 --- Method
 --- Hides the puppets and stops following events.
 function obj:stop()

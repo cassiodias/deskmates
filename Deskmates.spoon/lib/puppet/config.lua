@@ -1,6 +1,6 @@
 -- Sizes, timings and colours shared by every part of the Spoon.
 
-return {
+local config = {
   W = 48, -- a puppet's drawing, in puppet pixels
   H = 24,
   STATUS_H = 3, -- the status line under the drawing
@@ -11,9 +11,9 @@ return {
   GAP = 12,
   CLICK_DISTANCE = 4,
   TABS_SECONDS = 3,
-  POSITION_KEY = "ClaudePuppet.position",
-  CHOICE_KEY = "ClaudePuppet.choice",
-  HIDDEN_KEY = "ClaudePuppet.hidden",
+  POSITION_KEY = "Deskmates.position",
+  CHOICE_KEY = "Deskmates.choice",
+  HIDDEN_KEY = "Deskmates.hidden",
   COLORS = {
     c = { hex = "#D97757" }, -- the puppet; replaced by each puppet's own colour
     d = { hex = "#8C8C8C" }, -- a puppet whose subagent is done
@@ -32,3 +32,17 @@ return {
     r = { hex = "#E5534B" }, -- tests failed
   },
 }
+
+-- Settings saved under the old name move to the new one once; a value already saved under the new name wins.
+function config.carryOverSettings(settings)
+  for _, name in ipairs({ "choice", "position", "hidden" }) do
+    local old, new = "ClaudePuppet." .. name, "Deskmates." .. name
+    local value = settings.get(old)
+    if value ~= nil then
+      if settings.get(new) == nil then settings.set(new, value) end
+      settings.clear(old)
+    end
+  end
+end
+
+return config

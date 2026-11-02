@@ -7,9 +7,9 @@ work=$(mktemp -d)
 for payload in harnesses/*/fixtures/*.json; do
   harness=$(echo "$payload" | cut -d/ -f2)
   expected="${payload%.json}.line"
-  rm -rf "$work/.claude-puppet"
+  rm -rf "$work/.deskmates"
   HOME="$work" PUPPET_NOW=0 PUPPET_TTY=/dev/ttys009 TERM_PROGRAM=iTerm.app "harnesses/$harness/translate.sh" < "$payload"
-  got=$(cut -d'|' -f2- "$work/.claude-puppet/events" 2>/dev/null)
+  got=$(cut -d'|' -f2- "$work/.deskmates/events" 2>/dev/null)
   if [ "$got" != "$(cat "$expected")" ]; then
     echo "harness $harness: $(basename "$payload") wrote"
     echo "  $got"

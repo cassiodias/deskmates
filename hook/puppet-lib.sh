@@ -1,12 +1,12 @@
 # Shared by every harness translator (harnesses/<id>/translate.sh sources it). It reads the agent's JSON
 # payload and writes the one line per event the puppets read. The line format lives here and in
-# ClaudePuppet.spoon/lib/puppet/events/parse.lua only:
+# Deskmates.spoon/lib/puppet/events/parse.lua only:
 #   time|event|session|agent id|tool|agent type|text|folder|terminal app|flag|tty|harness|title
 # Kept from an agent: a prompt's leading /command, a skill's name, a notification, the first sentence of the
 # agent's reply, and what the agent itself wrote to name the work: the session's title and a subagent's short
 # description. Never prompts, commands or code. Tests set PUPPET_NOW and PUPPET_TTY to make lines repeatable.
 
-PUPPET_DIR="$HOME/.claude-puppet"
+PUPPET_DIR="$HOME/.deskmates"
 PUPPET_EVENTS="$PUPPET_DIR/events"
 
 # Reads the payload from stdin once; field and first_sentence read from it.

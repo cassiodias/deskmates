@@ -21,7 +21,7 @@ smile() {
   # Waits for the moment the puppets turn to smile (frames 68-79 of every 80).
   i=0
   while [ $i -lt 100 ]; do
-    f=$(hsq 'return spoon.ClaudePuppet.frame % 80')
+    f=$(hsq 'return spoon.Deskmates.frame % 80')
     [ "$f" -ge 70 ] && [ "$f" -le 75 ] && break
     wait 0.1; i=$((i + 1))
   done

@@ -2,7 +2,7 @@
 -- no real agent.
 
 local root = arg[0]:match("^(.*)/tests/") or "."
-package.path = root .. "/ClaudePuppet.spoon/lib/?.lua;" .. root .. "/ClaudePuppet.spoon/lib/?/init.lua;" .. package.path
+package.path = root .. "/Deskmates.spoon/lib/?.lua;" .. root .. "/Deskmates.spoon/lib/?/init.lua;" .. package.path
 local check = dofile(root .. "/tests/support/check.lua")
 local Sessions = require("puppet.model.sessions")
 local Mapping = require("puppet.model.mapping")

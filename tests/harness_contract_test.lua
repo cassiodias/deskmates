@@ -1,7 +1,7 @@
 -- Every Spoon-side harness keeps the contract in docs/architecture.md, and has a hook side with fixtures.
 
 local root = arg[0]:match("^(.*)/tests/") or "."
-package.path = root .. "/ClaudePuppet.spoon/lib/?.lua;" .. root .. "/ClaudePuppet.spoon/lib/?/init.lua;" .. package.path
+package.path = root .. "/Deskmates.spoon/lib/?.lua;" .. root .. "/Deskmates.spoon/lib/?/init.lua;" .. package.path
 local check = dofile(root .. "/tests/support/check.lua")
 local harnesses = require("puppet.harnesses")
 

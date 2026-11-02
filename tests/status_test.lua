@@ -1,7 +1,7 @@
 -- The status texts: the line under the name tag and the card shown when the mouse rests on a puppet.
 
 local root = arg[0]:match("^(.*)/tests/") or "."
-package.path = root .. "/ClaudePuppet.spoon/lib/?.lua;" .. root .. "/ClaudePuppet.spoon/lib/?/init.lua;" .. package.path
+package.path = root .. "/Deskmates.spoon/lib/?.lua;" .. root .. "/Deskmates.spoon/lib/?/init.lua;" .. package.path
 local check = dofile(root .. "/tests/support/check.lua")
 local status = require("puppet.model.status")
 
