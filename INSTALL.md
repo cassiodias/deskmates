@@ -27,11 +27,12 @@ This puts the source in `~/.claude-puppet/src` and links Hammerspoon's `~/.hamme
 ```sh
 grep -qs 'ClaudePuppet' ~/.hammerspoon/init.lua || cat >> ~/.hammerspoon/init.lua <<'LUA'
 hs.loadSpoon("ClaudePuppet")
+spoon.ClaudePuppet:bindHotkeys({ toggle = { { "ctrl", "alt", "cmd" }, "p" } })
 spoon.ClaudePuppet:start()
 LUA
 ```
 
-This adds two lines to `~/.hammerspoon/init.lua` (Hammerspoon's config, created if you have none), unless they are there already. Anything else in that file stays.
+This adds three lines to `~/.hammerspoon/init.lua` (Hammerspoon's config, created if you have none), unless they are there already. Anything else in that file stays.
 
 ## 4. Connect Claude Code
 
@@ -89,7 +90,9 @@ Move to <each of your screens>
 
 A turn plays from when you type a listed command, or from when Claude calls a listed skill. Changes apply at once to every tab, and Hammerspoon keeps them across restarts.
 
-Menu bar icon hidden behind the notch? **Option-click any puppet** to open the same menu.
+Menu bar icon hidden behind the notch? Hold ⌘ and drag it to the right of the notch; macOS keeps it there. Or **Option-click any puppet** to open the same menu.
+
+**Hide puppets** (or ⌃⌥⌘P) takes every puppet off the screen until you show them again, even after a restart; the `▟▙` icon dims meanwhile. To use other keys, change the `bindHotkeys` line in `~/.hammerspoon/init.lua`.
 
 If you prefer a file, set the starting choice in `~/.hammerspoon/init.lua`, before the `start()` line. Once you change the choice in the menu, the menu's choice is used instead:
 
@@ -132,9 +135,10 @@ jq '.hooks |= ((. // {}) | with_entries(.value |= map(select(all(.hooks[]; .comm
 rm -rf ~/.hammerspoon/Spoons/ClaudePuppet.spoon ~/.claude-puppet
 defaults delete org.hammerspoon.Hammerspoon ClaudePuppet.choice 2>/dev/null
 defaults delete org.hammerspoon.Hammerspoon ClaudePuppet.position 2>/dev/null
+defaults delete org.hammerspoon.Hammerspoon ClaudePuppet.hidden 2>/dev/null
 ```
 
-This removes the puppet's hooks from your Claude Code settings (keeping a backup), its files and the link in `~/.hammerspoon/Spoons`, and the menu choices and position Hammerspoon kept for it. Then delete the two `ClaudePuppet` lines from `~/.hammerspoon/init.lua` and click **Reload Config**.
+This removes the puppet's hooks from your Claude Code settings (keeping a backup), its files and the link in `~/.hammerspoon/Spoons`, and the menu choices, position and hidden state Hammerspoon kept for it. Then delete the three `ClaudePuppet` lines from `~/.hammerspoon/init.lua` and click **Reload Config**.
 
 Hammerspoon itself stays: `brew uninstall --cask hammerspoon` removes it, and you can turn its Accessibility and Automation switches off in System Settings.
 

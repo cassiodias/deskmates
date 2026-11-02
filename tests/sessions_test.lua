@@ -112,4 +112,34 @@ said("UserPromptSubmit", { text = "/build" })
 said("SubagentStart", { agentId = "a4", agentType = "lens" })
 check("a new turn forgets descriptions queued in the last one", named.all.s1.agents.a4.label == "lens")
 
+-- Terminal tabs: a closed tab takes its puppet away, and so does having no tab at all while resting.
+local tabbed = Sessions.new(100)
+local function tab(sid, name, fields)
+  fields = fields or {}
+  fields.session = sid
+  return tabbed:apply(event(name, fields), { mapping = mapping, harness = fake, frame = 1, now = 100 })
+end
+local function onStage(sid)
+  for _, key in ipairs(tabbed:stageKeys(100)) do if key == sid then return true end end
+  return false
+end
+tab("here", "UserPromptSubmit", { text = "/build", tty = "/dev/ttys002", app = "iTerm.app" })
+tab("ghost", "UserPromptSubmit", { text = "/build", tty = "/dev/ttys001" })
+tab("other", "UserPromptSubmit", { text = "/build", tty = "/dev/ttys009", app = "Apple_Terminal" })
+tabbed:closeMissing({ ["/dev/ttys002"] = { window = 1, tab = 1 } })
+check("a working session with no tab still plays", onStage("ghost"))
+tab("ghost", "Stop", { text = "Done." })
+tab("here", "Stop", { text = "Done." })
+tab("other", "Stop", { text = "Done." })
+tabbed:closeMissing({ ["/dev/ttys002"] = { window = 1, tab = 1 } })
+check("a resting session never seen in a tab leaves", not onStage("ghost"))
+check("a resting session in its tab stays at its desk", onStage("here"))
+check("another terminal's session is not judged by iTerm's tabs", onStage("other"))
+tab("ghost", "UserPromptSubmit", { text = "/build" })
+check("the tabless session comes back when it works again", onStage("ghost"))
+tabbed:closeMissing({})
+check("a session whose tab closed leaves", not onStage("here"))
+tabbed:closeMissing({ ["/dev/ttys002"] = { window = 1, tab = 1 } })
+check("and stays gone when another tab takes its terminal", not onStage("here"))
+
 check.done("sessions")

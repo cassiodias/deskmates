@@ -177,7 +177,28 @@ P:stop()
 local again = load()
 again:start()
 stub.advance(0.2)
-snapshot(again, "after a restart, replayed from the events file")
+snapshot(again, "after a restart, replayed from the events file: tab1, whose tab closed, stays gone")
+
+-- Hiding the puppets lasts across a restart, and the menu bar icon dims meanwhile.
+local function iconLook()
+  stub.styled = {}
+  return stub.icon.text .. (stub.icon.style and " dimmed" or "")
+end
+local function shownPuppets(P)
+  local n = 0
+  for _, key in ipairs(P.stage.keys) do if P.stage.puppets[key].canvas:isShowing() then n = n + 1 end end
+  return n
+end
+again:toggle()
+line("== hidden: " .. shownPuppets(again) .. " puppets showing, icon " .. iconLook())
+again:stop()
+local hidden = load()
+hidden:start()
+stub.advance(0.2)
+line("== hidden after a restart: " .. shownPuppets(hidden) .. " puppets showing, icon " .. iconLook())
+hidden:toggle()
+stub.advance(0.2)
+line("== shown again: " .. shownPuppets(hidden) .. " puppets showing, icon " .. iconLook())
 
 os.remove(eventsFile)
 

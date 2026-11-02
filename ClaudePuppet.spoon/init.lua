@@ -30,7 +30,7 @@ local obj = {}
 obj.__index = obj
 
 obj.name = "ClaudePuppet"
-obj.version = "0.10.0"
+obj.version = "0.11.0"
 obj.author = "Cassio Dias"
 obj.license = "MIT - https://opensource.org/licenses/MIT"
 obj.homepage = "https://github.com/cassiodias/claude-puppet-overlay"
@@ -228,8 +228,29 @@ function obj:moveToCorner(screen)
   self:layout()
 end
 
+-- The menu bar icon, dimmed while the puppets are hidden.
+function obj:showIcon()
+  local icon = "▟▙"
+  if not self.stage.isShown then icon = hs.styledtext.new(icon, { color = { white = 0.5, alpha = 0.5 } }) end
+  self.menu:setTitle(icon)
+end
+
+--- ClaudePuppet:toggle()
+--- Method
+--- Hides the puppets, or shows them again; Hammerspoon remembers which across restarts.
 function obj:toggle()
   self.stage:toggle()
+  hs.settings.set(config.HIDDEN_KEY, not self.stage.isShown)
+  self:showIcon()
+end
+
+--- ClaudePuppet:bindHotkeys(mapping)
+--- Method
+--- Binds keys to the Spoon's actions; `toggle` hides or shows the puppets.
+--- Example: `spoon.ClaudePuppet:bindHotkeys({ toggle = { { "ctrl", "alt", "cmd" }, "p" } })`
+function obj:bindHotkeys(mapping)
+  hs.spoons.bindHotkeysToSpec({ toggle = function() self:toggle() end }, mapping)
+  return self
 end
 
 --- ClaudePuppet:start()
@@ -259,8 +280,10 @@ function obj:start()
   self.reader:read(function(line) self:handle(line) end)
   self.replayFrom = nil
 
-  self.menu = hs.menubar.new()
-  self.menu:setTitle("▟▙")
+  if hs.settings.get(config.HIDDEN_KEY) then self.stage:toggle() end
+  -- Named, so macOS keeps the place you ⌘-drag the icon to (out from behind the notch, say).
+  self.menu = hs.menubar.new(true, "ClaudePuppet")
+  self:showIcon()
   self.menu:setMenu(function() return menuItems(self) end)
 
   self.timer = hs.timer.doEvery(1 / config.FPS, function()

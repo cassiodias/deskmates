@@ -13,6 +13,7 @@ return {
   TABS_SECONDS = 3,
   POSITION_KEY = "ClaudePuppet.position",
   CHOICE_KEY = "ClaudePuppet.choice",
+  HIDDEN_KEY = "ClaudePuppet.hidden",
   COLORS = {
     c = { hex = "#D97757" }, -- the puppet; replaced by each puppet's own colour
     d = { hex = "#8C8C8C" }, -- a puppet whose subagent is done

@@ -970,34 +970,8 @@
   |            g                      g            |
   |            g                      g            |
   texts: ✓ 1 Check the contract / 1 Try to break it / qa CON-1 · tab 1 / app · <1m
-== after a restart, replayed from the events file
-  puppet 1: tab1 at 1208,752 colour #D97757 bubble: -
-  |                                                |
-  |                 gggggggggggggggggggggggggggggg |
-  |                 g::::::::::::::::::::::::::::g |
-  |                 g::::::::::::::::::::::::::::g |
-  |                 g::::::::::::::::::::::::::::g |
-  |                 g::::::::::::::::::::::::::::g |
-  |                 g::::::::::::::::::::::::::::g |
-  |                 g::::::::::::::::::::::::::::g |
-  |                 g::::::::::::::::::::::::::::g |
-  |                 g::::::::::::::::::::::::::::g |
-  |   ccccc         g::::::::::::::::::::::::::::g |
-  |  ccccccc     g  g::::::::::::::::::::::::::::g |
-  |  cccccck     g  g::::::::::::::::::::::::::::g |
-  |  cccccck     g  g::::::::::::::::::::::::::::g |
-  |  ccccccc     g  g::::::::::::::::::::::::::::g |
-  |  ccccccc     g  g::::::::::::::::::::::::::::g |
-  |  ccccccc     g  g::::::::::::::::::::::::::::g |
-  |  cccccccgggggg  g::::::::::::::::::::::::::::g |
-  |  ccccccc        gggggggggggggggggggggggggggggg |
-  |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
-  |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
-  |  bb                                        bb  |
-  |  bb                                        bb  |
-  |  bb                                        bb  |
-  texts: z / dev-skill CON-1 / app · idle <1m
-  puppet 2: tab2 at 1004,752 colour #5B8DEF bubble: -
+== after a restart, replayed from the events file: tab1, whose tab closed, stays gone
+  puppet 1: tab2 at 1208,752 colour #D97757 bubble: -
   |                                                |
   |                                                |
   |                                                |
@@ -1011,11 +985,11 @@
   |                                                |
   |                                                |
   |                                                |
-  | ddddddd      w                       w uuuuuuu |
-  | dkddddk                w             w ukuuuuk |
-  |ddddddddd               w             wuuuuuuuuu|
-  | ddddddd                w               uuuuuuu |
-  | d d d d  tttttttttttttttttttttttttttt  u u u u |
+  | ddddddd      w                       w ccccccc |
+  | dkddddk                w             w ckcccck |
+  |ddddddddd               w             wccccccccc|
+  | ddddddd                w               ccccccc |
+  | d d d d  tttttttttttttttttttttttttttt  c c c c |
   |          tttttttttttttttttttttttttttt          |
   |            g                      g            |
   |            g                      g            |
@@ -1023,3 +997,6 @@
   |            g                      g            |
   |            g                      g            |
   texts: ✓ 1 Check the contract / 1 Try to break it / qa CON-1 · tab 1 / app · <1m
+== hidden: 0 puppets showing, icon ▟▙ dimmed
+== hidden after a restart: 0 puppets showing, icon ▟▙ dimmed
+== shown again: 1 puppets showing, icon ▟▙

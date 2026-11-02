@@ -21,6 +21,10 @@ local function liveAgents(s)
   return live
 end
 
+local function isAtRest(s)
+  return not s.isWorking and s.mood == nil and liveAgents(s) == 0
+end
+
 -- A session playing now gets a puppet, which it keeps until it leaves the stage.
 local function markPlayed(s)
   if s.isListed and (s.isWorking or s.mood ~= nil or liveAgents(s) > 0) then s.hasPlayed = true end
@@ -38,11 +42,12 @@ function Sessions.sceneFor(s, mapping)
 end
 
 -- The sessions with a puppet, oldest first: one that has played keeps it until it ends, its terminal tab
--- closes, or it has been silent for hours. With none, the home puppet.
+-- closes, it rests with no tab, or it has been silent for hours. With none, the home puppet.
 function Sessions:stageKeys(now)
   local keys = {}
   for sid, s in pairs(self.all) do
-    if s.hasPlayed and not s.isClosed and now - s.seenAt < config.STALE_SECONDS then keys[#keys + 1] = sid end
+    local isGone = s.isClosed or (s.isAway and isAtRest(s)) or now - s.seenAt >= config.STALE_SECONDS
+    if s.hasPlayed and not isGone then keys[#keys + 1] = sid end
   end
   table.sort(keys, function(a, b) return self.all[a].joinedAt < self.all[b].joinedAt end)
   if #keys == 0 then keys = { "home" } end
@@ -57,11 +62,20 @@ function Sessions:remap(mapping)
   end
 end
 
--- A session whose terminal tab was there and is gone was closed without saying so.
+-- Sessions iTerm should hold: those it ran in, and those with no terminal app at all (run in the background).
+local function wantsItermTab(s)
+  return s.app == nil or s.app == "" or s.app == "iTerm.app"
+end
+
+-- Given the terminal tabs iTerm holds now: a session whose tab was there and is gone was closed without saying
+-- so. One never seen in a tab (closed before Hammerspoon started, or a background session) is away while it
+-- rests: no tab to jump to, nothing to show; it comes back when it works again.
 function Sessions:closeMissing(tabs)
   for _, s in pairs(self.all) do
-    if s.tty and tabs[s.tty] then s.wasInTab = true end
-    if s.tty and s.wasInTab and not tabs[s.tty] then s.isClosed = true end
+    local inTab = s.tty and tabs[s.tty]
+    if inTab then s.wasInTab = true end
+    if s.tty and s.wasInTab and not inTab then s.isClosed = true end
+    s.isAway = not inTab and not s.wasInTab and wantsItermTab(s)
   end
 end
 

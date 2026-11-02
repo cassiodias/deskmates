@@ -32,11 +32,12 @@ Claude puppets that float over your Mac desktop, like the old Office paperclip, 
 | ![Three puppets dozing at their desks, monitors off](docs/images/3-desks-sleeping.png) | **Between turns.** Each puppet rests at its desk, monitor off, and dozes off. |
 | ![A single puppet waiting on an empty table](docs/images/big-desk.png) | **Nothing running.** One puppet waits at home. |
 
-- **One puppet per session:** with one tab coding and another reviewing, two puppets sit side by side, each in its own colour, with a name tag (the command you ran, or the project folder), its own scene and its own bubble. Between turns a puppet rests at its desk with the monitor off, and dozes; it leaves when its session ends or its iTerm tab closes. With no session on stage, one puppet waits at home.
+- **One puppet per session:** with one tab coding and another reviewing, two puppets sit side by side, each in its own colour, with a name tag (the command you ran, or the project folder), its own scene and its own bubble. Between turns a puppet rests at its desk with the monitor off, and dozes; it leaves when its session ends or its iTerm tab closes (a session running in no iTerm tab leaves when it rests). With no session on stage, one puppet waits at home.
 - **Choose what plays** from the `▟▙` menu bar icon (or Option-click a puppet): list `my-coding-skill` under Coder, `my-planner` under Matrix and `my-reviewer` under Ping pong, and set the main conversation to Coder, Matrix, auto or Off. Each tab's puppet follows the command that tab runs.
 - **See where each one is:** under the name tag, a short line gives the project folder and how long the puppet has been at it (`my-app · 32m`, `idle 12m`, `waiting 3m`). Rest the mouse on a puppet for a card with the rest: the session's title (as Claude Code names it), its folder and tab, the command and what it is doing, its subagents (by their task while working, and how many are done), its tool calls and the last tool, and the first sentence of its last reply.
 - **Click a puppet** (or its bubble) to jump to the terminal running that session. In iTerm2 it selects the exact window and tab, and the tab number is written under the puppet's table (`tab 3`, or `window 2 · tab 3` with several windows).
 - **Drag any puppet** to move the whole row, across screens too; it stays on top of every app and every desktop. The `▟▙` menu bar icon sends the row to the corner of any screen, and puppets left on a screen you unplug come back to the main one.
+- **Hide them** from the `▟▙` menu, or with ⌃⌥⌘P; they stay hidden until you show them again, even after a restart.
 
 It is two small pieces: a hook that writes one line per agent event to `~/.claude-puppet/events`, and a [Hammerspoon](https://www.hammerspoon.org) Spoon that reads them and draws the puppets. Claude Code is the first agent it supports; each agent is a separate *harness*, so Codex, Cursor, OpenCode and others can be added (see [Contributing](CONTRIBUTING.md)). Nothing leaves your machine. From your prompts it keeps only a leading `/command`; from Claude's answers, only the first sentence; otherwise the tool names, the project folder's name and the terminal tab; never commands or code.
 
@@ -46,7 +47,7 @@ It is two small pieces: a hook that writes one line per agent event to `~/.claud
 
 - installs Hammerspoon, a free macOS automation app (Homebrew);
 - adds `~/.claude-puppet/` (the source and the events file) and links `~/.hammerspoon/Spoons/ClaudePuppet.spoon` to it;
-- adds two lines to `~/.hammerspoon/init.lua`;
+- adds three lines to `~/.hammerspoon/init.lua`;
 - adds the puppet's hook to `~/.claude/settings.json`, after saving a backup, keeping your other settings and hooks;
 - asks you to allow Hammerspoon in **Accessibility** (to drag and click the puppets) and, with iTerm2, **Automation** (to show and select each session's tab), and to start it at login.
 

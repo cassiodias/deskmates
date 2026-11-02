@@ -2,7 +2,7 @@
 -- so the Spoon runs under plain Lua 5.4 with a clock and timers the test moves by hand.
 
 local stub = { canvases = {}, timers = {}, settings = {}, focused = nil, selected = nil, clock = 1000000,
-  mouse = { x = 0, y = 0 } }
+  mouse = { x = 0, y = 0 }, styled = {} }
 
 local function canvas(frame)
   local c = { frame_ = frame, shown = false, elements = {}, deleted = false }
@@ -57,7 +57,9 @@ hs = {
   menubar = {
     new = function()
       return {
-        setTitle = function() end,
+        setTitle = function(_, title)
+          stub.icon = { text = title, style = stub.styled.text == title and stub.styled.style or nil }
+        end,
         setMenu = function(_, fn) stub.menu = fn end,
         popupMenu = function() end,
         delete = function() end,
@@ -93,7 +95,10 @@ hs = {
       return true, stub.tabs:find(tty .. "=", 1, true) ~= nil
     end,
   },
-  styledtext = { new = function(text) return text end },
+  styledtext = { new = function(text, style)
+    stub.styled = { text = text, style = style }
+    return text
+  end },
   mouse = { absolutePosition = function() return { x = stub.mouse.x, y = stub.mouse.y } end },
   eventtap = {
     event = { types = { leftMouseDragged = 6, leftMouseUp = 2 } },
