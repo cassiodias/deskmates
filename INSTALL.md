@@ -85,7 +85,7 @@ Main conversation:
 Move to <each of your screens>
 ```
 
-- **Coder**, **Matrix** and **Ping pong:** click one, and type the slash commands or skills whose turns show that animation, comma separated, with or without the slash. A command is on one list only: adding it to one takes it off the others.
+- **Coder**, **Matrix** and **Ping pong:** click one, and type the slash commands or skills whose turns show that animation, comma separated, with or without the slash. A command is on one list only: adding it to one takes it off the others. A ping pong turn goes back to the coder once all its subagents are done and Claude carries on alone.
 - **Main conversation:** every other turn, like chatting with Claude, or a command on neither list. **Off** keeps those turns quiet, so only your listed commands get a puppet.
 
 A turn plays from when you type a listed command, or from when Claude calls a listed skill. Changes apply at once to every tab, and Hammerspoon keeps them across restarts.

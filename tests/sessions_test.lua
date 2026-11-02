@@ -67,6 +67,13 @@ on("SubagentStop", { agentId = "a1" })
 check("a prompt while subagents run keeps the command", busy.all.s1.command == "review")
 check("and its subagents", #busy.all.s1.order == 2)
 check("so ping pong goes on", Sessions.sceneFor(busy.all.s1, mapping) == "pingpong")
+on("SubagentStop", { agentId = "a2" })
+check("once every subagent is done, the main conversation codes", Sessions.sceneFor(busy.all.s1, mapping) == "code")
+on("UserPromptSubmit", { text = "/review" })
+check("a ping pong turn plays before its first subagent starts", Sessions.sceneFor(busy.all.s1, mapping) == "pingpong")
+on("SubagentStart", { agentId = "a3", agentType = "lens" })
+on("SubagentStop", { agentId = "a3" })
+check("and goes back to coding when its only subagent is done", Sessions.sceneFor(busy.all.s1, mapping) == "code")
 on("UserPromptSubmit", { text = "/build" })
 check("a new /command always wins", busy.all.s1.command == "build" and #busy.all.s1.order == 0)
 
@@ -119,8 +126,8 @@ local function tab(sid, name, fields)
   fields.session = sid
   return tabbed:apply(event(name, fields), { mapping = mapping, harness = fake, frame = 1, now = 100 })
 end
-local function onStage(sid)
-  for _, key in ipairs(tabbed:stageKeys(100)) do if key == sid then return true end end
+local function onStage(sid, now)
+  for _, key in ipairs(tabbed:stageKeys(now or 160)) do if key == sid then return true end end
   return false
 end
 tab("here", "UserPromptSubmit", { text = "/build", tty = "/dev/ttys002", app = "iTerm.app" })
@@ -132,7 +139,8 @@ tab("ghost", "Stop", { text = "Done." })
 tab("here", "Stop", { text = "Done." })
 tab("other", "Stop", { text = "Done." })
 tabbed:closeMissing({ ["/dev/ttys002"] = { window = 1, tab = 1 } })
-check("a resting session never seen in a tab leaves", not onStage("ghost"))
+check("a session with no tab stays to say what it did", onStage("ghost", 100))
+check("then, resting, leaves", not onStage("ghost"))
 check("a resting session in its tab stays at its desk", onStage("here"))
 check("another terminal's session is not judged by iTerm's tabs", onStage("other"))
 tab("ghost", "UserPromptSubmit", { text = "/build" })

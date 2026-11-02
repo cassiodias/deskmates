@@ -37,7 +37,10 @@ function Sessions.sceneFor(s, mapping)
   if s.mood == "asking" or s.mood == "permission" then return "code" end
   if not (s.isWorking or live > 0) then return "rest" end
   local choice = mapping:choiceFor(s.command)
-  if choice == "pingpong" or (choice == "auto" and #s.order >= 2 and live > 0) then return "pingpong" end
+  -- Once every subagent the turn started is done, the main conversation carries on at the laptop: no rally
+  -- between players who have left the table.
+  if choice == "pingpong" and (#s.order == 0 or live > 0) then return "pingpong" end
+  if choice == "auto" and #s.order >= 2 and live > 0 then return "pingpong" end
   return "code"
 end
 
@@ -46,7 +49,9 @@ end
 function Sessions:stageKeys(now)
   local keys = {}
   for sid, s in pairs(self.all) do
-    local isGone = s.isClosed or (s.isAway and isAtRest(s)) or now - s.seenAt >= config.STALE_SECONDS
+    -- A session away from any tab first says what it did, then leaves.
+    local isResting = isAtRest(s) and now - s.seenAt >= config.DONE_SECONDS
+    local isGone = s.isClosed or (s.isAway and isResting) or now - s.seenAt >= config.STALE_SECONDS
     if s.hasPlayed and not isGone then keys[#keys + 1] = sid end
   end
   table.sort(keys, function(a, b) return self.all[a].joinedAt < self.all[b].joinedAt end)
