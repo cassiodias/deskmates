@@ -67,7 +67,9 @@ Use `claude` as the example; each part is small.
      `~/.claude-puppet/src/harnesses/<agent>/translate.sh`.
    - `fixtures/`: real payloads, ideally from a live run of the agent, and the line each must produce.
 2. **Spoon side**, `ClaudePuppet.spoon/lib/puppet/harnesses/<agent>.lua`: `id`, `name`, `capabilities`,
-   `character.palette`, `toolKind(tool)` and `focus(session, terminals)`; then add it to `harnesses/init.lua`.
+   `character.body` and `character.palette`, `toolKind(tool)` and `focus(session, terminals)`; then add it to
+   `harnesses/init.lua`. The body is one of `BODIES` in `render/sprites.lua` (`claude`, `owl`, `cat`), or a new one
+   drawn there in the same four poses and sizes: each agent gets its own creature and colours, never a logo.
 3. **Install steps** in INSTALL.md: where the agent's hooks file lives and how to merge `hooks.json` into it.
 4. Run `tests/run.sh`.
 

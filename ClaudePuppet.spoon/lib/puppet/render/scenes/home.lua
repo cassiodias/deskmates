@@ -12,11 +12,14 @@ return {
     fill(buf, 0, 19, W - 1, 20, "b")
     fill(buf, 2, 21, 3, H - 1, "b")
     fill(buf, W - 4, 21, W - 3, H - 1, "b")
+    local body = sprites.body(ctx.harness)
     local isAsleep = ctx.now - ctx.lastEventAt > config.IDLE_SLEEP_SECONDS
-    stamp(buf, isAsleep and sprites.FRONT_ASLEEP or sprites.FRONT, 19, 14)
+    -- Standing on the desk, however tall the body is.
+    local top = 19 - #body.FRONT
+    stamp(buf, isAsleep and body.FRONT_ASLEEP or body.FRONT, 19, top)
     if isAsleep then
       local rise = (ctx.frame // 5) % 4
-      texts[#texts + 1] = label("z", 29 + rise, 11 - rise, 4, "left", ctx.pixel)
+      texts[#texts + 1] = label("z", 29 + rise, top - 3 - rise, 4, "left", ctx.pixel)
     end
   end,
 }

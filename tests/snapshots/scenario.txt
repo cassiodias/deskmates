@@ -45,7 +45,7 @@
   |  cccccccc    g  g:::::c::::::::::::::::::::::g |
   |  ccccccc     g  g:::ccccc::::::::::::::::::::g |
   |  cccccccgggggg  g::::::::::::::::::::::::::::g |
-  |  ccccccc        gggggggggggggggggggggggggggggg |
+  |  c c c c        gggggggggggggggggggggggggggggg |
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |  bb                                        bb  |
@@ -72,7 +72,7 @@
   |  ccccccc     g  g::::::::::::::::c:::::::::::g |
   |  ccccccccc   g  g::::::::::::::ccccc:::::::::g |
   |  cccccccgggggg  g::::::::::::::::::::::::::::g |
-  |  ccccccc        gggggggggggggggggggggggggggggg |
+  |  c c c c        gggggggggggggggggggggggggggggg |
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |  bb                                        bb  |
@@ -99,7 +99,7 @@
   |  ccccccc     g  g:::::::::c::::::::::::::::::g |
   |  ccccccccc   g  g:::::::ccccc::::::::::::::::g |
   |  cccccccgggggg  g::::::::::::::::::::::::::::g |
-  |  ccccccc        gggggggggggggggggggggggggggggg |
+  |  c c c c        gggggggggggggggggggggggggggggg |
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |  bb                                        bb  |
@@ -126,7 +126,7 @@
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  ccccccccc   g  g::::::::::::::::::::::::::::g |
   |  cccccccgggggg  g::::::::::::::::::::::::::::g |
-  |  ccccccc        gggggggggggggggggggggggggggggg |
+  |  c c c c        gggggggggggggggggggggggggggggg |
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |  bb                                        bb  |
@@ -153,7 +153,7 @@
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  cccccccgggggg  g::::::::::::::::::::::::::::g |
-  |  ccccccc        gggggggggggggggggggggggggggggg |
+  |  c c c c        gggggggggggggggggggggggggggggg |
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |  bb                                        bb  |
@@ -180,7 +180,7 @@
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  cccccccgggggg  g::::::::::::::::::::::::::::g |
-  |  ccccccc        gggggggggggggggggggggggggggggg |
+  |  c c c c        gggggggggggggggggggggggggggggg |
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |  bb                                        bb  |
@@ -207,7 +207,7 @@
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  cccccccgggggg  g::::::::::::::::::::::::::::g |
-  |  ccccccc        gggggggggggggggggggggggggggggg |
+  |  c c c c        gggggggggggggggggggggggggggggg |
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |  bb                                        bb  |
@@ -218,23 +218,23 @@
   puppet 1: tab1 at 1208,752 colour #D97757 bubble: I have a question for you
   |                                                |
   |                 gggggggggggggggggggggggggggggg |
-  |                 g::::::::::::::::::::::::::::g |
-  |                 g::::::::::::::::::::::::::::g |
-  |        ccc      g::::::::::::::::::::::::::::g |
-  |        ccc      g::::::::::::::::::::::::::::g |
-  |         c       g::::::::::::::::::::::::::::g |
-  |         c       g:::::::::::x:::x::::::::::::g |
-  |         c       g::::::::::::x:x:::::::::::::g |
-  |         c       g:::::::::::::x::::::::::::::g |
-  |   ccccc c       g::::::::::::x:x:::::::::::::g |
-  |  cccccccc    g  g:::::::::::x:::x::::::::::::g |
+  |          www    g::::::::::::::::::::::::::::g |
+  |         w   w   g::::::::::::::::::::::::::::g |
+  |             w   g::::::::::::::::::::::::::::g |
+  |            w    g::::::::::::::::::::::::::::g |
+  |           w     g::::::::::::::::::::::::::::g |
+  |                 g:::::::::::x:::x::::::::::::g |
+  |           w     g::::::::::::x:x:::::::::::::g |
+  |                 g:::::::::::::x::::::::::::::g |
+  |   ccccc         g::::::::::::x:x:::::::::::::g |
+  |  ccccccc     g  g:::::::::::x:::x::::::::::::g |
   |  cccccck     g  g::::::::::::::::::::::::::::g |
   |  cccccck     g  g::::::::::::::::::::::::::::g |
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  cccccccgggggg  g::::::::::::::::::::::::::::g |
-  |  ccccccc        gggggggggggggggggggggggggggggg |
+  |  c c c c        gggggggggggggggggggggggggggggg |
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |  bb                                        bb  |
@@ -245,23 +245,23 @@
   puppet 1: tab1 at 1208,752 colour #D97757 bubble: I have a question for you
   |                                                |
   |                 gggggggggggggggggggggggggggggg |
+  |          www    g::::::::::::::::::::::::::::g |
+  |         w   w   g::::::::::::::::::::::::::::g |
+  |             w   g::::::::::::::::::::::::::::g |
+  |            w    g:::::::::vvv:::::::::vvv::::g |
+  |           w     g::::::::v:v:v:::::::v:v:v:::g |
+  |                 g:::::::::v:v:::::::::v:v::::g |
+  |           w     g::::::::::::::::::::::::::::g |
   |                 g::::::::::::::::::::::::::::g |
-  |                 g::::::::::::::::::::::::::::g |
-  |        ccc      g::::::::::::::::::::::::::::g |
-  |        ccc      g:::::::::vvv:::::::::vvv::::g |
-  |         c       g::::::::v:v:v:::::::v:v:v:::g |
-  |         c       g:::::::::v:v:::::::::v:v::::g |
-  |         c       g::::::::::::::::::::::::::::g |
-  |         c       g::::::::::::::::::::::::::::g |
-  |   ccccc c       g::::::::::::::::::::::::::::g |
-  |  cccccccc    g  g::::::::::::::::::::::::::::g |
+  |   ccccc         g::::::::::::::::::::::::::::g |
+  |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  cccccck     g  g::::::::::::::::::::::::::::g |
   |  cccccck     g  g::::::::::::::::::::::::::::g |
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  ccccccc     g  g::::::::::::::::c:::::::::::g |
   |  ccccccc     g  g::::::::::::::ccccc:::::::::g |
   |  cccccccgggggg  g::::::::::::::::::::::::::::g |
-  |  ccccccc        gggggggggggggggggggggggggggggg |
+  |  c c c c        gggggggggggggggggggggggggggggg |
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |  bb                                        bb  |
@@ -298,23 +298,23 @@
   puppet 1: tab1 at 1208,752 colour #D97757 bubble: I have a question for you
   |                                                |
   |                 gggggggggggggggggggggggggggggg |
+  |          www    g::::::::::::::::::::::::::::g |
+  |         w   w   g::::::::::::::::::::::::::::g |
+  |             w   g::::::::::::::::::::::::::::g |
+  |            w    g::::::::vvv:::::::::vvv:::::g |
+  |           w     g:::::::v:v:v:::::::v:v:v::::g |
+  |                 g::::::::v:v:::::::::v:v:::::g |
+  |           w     g::::::::::::::::::::::::::::g |
   |                 g::::::::::::::::::::::::::::g |
-  |                 g::::::::::::::::::::::::::::g |
-  |        ccc      g::::::::::::::::::::::::::::g |
-  |        ccc      g::::::::vvv:::::::::vvv:::::g |
-  |         c       g:::::::v:v:v:::::::v:v:v::::g |
-  |         c       g::::::::v:v:::::::::v:v:::::g |
-  |         c       g::::::::::::::::::::::::::::g |
-  |         c       g::::::::::::::::::::::::::::g |
-  |   ccccc c       g::::::::::::::::::::::::::::g |
-  |  cccccccc    g  g::::::::::::::::::::::::::::g |
+  |   ccccc         g::::::::::::::::::::::::::::g |
+  |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  cccccck     g  g::::::::::::::::::::::::::::g |
   |  cccccck     g  g::::::::::::::::::::::::::::g |
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  ccccccc     g  g:::::::::::::c::::::::::::::g |
   |  ccccccc     g  g:::::::::::ccccc::::::::::::g |
   |  cccccccgggggg  g::::::::::::::::::::::::::::g |
-  |  ccccccc        gggggggggggggggggggggggggggggg |
+  |  c c c c        gggggggggggggggggggggggggggggg |
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |  bb                                        bb  |
@@ -366,7 +366,7 @@
   |  ppppppp     g  g::::::::::::::::::::::::::M:g |
   |  ppppppppp   g  g::::::::::::::::::::::::::::g |
   |  pppppppgggggg  g::::::::.:::::::::.:::::::::g |
-  |  ppppppp        gggggggggggggggggggggggggggggg |
+  |  p p p p        gggggggggggggggggggggggggggggg |
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |  bb                                        bb  |
@@ -393,7 +393,7 @@
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  cccccccgggggg  g::::::::::::::::::::::::::::g |
-  |  ccccccc        gggggggggggggggggggggggggggggg |
+  |  c c c c        gggggggggggggggggggggggggggggg |
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |  bb                                        bb  |
@@ -445,7 +445,7 @@
   |  ppppppp     g  g::::::::::::::n:::::::M:n:n:g |
   |  ppppppp     g  g::::::::::::::n:::::::::n:::g |
   |  pppppppgggggg  g::::::::::::::M:::::::::::n:g |
-  |  ppppppp        gggggggggggggggggggggggggggggg |
+  |  p p p p        gggggggggggggggggggggggggggggg |
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |  bb                                        bb  |
@@ -472,7 +472,7 @@
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  cccccccgggggg  g::::::::::::::::::::::::::::g |
-  |  ccccccc        gggggggggggggggggggggggggggggg |
+  |  c c c c        gggggggggggggggggggggggggggggg |
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |  bb                                        bb  |
@@ -524,7 +524,7 @@
   |  kpppppk     g  g::.:::::::::n:::::::::n:::::g |
   |  pkkkkkp     g  g::.:::.:::::n:::n:::::n:::::g |
   |  pppppppgggggg  g::::::n:::::::::n:::.:M:::::g |
-  |  ppppppp        gggggggggggggggggggggggggggggg |
+  |  p p p p        gggggggggggggggggggggggggggggg |
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |  bb                                        bb  |
@@ -551,7 +551,7 @@
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  cccccccgggggg  g::::::::::::::::::::::::::::g |
-  |  ccccccc        gggggggggggggggggggggggggggggg |
+  |  c c c c        gggggggggggggggggggggggggggggg |
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |  bb                                        bb  |
@@ -603,7 +603,7 @@
   |  kpppppk     g  g::::::::::::.:::::::::.:::::g |
   |  pkkkkkp     g  g::::::.:::::::M:.:::::::::::g |
   |  pppppppgggggg  g::.:::.:::::n:::.:::::n:::::g |
-  |  ppppppp        gggggggggggggggggggggggggggggg |
+  |  p p p p        gggggggggggggggggggggggggggggg |
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |  bb                                        bb  |
@@ -630,7 +630,7 @@
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  cccccccgggggg  g::::::::::::::::::::::::::::g |
-  |  ccccccc        gggggggggggggggggggggggggggggg |
+  |  c c c c        gggggggggggggggggggggggggggggg |
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |  bb                                        bb  |
@@ -647,15 +647,15 @@
   |                                                |
   |                                                |
   |                                                |
-  |                                                |
-  |                                                |
-  |                                                |
+  |      +                                         |
+  |  +  +                                          |
+  |   ++                                           |
   |                                                |
   | ddddddd                          w   w uuuuuuu |
   | dkddddk                w             w ukuuuuk |
-  |ddddddddd               w             wuuuuuuuuu|
-  | ddddddd                w               uuuuuuu |
-  | d d d d  tttttttttttttttttttttttttttt  u u u u |
+  |dddddddddw              w             wuuuuuuuuu|
+  | ddddddd w              w               uuuuuuu |
+  | d d d d wtttttttttttttttttttttttttttt  u u u u |
   |          tttttttttttttttttttttttttttt          |
   |            g                      g            |
   |            g                      g            |
@@ -682,7 +682,7 @@
   |  kpppppk     g  gn:::::::M:::::.:::::::::::::g |
   |  pkkkkkp     g  gM:::::::::::::n:::::::::::::g |
   |  pppppppgggggg  g::::::.:::::::n:::::::.:::::g |
-  |  ppppppp        gggggggggggggggggggggggggggggg |
+  |  p p p p        gggggggggggggggggggggggggggggg |
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |  bb                                        bb  |
@@ -709,7 +709,7 @@
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  cccccccgggggg  g::::::::::::::::::::::::::::g |
-  |  ccccccc        gggggggggggggggggggggggggggggg |
+  |  c c c c        gggggggggggggggggggggggggggggg |
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |  bb                                        bb  |
@@ -726,15 +726,15 @@
   |                                                |
   |                                                |
   |                                                |
-  |                                                |
-  |                                                |
-  |                                                |
+  |      +                                         |
+  |  +  +                                          |
+  |   ++                                           |
   |                                                |
   | ddddddd                              w uuuuuuu |
   | dkddddk                w             w ukuuuuk |
-  |ddddddddd               w            wwuuuuuuuuu|
-  | ddddddd                w               uuuuuuu |
-  | d d d d  tttttttttttttttttttttttttttt  u u u u |
+  |dddddddddw              w            wwuuuuuuuuu|
+  | ddddddd w              w               uuuuuuu |
+  | d d d d wtttttttttttttttttttttttttttt  u u u u |
   |          tttttttttttttttttttttttttttt          |
   |            g                      g            |
   |            g                      g            |
@@ -761,7 +761,7 @@
   |  kpppppk     g  g::::::::n:::::::::M:::::::::g |
   |  pkkkkkp     g  gn:::::::::::::::::::::::::::g |
   |  pppppppgggggg  gn:::::::M:::::::::::::::::::g |
-  |  ppppppp        gggggggggggggggggggggggggggggg |
+  |  p p p p        gggggggggggggggggggggggggggggg |
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |  bb                                        bb  |
@@ -788,7 +788,7 @@
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  cccccccgggggg  g::::::::::::::::::::::::::::g |
-  |  ccccccc        gggggggggggggggggggggggggggggg |
+  |  c c c c        gggggggggggggggggggggggggggggg |
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |  bb                                        bb  |
@@ -805,15 +805,15 @@
   |                                                |
   |                                                |
   |                                                |
-  |                                                |
-  |                                                |
-  |                                                |
+  |      +                                         |
+  |  +  +                                          |
+  |   ++                                           |
   |                                                |
   | ddddddd                           w  w uuuuuuu |
   | dkddddk                w             w ukuuuuk |
-  |ddddddddd               w             wuuuuuuuuu|
-  | ddddddd                w               uuuuuuu |
-  | d d d d  tttttttttttttttttttttttttttt  u u u u |
+  |dddddddddw              w             wuuuuuuuuu|
+  | ddddddd w              w               uuuuuuu |
+  | d d d d wtttttttttttttttttttttttttttt  u u u u |
   |          tttttttttttttttttttttttttttt          |
   |            g                      g            |
   |            g                      g            |
@@ -840,7 +840,7 @@
   |  ppppppp     g  g::::::::n:::::::::n:::::::::g |
   |  ppppppppp   g  g.:::::::::::::::::::::::::::g |
   |  pppppppgggggg  g.:::::::n:::::::::M:::::::::g |
-  |  ppppppp        gggggggggggggggggggggggggggggg |
+  |  p p p p        gggggggggggggggggggggggggggggg |
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |  bb                                        bb  |
@@ -867,7 +867,7 @@
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  ccccccc     g  g::::::::::::::::::::::::::::g |
   |  cccccccgggggg  g::::::::::::::::::::::::::::g |
-  |  ccccccc        gggggggggggggggggggggggggggggg |
+  |  c c c c        gggggggggggggggggggggggggggggg |
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |  bb                                        bb  |
@@ -884,15 +884,15 @@
   |                                                |
   |                                                |
   |                       w                        |
-  |                                                |
-  |                                                |
-  |                                                |
+  |      +                                         |
+  |  +  +                                          |
+  |   ++                                           |
   |                                                |
   | ddddddd                              w uuuuuuu |
   | dkddddk                w             w ukuuuuk |
-  |ddddddddd               w             wuuuuuuuuu|
-  | ddddddd                w               uuuuuuu |
-  | d d d d  tttttttttttttttttttttttttttt  u u u u |
+  |dddddddddw              w             wuuuuuuuuu|
+  | ddddddd w              w               uuuuuuu |
+  | d d d d wtttttttttttttttttttttttttttt  u u u u |
   |          tttttttttttttttttttttttttttt          |
   |            g                      g            |
   |            g                      g            |
@@ -919,7 +919,7 @@
   |  ppppppp     g  g::::n:::::n:::::::::::::::::g |
   |  ppppppppp   g  g::::n:::::::::::::.:::::::::g |
   |  pppppppgggggg  g::::M:::::M:::::::::::::::::g |
-  |  ppppppp        gggggggggggggggggggggggggggggg |
+  |  p p p p        gggggggggggggggggggggggggggggg |
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
   |  bb                                        bb  |
@@ -954,15 +954,15 @@
   |                                                |
   |                                                |
   |                                                |
-  |                    w                           |
-  |                                                |
-  |                                                |
+  |      +             w                           |
+  |  +  +                                          |
+  |   ++                                           |
   |                                                |
   | ddddddd                              w uuuuuuu |
   | dkddddk                w             w ukuuuuk |
-  |ddddddddd               w             wuuuuuuuuu|
-  | ddddddd                w               uuuuuuu |
-  | d d d d  tttttttttttttttttttttttttttt  u u u u |
+  |dddddddddw              w             wuuuuuuuuu|
+  | ddddddd w              w               uuuuuuu |
+  | d d d d wtttttttttttttttttttttttttttt  u u u u |
   |          tttttttttttttttttttttttttttt          |
   |            g                      g            |
   |            g                      g            |
@@ -981,15 +981,15 @@
   |                                                |
   |                                                |
   |                                                |
-  |                                                |
-  |                                                |
-  |                                                |
+  |      +                                         |
+  |  +  +                                          |
+  |   ++                                           |
   |                                                |
   | ddddddd      w                       w ccccccc |
   | dkddddk                w             w ckcccck |
-  |ddddddddd               w             wccccccccc|
-  | ddddddd                w               ccccccc |
-  | d d d d  tttttttttttttttttttttttttttt  c c c c |
+  |dddddddddw              w             wccccccccc|
+  | ddddddd w              w               ccccccc |
+  | d d d d wtttttttttttttttttttttttttttt  c c c c |
   |          tttttttttttttttttttttttttttt          |
   |            g                      g            |
   |            g                      g            |

@@ -1,5 +1,5 @@
 -- The puppet at its desk: a small `_|` laptop under its paws and a monitor. Its pose shows the session's mood:
--- typing, thinking, a raised hand, a permission sign, now and then a smile; resting, it dozes off after a while.
+-- typing, thinking, a question mark, a permission sign, now and then a smile; resting, it dozes off after a while.
 
 local config = require("puppet.config")
 local pixels = require("puppet.render.pixels")
@@ -10,8 +10,9 @@ local fill, stamp = pixels.fill, pixels.stamp
 
 local function drawPuppet(buf, texts, s, ctx)
   local frame, px = ctx.frame, ctx.pixel
+  local body = sprites.body(ctx.harness)
   if ctx.isResting then
-    stamp(buf, sprites.SIDE, 1, 10)
+    stamp(buf, body.SIDE, 1, 10)
     if ctx.now - s.seenAt > config.IDLE_SLEEP_SECONDS then
       local rise = (frame // 5) % 4
       texts[#texts + 1] = label("z", 9 + rise, 6 - rise, 4, "left", px)
@@ -19,15 +20,14 @@ local function drawPuppet(buf, texts, s, ctx)
     return
   end
   local isSmiling = s.mood == nil and frame % 80 >= 68
-  stamp(buf, isSmiling and sprites.SMILE or sprites.SIDE, 1, 10)
+  stamp(buf, isSmiling and body.SMILE or body.SIDE, 1, 10)
   if s.mood == "thinking" then
     fill(buf, 9, 14, 9, 15, "c")
     fill(buf, 10, 8, 10, 8, "w")
     fill(buf, 11, 6, 12, 6, "w")
     texts[#texts + 1] = label(string.rep(".", frame // 4 % 3 + 1), 11, 1, 8, "left", px)
   elseif s.mood == "asking" then
-    fill(buf, 9, 6, 9, 11, "c")
-    fill(buf, 8, 4, 10, 5, "c")
+    stamp(buf, sprites.QUESTION, 9, 2)
   elseif s.mood == "permission" then
     fill(buf, 9, 7, 9, 11, "b")
     fill(buf, 1, 1, 15, 6, "w")

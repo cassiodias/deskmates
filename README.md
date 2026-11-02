@@ -9,7 +9,7 @@ Claude puppets that float over your Mac desktop, like the old Office paperclip, 
 | reading or searching files | moves a magnifying glass over the monitor |
 | running tests | shows a progress bar, then a green ✓ or a red ✗ |
 | running subagents | plays ping pong: two puppets, one per subagent, each named after its task and scoring its own tool calls |
-| asking you something or showing a plan | raises its hand: "I have a question for you", "Plan ready for you" |
+| asking you something or showing a plan | shows a question mark: "I have a question for you", "Plan ready for you" |
 | waiting for a permission | holds up a sign with the tool's name: "May I use Bash?" |
 | done | says the first sentence of Claude's answer, like "Fixed the parser and added two tests. ✓" |
 | between turns | rests at its desk with the monitor off, and dozes off after a while |

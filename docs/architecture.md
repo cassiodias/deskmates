@@ -45,7 +45,7 @@ return {
   name = "Claude",                 -- used in texts like "Claude needs you"
   capabilities = { prompt = true, tools = true, toolFailure = true, subagents = true,
                    permission = true, question = true, reply = true, sessionEnd = true },
-  character = { palette = { "#D97757", "#5B8DEF" } },          -- puppet colours
+  character = { body = "claude", palette = { "#D97757", "#5B8DEF" } }, -- creature and colours
   toolKind = function(tool) ... end,                           -- "reading", "question", "plan", "skill" or nil
   focus = function(session, terminals) ... end,                -- bring its window forward on a click
 }

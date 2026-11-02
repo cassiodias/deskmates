@@ -2,7 +2,7 @@
 ---
 --- Puppets that float over your desktop, one per busy coding-agent session, acting out what it is doing:
 --- it thinks, codes at its laptop (invaders or Matrix rain on its monitor), reads, runs tests, plays ping pong
---- while subagents run, raises a hand when the agent asks you something, and says what it did when it is done.
+--- while subagents run, shows a question mark when the agent asks you something, and says what it did when it is done.
 --- Click a puppet to jump to its session's terminal.
 ---
 --- Agent hooks append one line per event to `~/.claude-puppet/events`; this Spoon reads it. This file is the
@@ -30,7 +30,7 @@ local obj = {}
 obj.__index = obj
 
 obj.name = "ClaudePuppet"
-obj.version = "0.11.1"
+obj.version = "0.12.0"
 obj.author = "Cassio Dias"
 obj.license = "MIT - https://opensource.org/licenses/MIT"
 obj.homepage = "https://github.com/cassiodias/claude-puppet-overlay"
