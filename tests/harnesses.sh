@@ -12,7 +12,10 @@ for payload in harnesses/*/fixtures/*.json; do
   [ -d "${payload%.json}.home" ] && cp -R "${payload%.json}.home/." "$work/"
   stdout=$(HOME="$work" PUPPET_NOW=0 PUPPET_TTY=/dev/ttys009 TERM_PROGRAM=iTerm.app "harnesses/$harness/translate.sh" < "$payload")
   got=$(cut -d'|' -f2- "$work/.deskmates/events" 2>/dev/null)
-  if [ ! -s "$expected" ] && [ -e "$work/.deskmates/events" ]; then
+  if [ ! -e "$expected" ]; then
+    echo "harness $harness: $(basename "$payload") has no .line file"
+    failed=1
+  elif [ ! -s "$expected" ] && [ -e "$work/.deskmates/events" ]; then
     echo "harness $harness: $(basename "$payload") wrote a line, expected none"
     failed=1
   elif [ -s "$expected" ] && [ "$got" != "$(cat "$expected")" ]; then

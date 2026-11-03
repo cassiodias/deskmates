@@ -25,7 +25,7 @@ case "$event" in
     # A failed command's output starts "Exit code: N"; plain output is a success.
     case "$(field tool_response)" in
       "Exit code: 0"*) ;;
-      "Exit code: "[0-9]*) event=PostToolUseFailure ;;
+      "Exit code: "[0-9]*|"Exit code: -"[0-9]*) event=PostToolUseFailure ;;
     esac ;;
   PreToolUse|PermissionRequest|SubagentStart|SessionEnd) ;;
   *) exit 0 ;;

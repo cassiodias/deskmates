@@ -225,6 +225,14 @@ check "migrate codex: claude hooks at ~/.deskmates" '[ "$(count "$(settings)" "^
 check "migrate codex: codex hooks on" '[ "$(count "$(chooks)" "^~/\\.deskmates/src/harnesses/codex/")" = 9 ]'
 rm -rf "$HOME/.deskmates"
 
+# A plain install finds both agents by their folders and installs both.
+fresh_home
+mkdir -p "$HOME/.claude" "$HOME/.codex"
+PATH=/usr/bin:/bin:$(dirname "$(command -v jq)") "$deskmates" install > /dev/null
+check "detect both: claude hooks on" '[ "$(count "$(settings)" "$OURS")" = 10 ]'
+check "detect both: codex hooks on" '[ "$(count "$(chooks)" "$OURS")" = 9 ]'
+rm -rf "$HOME/.deskmates"
+
 # Both folders: the old one is left alone and named.
 fresh_home
 mkdir -p "$HOME/.claude" "$HOME/.claude-puppet/src" "$HOME/.deskmates/src"
