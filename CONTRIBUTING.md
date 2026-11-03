@@ -217,7 +217,9 @@ Helpers in `hook/puppet-lib.sh`:
   without a `.stdout` file.
 - `puppet_tty_fallback`: define it when the agent runs hooks in a background process with no terminal; it
   prints the session's terminal. `puppet_tty_fallback() { tty_from_program codex; }` finds the agent's
-  process working in the session's folder.
+  process working in the session's folder. The terminal found is remembered per session; also call
+  `puppet_program codex` (the names your harness gives as `program`), so a remembered terminal counts only while
+  it still runs the agent, not once the agent quit there and the session went on in another tab.
 
 A failure that the agent reports as a normal tool result (Codex: `Exit code: 1` in the output) is your
 translator's to spot and turn into `PostToolUseFailure`.

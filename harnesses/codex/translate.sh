@@ -6,7 +6,8 @@
 puppet_read_payload
 
 # Codex runs hooks from a background process with no terminal: the terminal is the one of the codex process
-# working in the session's folder.
+# working in the session's folder, and a remembered one counts only while it still runs codex.
+puppet_program codex
 puppet_tty_fallback() { tty_from_program codex; }
 
 # A command's exit code, from the transcript's record of the call (the hook's result has only its output). Nothing

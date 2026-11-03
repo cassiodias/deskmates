@@ -1,7 +1,7 @@
 #!/bin/sh
 # Codex runs its hooks with no terminal: the hook finds the codex process working in the session's folder.
 # Two sessions in one folder: each takes a terminal no other session has claimed. pgrep, ps and lsof are fakes:
-# terminals ttys011 and ttys012 run codex; ttys099 has nothing running any more.
+# terminals ttys011 and ttys012 run codex; ttys050 runs only a shell; ttys099 has nothing running any more.
 cd "$(dirname "$0")/.." || exit 1
 failed=0
 work=$(mktemp -d)
@@ -15,6 +15,8 @@ cat > "$work/bin/ps" <<'X'
 #!/bin/sh
 case "$*" in
   *"-t ttys099"*) ;;
+  *"-t ttys050"*) case "$*" in *comm=*) echo -zsh ;; *) echo 50 ;; esac ;;
+  *"comm= -t "*) echo -zsh; echo /opt/homebrew/bin/codex ;;
   *tty=*) case "$*" in *" 11") echo ttys011 ;; *" 12") echo ttys012 ;; *) echo '??' ;; esac ;;
   *) echo 1 ;;
 esac
@@ -43,6 +45,11 @@ rm "$work/home/.deskmates/tty-"*
 echo /dev/ttys099 > "$work/home/.deskmates/tty-s1"
 check "a terminal gone from the cache is found again" "$(run s1)" /dev/ttys011
 check "and remembered" "$(cat "$work/home/.deskmates/tty-s1")" /dev/ttys011
+
+# Nor is one that runs something else now: Codex quit there without SessionEnd and the session was resumed in
+# another tab, whose codex is the one to find.
+echo /dev/ttys050 > "$work/home/.deskmates/tty-s1"
+check "a cached terminal no longer running codex is found again" "$(run s1)" /dev/ttys011
 
 # What sessions leave behind expires after the Spoon's 2 hours: Codex and Cursor often skip SessionEnd.
 rm "$work/home/.deskmates/tty-"*

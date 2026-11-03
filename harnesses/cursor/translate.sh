@@ -6,6 +6,9 @@
 . "$(dirname "$0")/../../hook/puppet-lib.sh"
 puppet_read_payload
 
+# Its CLI runs as agent or cursor-agent: a terminal remembered for a session counts while it runs one of them.
+puppet_program agent cursor-agent
+
 event=$(field hook_event_name)
 session=$(field session_id)
 tool=$(field tool_name)

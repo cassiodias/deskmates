@@ -148,14 +148,26 @@ terminal_of() {
   case "$name" in ""|"??") ;; *) printf '/dev/%s' "$name" ;; esac
 }
 
-# Whether some process still runs in terminal $1: once its tab or window closes, none does.
-terminal_in_use() {
-  [ -n "$1" ] && [ -n "$(ps -o pid= -t "${1#/dev/}" 2>/dev/null)" ]
+# Names the program, or programs, the agent runs as in its terminal (the last part of ps -o comm, like the
+# harness's `program`): a terminal remembered for a session then counts only while it still runs one of them.
+puppet_program() {
+  PUPPET_PROGRAM=$*
 }
 
-# The terminal the session runs in: the hook's own, else the one remembered for the session while something
-# still runs in it, else the first ancestor process's that has one. An agent that runs its hooks away from its
-# terminal (no ancestor has one) defines puppet_tty_fallback in its translator to print it another way, usually
+# Whether terminal $1 still runs one of the programs named in $2 (space separated, the last part of ps -o comm),
+# or anything at all when $2 is empty. Once its tab or window closes, nothing runs in it.
+terminal_runs() {
+  [ -n "$1" ] || return 1
+  ps -o comm= -t "${1#/dev/}" 2>/dev/null | awk -v names=" $2 " '
+    { name = $0; sub(/.*\//, "", name); sub(/^-/, "", name); if (names == "  " || index(names, " " name " ")) found = 1 }
+    END { exit !found }'
+}
+
+# The terminal the session runs in: the hook's own, else the one remembered for the session while it still runs
+# the agent, else the first ancestor process's that has one. A translator names its agent's program with
+# puppet_program; without it, a remembered terminal counts while anything runs in it. An agent that runs its
+# hooks away from its terminal (no ancestor has one) defines puppet_tty_fallback in its translator to print it
+# another way, usually
 # `puppet_tty_fallback() { tty_from_program <its program>; }`. Not finding one is not remembered, so a later
 # event can still find it.
 puppet_tty() {
@@ -164,7 +176,7 @@ puppet_tty() {
   tty=$(terminal_of $$)
   if [ -z "$tty" ] && [ -n "$1" ] && [ -f "$cache" ]; then
     tty=$(cat "$cache")
-    terminal_in_use "$tty" || tty=""
+    terminal_runs "$tty" "${PUPPET_PROGRAM:-}" || tty=""
   fi
   pid=$(ps -o ppid= -p $$ | tr -d ' ')
   while [ -z "$tty" ] && [ -n "$pid" ] && [ "$pid" -gt 1 ]; do
