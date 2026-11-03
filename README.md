@@ -21,7 +21,7 @@ Pixel puppets that float over your Mac desktop, like the old Office paperclip, a
 | Claude Code | the puppet | every mood above |
 | Codex | an owl, in teal | every mood above except three: no notifications, no question (plans only), and no permission sign (Codex's default sandbox does not ask). The owl leaves a few seconds after you quit Codex |
 
-Codex shows the title Codex gives the session; its subagents show their short task name. Want to add an agent? Open an issue.
+Codex shows the title Codex gives the session; its subagents show their short task name. Want to add an agent, a creature or an animation? [CONTRIBUTING.md](CONTRIBUTING.md) has the steps.
 
 ## What it looks like
 
