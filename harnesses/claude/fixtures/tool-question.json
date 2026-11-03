@@ -1,0 +1,10 @@
+{
+  "session_id": "s1",
+  "cwd": "/Users/dev/workspace/my-app",
+  "transcript_path": "/tmp/t.jsonl",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "AskUserQuestion",
+  "tool_input": {
+    "questions": [{ "question": "Which one?", "header": "Pick", "options": [{ "label": "A" }, { "label": "B" }], "multiSelect": false }]
+  }
+}

@@ -3,11 +3,11 @@
 # expected one. No agent and no Hammerspoon needed.
 cd "$(dirname "$0")/.."
 failed=0
-work=$(mktemp -d)
 for payload in harnesses/*/fixtures/*.json; do
   harness=$(echo "$payload" | cut -d/ -f2)
   expected="${payload%.json}.line"
-  rm -rf "$work/.deskmates" "$work/.codex"
+  # Each case gets a home of its own, so nothing one leaves behind reaches the next.
+  work=$(mktemp -d)
   # <name>.home holds files the case needs in its home (like Codex's session index).
   [ -d "${payload%.json}.home" ] && cp -R "${payload%.json}.home/." "$work/"
   stdout=$(HOME="$work" PUPPET_NOW=0 PUPPET_TTY=/dev/ttys009 TERM_PROGRAM=iTerm.app "harnesses/$harness/translate.sh" < "$payload")
@@ -29,7 +29,7 @@ for payload in harnesses/*/fixtures/*.json; do
     echo "harness $harness: $(basename "$payload") printed '$stdout'"
     failed=1
   fi
+  rm -rf "$work"
 done
-rm -rf "$work"
 [ "$failed" = 0 ] && echo "harnesses: ok"
 exit "$failed"
