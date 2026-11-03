@@ -162,9 +162,6 @@ export DESKMATES_NO_RELOAD=1 DESKMATES_NO_DEFAULTS=1
 deskmates="$src/bin/deskmates"
 init() { echo "$HOME/.hammerspoon/init.lua"; }
 spoon_link() { echo "$HOME/.hammerspoon/Spoons/Deskmates.spoon"; }
-ours_init='hs.loadSpoon("Deskmates")
-spoon.Deskmates:bindHotkeys({ toggle = { { "ctrl", "alt", "cmd" }, "p" } })
-spoon.Deskmates:start()'
 mine_init='-- mine
 -- mine too'
 

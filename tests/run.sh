@@ -4,8 +4,6 @@ set -e
 cd "$(dirname "$0")/.."
 LUA=$(command -v lua5.4 || command -v lua-5.4 || echo /opt/homebrew/opt/lua@5.4/bin/lua)
 for test in tests/*_test.lua; do "$LUA" "$test"; done
-[ -x tests/harnesses.sh ] && tests/harnesses.sh
-[ -x tests/codex_tty.sh ] && tests/codex_tty.sh
-[ -x tests/cursor_turns.sh ] && tests/cursor_turns.sh
-[ -x tests/install.sh ] && tests/install.sh
+# Each script runs through sh, so one that lost its executable bit still runs.
+for test in harnesses codex_tty cursor_turns install; do sh "tests/$test.sh"; done
 exit 0
