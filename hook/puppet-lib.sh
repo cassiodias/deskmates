@@ -116,26 +116,46 @@ is_test_command() {
   return 1
 }
 
-# The terminal the session runs in: the first ancestor process that has one, remembered per session. An agent
-# that runs its hooks away from its terminal (no ancestor has one) defines puppet_tty_fallback in its translator
-# to print it another way, usually `puppet_tty_fallback() { tty_from_program <its program>; }`. Not finding one
-# is not remembered, so a later event can still find it.
+# The terminal of process $1 (/dev/ttys004), or nothing.
+terminal_of() {
+  name=$(ps -o tty= -p "$1" 2>/dev/null | tr -d ' ')
+  case "$name" in ""|"??") ;; *) printf '/dev/%s' "$name" ;; esac
+}
+
+# Whether some process still runs in terminal $1: once its tab or window closes, none does.
+terminal_in_use() {
+  [ -n "$1" ] && [ -n "$(ps -o pid= -t "${1#/dev/}" 2>/dev/null)" ]
+}
+
+# The terminal the session runs in: the hook's own, else the one remembered for the session while something
+# still runs in it, else the first ancestor process's that has one. An agent that runs its hooks away from its
+# terminal (no ancestor has one) defines puppet_tty_fallback in its translator to print it another way, usually
+# `puppet_tty_fallback() { tty_from_program <its program>; }`. Not finding one is not remembered, so a later
+# event can still find it.
 puppet_tty() {
   if [ -n "${PUPPET_TTY+set}" ]; then printf '%s' "$PUPPET_TTY"; return; fi
   cache="$PUPPET_DIR/tty-$1"
-  if [ -n "$1" ] && [ -f "$cache" ]; then cat "$cache"; return; fi
-  tty=""
-  pid=$$
-  while [ -n "$pid" ] && [ "$pid" -gt 1 ]; do
-    name=$(ps -o tty= -p "$pid" | tr -d ' ')
-    case "$name" in
-      ""|"??") pid=$(ps -o ppid= -p "$pid" | tr -d ' ') ;;
-      *) tty="/dev/$name"; break ;;
-    esac
+  tty=$(terminal_of $$)
+  if [ -z "$tty" ] && [ -n "$1" ] && [ -f "$cache" ]; then
+    tty=$(cat "$cache")
+    terminal_in_use "$tty" || tty=""
+  fi
+  pid=$(ps -o ppid= -p $$ | tr -d ' ')
+  while [ -z "$tty" ] && [ -n "$pid" ] && [ "$pid" -gt 1 ]; do
+    tty=$(terminal_of "$pid")
+    pid=$(ps -o ppid= -p "$pid" | tr -d ' ')
   done
   [ -z "$tty" ] && command -v puppet_tty_fallback > /dev/null && tty=$(puppet_tty_fallback)
+  # Written each time, so the cache of a session still at work never expires.
   [ -n "$1" ] && [ -n "$tty" ] && printf '%s' "$tty" > "$cache"
   printf '%s' "$tty"
+}
+
+# Removes what sessions left in $PUPPET_DIR (tty caches, Cursor's turn state) once untouched for the Spoon's
+# 2 hours (config.STALE_SECONDS): Codex and Cursor often end a session without SessionEnd.
+puppet_expire() {
+  find "$PUPPET_DIR" -maxdepth 1 -type f \( -name 'tty-*' -o -name 'cursor-*' \) -mmin +120 -delete 2>/dev/null
+  return 0
 }
 
 # The terminal of a process named $1 (pgrep -x) working in the payload's cwd, for agents whose hooks run in a
@@ -173,6 +193,7 @@ respond() {
 # CONTRIBUTING.md, "What each event must carry"); agent_id is empty on the main thread; flag is "test" or empty.
 write_event() {
   mkdir -p "$PUPPET_DIR"
+  puppet_expire
   tty=$(puppet_tty "$3")
   [ "$2" = "SessionEnd" ] && rm -f "$PUPPET_DIR/tty-$3"
   printf '%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s\n' "${PUPPET_NOW:-$(date +%s)}" "$2" "$3" "$4" "$5" "$6" "$7" \
