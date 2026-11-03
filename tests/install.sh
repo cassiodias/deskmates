@@ -129,6 +129,19 @@ check "lib: present" '(. hook/install-lib.sh; hooks_present "$lib")'
 check "lib: absent after remove" '(. hook/install-lib.sh; hooks_remove "$lib" && ! hooks_present "$lib")'
 check "lib: remove missing file" '(. hook/install-lib.sh; hooks_remove "$HOME/none.json") && [ ! -e "$HOME/none.json" ]'
 
+# The library on a flat hooks file ({"version": 1, "hooks": {event: [{command}]}}): the same round trip.
+fresh_home
+flat="$HOME/flat.json"
+printf '%s' '{"version":1,"hooks":{"stop":[{"command":"~/.deskmates/src/harnesses/x/translate.sh"}],"start":[{"command":"~/.deskmates/src/harnesses/x/translate.sh"}]}}' > "$HOME/flat-snippet.json"
+printf '%s' '{"hooks":{"stop":[{"command":"~/bin/mine"}]}}' > "$flat"
+check "flat: merge" '(. hook/install-lib.sh; hooks_merge "$flat" "$HOME/flat-snippet.json")'
+check "flat: ours in, user kept" '[ "$(jq -c "[.hooks.stop[].command, .hooks.start[].command]" "$flat")" = "[\"~/bin/mine\",\"~/.deskmates/src/harnesses/x/translate.sh\",\"~/.deskmates/src/harnesses/x/translate.sh\"]" ]'
+check "flat: version added" '[ "$(jq .version "$flat")" = 1 ]'
+check "flat: present" '(. hook/install-lib.sh; hooks_present "$flat")'
+cp "$flat" "$HOME/flat-once.json"
+check "flat: twice, same file" '(. hook/install-lib.sh; hooks_merge "$flat" "$HOME/flat-snippet.json") && cmp -s "$flat" "$HOME/flat-once.json"'
+check "flat: remove keeps the user's" '(. hook/install-lib.sh; hooks_remove "$flat" && ! hooks_present "$flat") && [ "$(jq -c .hooks "$flat")" = "{\"stop\":[{\"command\":\"~/bin/mine\"}]}" ]'
+
 # The command: bin/deskmates from this working copy, never reloading Hammerspoon or touching its settings.
 export DESKMATES_NO_RELOAD=1 DESKMATES_NO_DEFAULTS=1
 deskmates="$src/bin/deskmates"
@@ -398,6 +411,34 @@ fresh_home
 echo '{}' > "$HOME/s.json"
 chmod 600 "$HOME/s.json"
 check "backup: mode kept" '(. hook/install-lib.sh; backup "$HOME/s.json") && [ "$(stat -f %Lp "$HOME/s.json.bak")" = 600 ]'
+
+# Every harness, with nothing written for it here: its hooks file holding a hook of the user's for each of its
+# events, install, install again, status, uninstall. Harnesses with their own present.sh are not JSON-based and
+# only get the install, status and uninstall exit codes checked.
+for dir in harnesses/*/; do
+  id=$(basename "$dir")
+  [ -f "$dir/detect.sh" ] || continue
+  fresh_home
+  f=$("$dir/config.sh")
+  check "$id: hooks.json points at its translator" \
+    '[ "$(jq -r "[$(. hook/install-lib.sh; echo "$COMMANDS")] | unique | join(\" \")" "$dir/hooks.json")" = "~/.deskmates/src/harnesses/$id/translate.sh" ]'
+  mkdir -p "$(dirname "$f")"
+  if [ ! -x "$dir/present.sh" ]; then
+    jq 'walk(if type == "object" and has("command") then .command = "~/bin/my-hook" else . end)' "$dir/hooks.json" > "$f"
+    cp "$f" "$HOME/user.json"
+  fi
+  check "$id: install" '"$dir/install.sh" > /dev/null'
+  check "$id: status says hooks on" '"$deskmates" status | grep -Eq "^$id +[a-z ]+ +hooks on"'
+  if [ ! -x "$dir/present.sh" ]; then
+    users=$(. hook/install-lib.sh; jq "[$COMMANDS | select(. == \"~/bin/my-hook\")] | length" "$HOME/user.json")
+    check "$id: user hooks kept" '[ "$(. hook/install-lib.sh; jq "[$COMMANDS | select(. == \"~/bin/my-hook\")] | length" "$f")" = "$users" ]'
+    cp "$f" "$HOME/once.json"
+    check "$id: twice, same file" '"$dir/install.sh" > /dev/null && cmp -s "$f" "$HOME/once.json"'
+  fi
+  check "$id: uninstall" '"$dir/uninstall.sh" > /dev/null'
+  check "$id: status says hooks off" '"$deskmates" status | grep -Eq "^$id +[a-z ]+ +hooks off"'
+  [ -x "$dir/present.sh" ] || check "$id: uninstall gives the user's file back" '[ "$(jq -S . "$f")" = "$(jq -S . "$HOME/user.json")" ]'
+done
 
 rm -rf "$HOME_DIR"
 [ "$failed" = 0 ] && echo "install: ok"

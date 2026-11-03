@@ -55,7 +55,12 @@ detected() {
   "$root/harnesses/$1/detect.sh" > /dev/null 2>&1
 }
 
+# Whether harness $1's hooks are on: its own present.sh when it has one, else our commands in its hooks file.
 hooks_on() {
+  if [ -x "$root/harnesses/$1/present.sh" ]; then
+    "$root/harnesses/$1/present.sh" > /dev/null 2>&1
+    return
+  fi
   hooks_present "$("$root/harnesses/$1/config.sh")"
 }
 

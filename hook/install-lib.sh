@@ -1,11 +1,21 @@
-# Shared by every harness's install.sh, uninstall.sh and detect.sh (harnesses/<id>/ sources it). Agents that
-# keep hooks as {"hooks": {event: [{matcher?, hooks: [{type, command}]}]}} share the jq filters here: ours
-# are the hook commands under ~/.deskmates/ or the old ~/.claude-puppet/.
+# Shared by every harness's install.sh and uninstall.sh (harnesses/<id>/ sources it), and by bin/deskmates.
+# The jq filters here handle a JSON hooks file with an event map under "hooks", in either shape:
+#   nested (Claude Code, Codex):  {"hooks": {event: [{matcher?, hooks: [{type, command}]}]}}
+#   flat:                         {"version": 1, "hooks": {event: [{command}]}}
+# Ours are the hook commands under ~/.deskmates/ or the old ~/.claude-puppet/. An agent whose hooks live
+# elsewhere (not JSON, or another layout) writes its own install.sh and uninstall.sh, and a present.sh that
+# exits 0 when our hooks are on, which bin/deskmates then uses instead of hooks_present.
 
 OURS='\.deskmates/|\.claude-puppet/'
 
 # Settings without our hook commands; events and groups left empty go.
-OURS_REMOVE='if has("hooks") then .hooks |= with_entries(.value |= map(.hooks |= map(select(.command // "" | test($ours) | not)) | select(.hooks | length > 0)) | select(.value | length > 0)) else . end'
+OURS_REMOVE='if (.hooks | type) == "object" then .hooks |= with_entries(.value |= map(
+    if (.hooks | type) == "array" then .hooks |= map(select(.command // "" | test($ours) | not)) | select(.hooks | length > 0)
+    else select(.command // "" | test($ours) | not) end)
+  | select(.value | length > 0)) else . end'
+
+# Every hook command in the file, in either shape.
+COMMANDS='.hooks | objects | .[] | arrays | .[] | objects | ((.hooks | arrays | .[] | objects | .command), .command) | strings'
 
 say() { echo "✓ $1"; }
 todo() { echo "→ $1"; }
@@ -58,19 +68,20 @@ hooks_remove() {
   write_json "$1" "$out"
 }
 
-# Our hooks from snippet $2 added to settings file $1, replacing any of ours already there.
+# Our hooks from snippet $2 added to settings file $1, replacing any of ours already there. The snippet's other
+# top-level keys (like "version") are added when the file has none of its own.
 hooks_merge() {
   if [ ! -f "$1" ]; then
     mkdir -p "$(dirname "$1")" && echo '{}' > "$1" || return 1
   fi
   valid_json "$1" || return 1
   out=$(jq -s --arg ours "$OURS" "(.[0] | $OURS_REMOVE) as \$mine | .[1].hooks as \$add
-    | \$mine | .hooks = (reduce (\$add | keys_unsorted[]) as \$e ((\$mine.hooks // {}); .[\$e] = ((.[\$e] // []) + \$add[\$e])))" \
+    | (.[1] | del(.hooks)) + \$mine | .hooks = (reduce (\$add | keys_unsorted[]) as \$e ((\$mine.hooks // {}); .[\$e] = ((.[\$e] // []) + \$add[\$e])))" \
     "$1" "$2") || return 1
   write_json "$1" "$out"
 }
 
 hooks_present() {
   [ -f "$1" ] || return 1
-  jq -e --arg ours "$OURS" '[.hooks[]?[]?.hooks[]?.command // "" | select(test($ours))] | length > 0' "$1" > /dev/null 2>&1
+  jq -e --arg ours "$OURS" "[$COMMANDS | select(test(\$ours))] | length > 0" "$1" > /dev/null 2>&1
 }
