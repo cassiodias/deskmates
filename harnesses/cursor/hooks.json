@@ -1,7 +1,6 @@
 {
   "version": 1,
   "hooks": {
-    "sessionStart": [{ "command": "~/.deskmates/src/harnesses/cursor/translate.sh" }],
     "beforeSubmitPrompt": [{ "command": "~/.deskmates/src/harnesses/cursor/translate.sh" }],
     "preToolUse": [{ "command": "~/.deskmates/src/harnesses/cursor/translate.sh" }],
     "postToolUse": [{ "command": "~/.deskmates/src/harnesses/cursor/translate.sh" }],

@@ -25,7 +25,7 @@ session_title() {
 
 # A subagent's own events come with its own session id, which is also its generation id; the main session's
 # turn events have a generation id of their own. Its transcript sits under the parent's subagents/ folder.
-case "$event" in sessionStart|sessionEnd) ;; *)
+case "$event" in sessionEnd) ;; *)
   [ "$(field generation_id)" = "$session" ] && exit 0
   case "$(path_field transcript_path)" in */subagents/*) exit 0 ;; esac ;;
 esac
