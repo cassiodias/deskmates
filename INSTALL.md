@@ -107,7 +107,13 @@ Hammerspoon itself stays: `brew uninstall --cask hammerspoon` removes it, and yo
 
 ## Installed as claude-puppet before?
 
-Run steps 2 and 3 above (the clone and the install). The Spoon link, the Hammerspoon lines and the hooks switch to the new paths. Then reload Hammerspoon and start new agent sessions. Once the puppets work, delete the old `~/.claude-puppet` folder, which the install says is left over.
+Update the copy you have and install from it, instead of steps 2 and 3:
+
+```sh
+cd ~/.claude-puppet/src && git pull && bin/deskmates install
+```
+
+It moves the old folder to `~/.deskmates` (keeping your puppets' recent events) and switches the Spoon link, the Hammerspoon lines and the hooks to the new paths. Then reload Hammerspoon and start new agent sessions.
 
 ## If something does not work
 
