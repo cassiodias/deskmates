@@ -39,9 +39,14 @@ first_sentence() {
     sed 's/^[[:space:]>-]*//' | sed 's/\([.!?]\)[[:space:]].*/\1/' | cut -c1-90
 }
 
-# A prompt's leading /command, or nothing.
+# A prompt's leading /command, or nothing: a slash and a name of letters, digits and ":_-". A prompt that starts
+# with a path ("/Users/me/notes.pdf summarise") has no command.
 leading_command() {
-  case "$1" in /*) printf '%s' "${1%% *}" ;; esac
+  word=${1%%[[:space:]]*}
+  name=${word#/}
+  case "$word" in /*) ;; *) return 0 ;; esac
+  case "$name" in ""|*[!A-Za-z0-9:_-]*) return 0 ;; esac
+  printf '/%s' "$name"
 }
 
 # True when a shell command runs tests, so the puppet shows a progress bar and the result.
