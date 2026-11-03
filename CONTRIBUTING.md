@@ -116,7 +116,8 @@ done
 Use the agent for a few minutes, one thing at a time, noting the time of each: a prompt, a `/command`, reading
 a file, an edit, a command that works and one that fails, a test run, a subagent, a question, a permission
 (approve one, refuse one), interrupting a turn (Ctrl-C) and sending one more prompt, quitting, and closing a
-tab with the agent still open. Then turn the hooks off and read the file (`jq` helps: `grep -v '^#' file | jq
+tab with the agent still open. If the agent has an app too, send a prompt from the app's chat and from its
+built-in terminal: both may fire the same hooks. Then turn the hooks off and read the file (`jq` helps: `grep -v '^#' file | jq
 -r .hook_event_name | uniq -c` shows what fired, in order).
 
 Payloads hold your prompts, commands and code. Keep the file to yourself; the fixtures you make from it keep
@@ -257,7 +258,9 @@ Make every script executable (`chmod +x`).
 - `focus(session, terminals)`: what a click does. `terminals.focus(session)` brings the terminal tab forward;
   `terminals.app(bundleId, session.folder)` brings an app's window forward, for an agent that runs in its own
   app. `session.app` is the `TERM_PROGRAM` the hook saw; when that is ambiguous for your agent, decide here
-  (Cursor's terminal says `vscode`, like VS Code's, so `cursor.lua` brings Cursor forward). The contract test
+  (Cursor's terminal says `vscode`, like VS Code's, so `cursor.lua` brings Cursor forward). An agent with an app
+  of its own may fire the same hooks from the app's chat, with no terminal at all (`app` empty): bring the app
+  forward for those. Such a session shows while it works and leaves once it rests, like any session with no tab. The contract test
   can check it with a stand-in `terminals` table.
 - `program` (optional): the program name, or a list of names, its sessions run in their terminal (the last
   part of `ps -o comm`). The session ends once its terminal no longer runs it; for agents that report the end

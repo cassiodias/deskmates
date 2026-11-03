@@ -164,23 +164,32 @@ function obj:loadChoice()
 end
 
 -- Dragging any puppet moves the whole row, and the place is remembered; a click without a drag is a focus.
-function obj:startDrag(key)
-  local start = hs.mouse.absolutePosition()
+-- Judged by where each mouse event happened, not where the mouse is when Hammerspoon gets to it: a busy
+-- Hammerspoon handles a click late, when the mouse is already on its way elsewhere. `at` is where the press was.
+function obj:startDrag(key, at)
+  -- A press whose release Hammerspoon missed leaves its tap running: only the last press is followed.
+  if self.dragTap then self.dragTap:stop() end
+  local start = at or hs.mouse.absolutePosition()
   local origin = { x = self.stage.anchor.x, y = self.stage.anchor.y }
   local types = hs.eventtap.event.types
-  self.dragTap = hs.eventtap.new({ types.leftMouseDragged, types.leftMouseUp }, function(e)
-    local now = hs.mouse.absolutePosition()
-    self.stage.anchor = { x = origin.x + now.x - start.x, y = origin.y + now.y - start.y }
+  local tap
+  tap = hs.eventtap.new({ types.leftMouseDragged, types.leftMouseUp }, function(e)
+    local now = e:location()
+    local isClick = math.abs(now.x - start.x) + math.abs(now.y - start.y) < config.CLICK_DISTANCE
+    -- A click leaves the row exactly where it was, so clicks do not make it creep.
+    self.stage.anchor = isClick and origin or { x = origin.x + now.x - start.x, y = origin.y + now.y - start.y }
     self:layout()
     if e:getType() == types.leftMouseUp then
-      self.dragTap:stop()
-      self.dragTap = nil
+      tap:stop()
+      if self.dragTap == tap then self.dragTap = nil end
       hs.settings.set(config.POSITION_KEY, self.stage.anchor)
-      if math.abs(now.x - start.x) + math.abs(now.y - start.y) < config.CLICK_DISTANCE then self:focus(key) end
+      -- Bringing a terminal forward can take a moment (iTerm's AppleScript); not inside the mouse's tap.
+      if isClick then hs.timer.doAfter(0, function() self:focus(key) end) end
     end
     return false
   end)
-  self.dragTap:start()
+  self.dragTap = tap
+  tap:start()
 end
 
 -- Resting the mouse on a puppet shows its card: where it is and what it is doing; render keeps it current.
@@ -202,11 +211,11 @@ function obj:isUnderMouse(key)
 end
 
 -- Option-click opens the menu bar menu at the puppet, for when the menu bar icon is hidden behind the notch.
-function obj:mouseDown(key)
+function obj:mouseDown(key, at)
   if hs.eventtap.checkKeyboardModifiers().alt then
-    self.menu:popupMenu(hs.mouse.absolutePosition())
+    self.menu:popupMenu(at or hs.mouse.absolutePosition())
   else
-    self:startDrag(key)
+    self:startDrag(key, at)
   end
 end
 
@@ -266,7 +275,7 @@ function obj:start()
   if not self:isOnAScreen(anchor) then anchor = self:defaultPosition() end
   self.stage = Stage.new({
     pixel = self.pixel, anchor = anchor,
-    onMouseDown = function(key) self:mouseDown(key) end,
+    onMouseDown = function(key, at) self:mouseDown(key, at) end,
     onBubbleClick = function(key) self:focus(key) end,
     onHover = function(key, isInside) self:hover(key, isInside) end,
   })

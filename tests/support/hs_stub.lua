@@ -2,7 +2,16 @@
 -- so the Spoon runs under plain Lua 5.4 with a clock and timers the test moves by hand.
 
 local stub = { canvases = {}, timers = {}, settings = {}, focused = nil, selected = nil, clock = 1000000,
-  mouse = { x = 0, y = 0 }, styled = {} }
+  mouse = { x = 0, y = 0 }, styled = {}, taps = {} }
+
+-- A mouse event of type `kind` (a name in hs.eventtap.event.types) at x, y, to every running tap.
+function stub.fire(kind, x, y)
+  local types = { leftMouseDragged = 6, leftMouseUp = 2 }
+  local event = { getType = function() return types[kind] end, location = function() return { x = x, y = y } end }
+  for _, tap in ipairs(stub.taps) do
+    if tap.running then tap.fn(event) end
+  end
+end
 
 local function canvas(frame)
   local c = { frame_ = frame, shown = false, elements = {}, deleted = false }
@@ -100,10 +109,16 @@ hs = {
     return text
   end },
   mouse = { absolutePosition = function() return { x = stub.mouse.x, y = stub.mouse.y } end },
+  -- Taps the Spoon starts are kept in stub.taps; stub.fire(type, x, y) hands each running one an event at x, y.
   eventtap = {
     event = { types = { leftMouseDragged = 6, leftMouseUp = 2 } },
     checkKeyboardModifiers = function() return {} end,
-    new = function() return { start = function() end, stop = function() end } end,
+    new = function(_, fn)
+      local tap = { fn = fn, running = false }
+      function tap:start() self.running = true stub.taps[#stub.taps + 1] = self return self end
+      function tap:stop() self.running = false return self end
+      return tap
+    end,
   },
   dialog = { textPrompt = function() return "Cancel", "" end },
   focus = function() end,
