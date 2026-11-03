@@ -47,16 +47,17 @@ check "and remembered" "$(cat "$work/home/.deskmates/tty-s1")" /dev/ttys011
 # What sessions leave behind expires after the Spoon's 2 hours: Codex and Cursor often skip SessionEnd.
 rm "$work/home/.deskmates/tty-"*
 old=$(date -v-3H +%Y%m%d%H%M)
-for name in tty-gone cursor-gone.turn cursor-gone.g1.reply; do
+for name in tty-gone cursor-gone.turn cursor-gone.g1.reply myagent-gone.state events; do
   echo /dev/ttys011 > "$work/home/.deskmates/$name"
   touch -t "$old" "$work/home/.deskmates/$name"
 done
 echo /dev/ttys005 > "$work/home/.deskmates/tty-recent"
 check "an old claim does not hold a terminal" "$(run s4)" /dev/ttys011
-for name in tty-gone cursor-gone.turn cursor-gone.g1.reply; do
+for name in tty-gone cursor-gone.turn cursor-gone.g1.reply myagent-gone.state; do
   check "$name expired" "$(ls "$work/home/.deskmates/$name" 2>/dev/null)" ""
 done
 check "a recent cache stays" "$(cat "$work/home/.deskmates/tty-recent")" /dev/ttys005
+check "the events file stays, however old" "$(head -n 1 "$work/home/.deskmates/events")" /dev/ttys011
 rm -rf "$work"
 [ "$failed" = 0 ] && echo "codex tty: ok"
 exit "$failed"
