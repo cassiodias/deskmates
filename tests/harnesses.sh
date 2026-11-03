@@ -4,8 +4,16 @@
 # with plutil alone (macOS 13 and 14 without jq).
 cd "$(dirname "$0")/.." || exit 1
 failed=0
-for parser in jq plutil; do
-  if [ "$parser" = plutil ]; then export PUPPET_JQ=; else unset PUPPET_JQ; fi
+# The jq the hooks would find (hook/puppet-lib.sh); without one, only the plutil pass runs, and it says so.
+unset PUPPET_JQ
+found_jq=$(HOME=/nonexistent sh -c '. hook/puppet-lib.sh; printf "%s" "$PUPPET_JQ"')
+parsers="jq plutil"
+if [ -z "$found_jq" ]; then
+  echo "harnesses: no jq on this Mac: the jq pass is skipped, the plutil pass runs"
+  parsers=plutil
+fi
+for parser in $parsers; do
+  if [ "$parser" = plutil ]; then export PUPPET_JQ=; else export PUPPET_JQ="$found_jq"; fi
   for payload in harnesses/*/fixtures/*.json; do
     harness=$(echo "$payload" | cut -d/ -f2)
     name="$harness ($parser): $(basename "$payload")"

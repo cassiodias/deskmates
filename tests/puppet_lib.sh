@@ -68,26 +68,35 @@ mkdir -p "$HOME/.deskmates"
 (export LC_ALL=C PUPPET_NOW=0 PUPPET_TTY=; write_event claude Stop s1 "" "" "" "" "/Users/me/${a119}ü✓" "" "")
 expect "the folder is cut at 120 characters" "$(LC_ALL=C cut -d'|' -f8 "$HOME/.deskmates/events")" "${a119}ü"
 
-# The payload is parsed once per event: with jq, no plutil runs for each field, and a 5 MB tool result keeps
-# the agent waiting well under half a second.
-mkdir -p "$HOME/bin"
-printf '#!/bin/sh\necho run >> "%s/plutil.log"\nexec /usr/bin/plutil "$@"\n' "$HOME" > "$HOME/bin/plutil"
-chmod +x "$HOME/bin/plutil"
-PATH="$HOME/bin:$PATH" PUPPET_NOW=0 PUPPET_TTY=/dev/ttys009 harnesses/claude/translate.sh \
-  < harnesses/claude/fixtures/tool-tests.json
-expect "with jq, plutil runs for no field" "$(cat "$HOME/plutil.log" 2>/dev/null | wc -l | tr -d ' ')" 0
-head -c 3700000 /dev/zero | tr '\0' x | fold -w 100 | jq -Rs '{session_id: "big", cwd: "/Users/dev/my-app",
-  hook_event_name: "PostToolUse", tool_name: "Read", tool_input: {file_path: "/Users/dev/my-app/big.txt"},
-  tool_response: {type: "text", file: {filePath: "/Users/dev/my-app/big.txt", content: ., numLines: 37000}}}' \
-  > "$HOME/big.json"
-seconds=$( { /usr/bin/time -p env PUPPET_NOW=0 PUPPET_TTY=/dev/ttys009 harnesses/claude/translate.sh \
-  < "$HOME/big.json" > /dev/null; } 2>&1 | awk '/^real/ { print $2 }')
-expect "a 5 MB payload takes under 0.5 s (took $seconds s)" "$(echo "$seconds" | awk '{ print ($1 < 0.5) }')" 1
-expect "and its line is written" "$(tail -n 1 "$HOME/.deskmates/events")" \
-  "0|PostToolUse|big||Read|||my-app|${TERM_PROGRAM:-}||/dev/ttys009|claude|"
+# The payload is parsed once per event: with jq, one jq run and no plutil, even for a 5 MB tool result (each
+# field read used to pipe the whole payload into its own plutil, keeping the agent waiting a second).
+found_jq=$PUPPET_JQ
+if [ -n "$found_jq" ]; then
+  mkdir -p "$HOME/bin"
+  printf '#!/bin/sh\necho run >> "%s/plutil.log"\nexec /usr/bin/plutil "$@"\n' "$HOME" > "$HOME/bin/plutil"
+  printf '#!/bin/sh\necho run >> "%s/jq.log"\nexec "%s" "$@"\n' "$HOME" "$found_jq" > "$HOME/bin/jq"
+  chmod +x "$HOME/bin/plutil" "$HOME/bin/jq"
+  runs() { cat "$HOME/$1.log" 2>/dev/null | wc -l | tr -d ' '; }
+  PATH="$HOME/bin:$PATH" PUPPET_JQ="$HOME/bin/jq" PUPPET_NOW=0 PUPPET_TTY=/dev/ttys009 \
+    harnesses/claude/translate.sh < harnesses/claude/fixtures/tool-tests.json
+  expect "with jq, plutil runs for no field" "$(runs plutil)" 0
+  expect "with jq, one jq run for the payload" "$(runs jq)" 1
+  rm -f "$HOME/plutil.log" "$HOME/jq.log"
+  head -c 3700000 /dev/zero | tr '\0' x | fold -w 100 | "$found_jq" -Rs '{session_id: "big", cwd: "/Users/dev/my-app",
+    hook_event_name: "PostToolUse", tool_name: "Read", tool_input: {file_path: "/Users/dev/my-app/big.txt"},
+    tool_response: {type: "text", file: {filePath: "/Users/dev/my-app/big.txt", content: ., numLines: 37000}}}' \
+    > "$HOME/big.json"
+  PATH="$HOME/bin:$PATH" PUPPET_JQ="$HOME/bin/jq" PUPPET_NOW=0 PUPPET_TTY=/dev/ttys009 \
+    harnesses/claude/translate.sh < "$HOME/big.json"
+  expect "a 5 MB payload: no plutil" "$(runs plutil)" 0
+  expect "a 5 MB payload: one jq run" "$(runs jq)" 1
+  expect "a 5 MB payload: its line is written" "$(tail -n 1 "$HOME/.deskmates/events")" \
+    "0|PostToolUse|big||Read|||my-app|${TERM_PROGRAM:-}||/dev/ttys009|claude|"
+else
+  echo "puppet-lib: no jq on this Mac: its checks are skipped, plutil's run"
+fi
 
 # Without jq (macOS 13 and 14), plutil reads each field: the same helpers, the same answers.
-found_jq=$PUPPET_JQ
 PUPPET_PAYLOAD='{"a":{"b":"one|two\nthree"},"n":3,"t":true,"z":null,"list":["x","y"],"cwd":"/Users/me/my-app"}'
 for jq in "$PUPPET_JQ" ""; do
   PUPPET_JQ=$jq
@@ -108,15 +117,17 @@ done
 
 # With jq, what the table holds (CONTRIBUTING.md, "Helpers"): 4 keys deep, 16 items of an array, 4000 characters
 # of a text.
-PUPPET_JQ=$found_jq
-PUPPET_PAYLOAD=$(jq -n '{a: {b: {c: {d: "four", e: {f: "five"}}}}, list: [range(20) | tostring],
-  text: ([range(4100)] | map("x") | join(""))}')
-puppet_parse_payload
-expect "jq: 4 keys deep" "$(field a.b.c.d)" four
-expect "jq: not 5" "$(field a.b.c.e.f)" ""
-expect "jq: the 16th item" "$(field list.15)" 15
-expect "jq: not the 17th" "$(field list.16)" ""
-expect "jq: a text up to 4000 characters" "$(payload_value text | wc -c | tr -d ' ')" 4001
+if [ -n "$found_jq" ]; then
+  PUPPET_JQ=$found_jq
+  PUPPET_PAYLOAD=$("$found_jq" -n '{a: {b: {c: {d: "four", e: {f: "five"}}}}, list: [range(20) | tostring],
+    text: ([range(4100)] | map("x") | join(""))}')
+  puppet_parse_payload
+  expect "jq: 4 keys deep" "$(field a.b.c.d)" four
+  expect "jq: not 5" "$(field a.b.c.e.f)" ""
+  expect "jq: the 16th item" "$(field list.15)" 15
+  expect "jq: not the 17th" "$(field list.16)" ""
+  expect "jq: a text up to 4000 characters" "$(payload_value text | wc -c | tr -d ' ')" 4001
+fi
 
 rm -rf "$HOME"
 [ "$failed" = 0 ] && echo "puppet-lib: ok"
