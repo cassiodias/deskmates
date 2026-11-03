@@ -30,21 +30,6 @@ path_field() {
   printf '%s' "$PUPPET_PAYLOAD" | plutil -extract "$1" raw -o - - 2>/dev/null | tr -d '\n|'
 }
 
-# The session's title, as Claude Code last wrote it in the transcript at path $1; its lines repeat, so the
-# end of the file is enough.
-session_title() {
-  [ -f "$1" ] || return 0
-  tail -c 2000000 "$1" | grep '"type":"ai-title"' | tail -n 1 | json_value aiTitle
-}
-
-# A subagent's short description, from the file Claude Code keeps beside the transcript at path $1 for the
-# subagent with id $2.
-subagent_description() {
-  meta="${1%.jsonl}/subagents/agent-$2.meta.json"
-  [ -f "$meta" ] || return 0
-  json_value description < "$meta"
-}
-
 # The first sentence of a text field, past any heading, without markdown marks.
 first_sentence() {
   value=$(printf '%s' "$PUPPET_PAYLOAD" | plutil -extract "$1" raw -o - - 2>/dev/null) || return 0
@@ -67,7 +52,8 @@ is_test_command() {
 }
 
 # The terminal the session runs in: the first ancestor process that has one, remembered per session. An agent
-# that runs its hooks away from its terminal defines puppet_tty_fallback to find it another way. Not finding one
+# that runs its hooks away from its terminal (no ancestor has one) defines puppet_tty_fallback in its translator
+# to print it another way, usually `puppet_tty_fallback() { tty_from_program <its program>; }`. Not finding one
 # is not remembered, so a later event can still find it.
 puppet_tty() {
   if [ -n "${PUPPET_TTY+set}" ]; then printf '%s' "$PUPPET_TTY"; return; fi
@@ -87,8 +73,39 @@ puppet_tty() {
   printf '%s' "$tty"
 }
 
+# The terminal of a process named $1 (pgrep -x) working in the payload's cwd, for agents whose hooks run in a
+# background process. With several there, the first one no other session has claimed.
+tty_from_program() {
+  folder=$(cd "$(path_field cwd)" 2>/dev/null && pwd -P) || return 0
+  first=""
+  for pid in $(pgrep -x "$1"); do
+    name=$(ps -o tty= -p "$pid" | tr -d ' ')
+    case "$name" in ""|"??") continue ;; esac
+    [ "$(lsof -a -d cwd -p "$pid" -Fn 2>/dev/null | sed -n 's/^n//p')" = "$folder" ] || continue
+    [ -n "$first" ] || first="/dev/$name"
+    claimed_by_other "/dev/$name" || { printf '/dev/%s' "$name"; return 0; }
+  done
+  printf '%s' "$first"
+}
+
+# Whether a session other than the payload's already has terminal $1.
+claimed_by_other() {
+  for cache in "$PUPPET_DIR"/tty-*; do
+    [ -f "$cache" ] && [ "$cache" != "$PUPPET_DIR/tty-$(field session_id)" ] && [ "$(cat "$cache")" = "$1" ] && return 0
+  done
+  return 1
+}
+
+# Prints JSON $1 for the agent when the translator exits, however it exits: for agents that wait for an answer
+# on some events (Codex wants {} after Stop). Call it before anything that could fail.
+respond() {
+  PUPPET_RESPONSE=$1
+  trap 'printf "%s\n" "$PUPPET_RESPONSE"' EXIT
+}
+
 # write_event harness event session agent_id tool agent_type text cwd flag title
-# Appends the line; the only place that writes the events file.
+# Appends the line; the only place that writes the events file. event is one of the common names (see
+# CONTRIBUTING.md, "What each event must carry"); agent_id is empty on the main thread; flag is "test" or empty.
 write_event() {
   mkdir -p "$PUPPET_DIR"
   tty=$(puppet_tty "$3")
