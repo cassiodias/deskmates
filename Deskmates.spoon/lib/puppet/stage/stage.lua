@@ -11,15 +11,16 @@ local function floating(canvas, isHoverable)
   canvas:level(hs.canvas.windowLevels.floating)
   canvas:behavior({ "canJoinAllSpaces", "stationary" })
   canvas:clickActivating(false)
-  canvas:canvasMouseEvents(true, false, isHoverable or false, false)
+  -- A puppet (hoverable) also reports releases: a quick click's release can come before any mouse tap starts.
+  canvas:canvasMouseEvents(true, isHoverable or false, isHoverable or false, false)
   return canvas
 end
 
--- opts: pixel, anchor, onMouseDown(key), onBubbleClick(key), onHover(key, isInside).
+-- opts: pixel, anchor, onMouseDown(key), onMouseUp(key), onBubbleClick(key), onHover(key, isInside).
 function Stage.new(opts)
   return setmetatable({
     puppets = {}, keys = {}, pixel = opts.pixel, anchor = opts.anchor, isShown = true,
-    onMouseDown = opts.onMouseDown, onBubbleClick = opts.onBubbleClick, onHover = opts.onHover,
+    onMouseDown = opts.onMouseDown, onMouseUp = opts.onMouseUp, onBubbleClick = opts.onBubbleClick, onHover = opts.onHover,
   }, Stage)
 end
 
@@ -39,6 +40,7 @@ function Stage:add(key, palette)
   local canvas = floating(hs.canvas.new({ x = self.anchor.x, y = self.anchor.y, w = config.W * px, h = height }), true)
   canvas:mouseCallback(function(_, message)
     if message == "mouseDown" then self.onMouseDown(key) end
+    if message == "mouseUp" and self.onMouseUp then self.onMouseUp(key) end
     if message == "mouseEnter" or message == "mouseExit" then self.onHover(key, message == "mouseEnter") end
   end)
   local balloon = floating(hs.canvas.new({ x = self.anchor.x, y = self.anchor.y - 40, w = 200, h = bubble.HEIGHT }))

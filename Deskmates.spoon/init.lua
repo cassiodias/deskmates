@@ -164,34 +164,48 @@ function obj:loadChoice()
 end
 
 -- Dragging any puppet moves the whole row, and the place is remembered; a click without a drag is a focus.
--- Judged only by the drag events' own positions: the press's position (the canvas's, or the mouse's when a busy
--- Hammerspoon gets to it) can be off, and turned clicks into jumps of the row.
+-- The press starts a mouse tap that follows the drag, judged only by the drag events' own positions (the
+-- mouse's position when a busy Hammerspoon gets to it can be off). The click itself is the release the puppet's
+-- canvas reports: a quick click's release comes before the tap has started, and the tap never sees it.
 function obj:startDrag(key)
   -- A press whose release Hammerspoon missed leaves its tap running: only the last press is followed.
   if self.dragTap then self.dragTap:stop() end
+  local press = { key = key, isDrag = false }
+  self.press = press
   local origin = { x = self.stage.anchor.x, y = self.stage.anchor.y }
   local types = hs.eventtap.event.types
-  local first, isDrag
+  local first
   local tap
   tap = hs.eventtap.new({ types.leftMouseDragged, types.leftMouseUp }, function(e)
     local now = e:location()
     if e:getType() == types.leftMouseDragged then
       first = first or now
-      isDrag = isDrag or math.abs(now.x - first.x) + math.abs(now.y - first.y) >= config.CLICK_DISTANCE
-      -- A click leaves the row exactly where it was, so clicks do not make it creep.
-      self.stage.anchor = isDrag and { x = origin.x + now.x - first.x, y = origin.y + now.y - first.y } or origin
+      press.isDrag = press.isDrag or math.abs(now.x - first.x) + math.abs(now.y - first.y) >= config.CLICK_DISTANCE
+      -- Until it is a drag, the row stays exactly where it was, so clicks do not make it creep.
+      self.stage.anchor = press.isDrag and { x = origin.x + now.x - first.x, y = origin.y + now.y - first.y } or origin
       self:layout()
       return false
     end
     tap:stop()
     if self.dragTap == tap then self.dragTap = nil end
-    hs.settings.set(config.POSITION_KEY, self.stage.anchor)
-    -- Bringing a terminal forward can take a moment (iTerm's AppleScript); not inside the mouse's tap.
-    if not isDrag then hs.timer.doAfter(0, function() self:focus(key) end) end
+    if press.isDrag then hs.settings.set(config.POSITION_KEY, self.stage.anchor) end
     return false
   end)
   self.dragTap = tap
   tap:start()
+end
+
+-- The release on a puppet: a click, unless the press became a drag.
+function obj:mouseUp(key)
+  local press = self.press
+  self.press = nil
+  if self.dragTap and not (press and press.isDrag) then
+    self.dragTap:stop()
+    self.dragTap = nil
+  end
+  if not press or press.isDrag or press.key ~= key then return end
+  -- Bringing a terminal forward can take a moment (iTerm's AppleScript); not inside the mouse's handling.
+  hs.timer.doAfter(0, function() self:focus(key) end)
 end
 
 -- Resting the mouse on a puppet shows its card: where it is and what it is doing; render keeps it current.
@@ -278,6 +292,7 @@ function obj:start()
   self.stage = Stage.new({
     pixel = self.pixel, anchor = anchor,
     onMouseDown = function(key) self:mouseDown(key) end,
+    onMouseUp = function(key) self:mouseUp(key) end,
     onBubbleClick = function(key) self:focus(key) end,
     onHover = function(key, isInside) self:hover(key, isInside) end,
   })

@@ -23,26 +23,35 @@ stub.advance(0.2)
 local canvas = P.stage.puppets.tab1.canvas
 local f = canvas:frame()
 local function anchor() return P.stage.anchor.x .. "," .. P.stage.anchor.y end
--- The press as the canvas reports it; its position is deliberately wrong, as nothing may depend on it.
+-- The press and release as the canvas reports them (the press's position deliberately wrong: nothing may
+-- depend on it). The mouse tap the press starts may come too late to see the release of a quick click.
 local function press() canvas.onMouse(canvas, "mouseDown", nil, 9999, -9999) end
+local function release() canvas.onMouse(canvas, "mouseUp", nil, 9999, -9999) end
+local function running()
+  local n = 0
+  for _, tap in ipairs(stub.taps) do if tap.running then n = n + 1 end end
+  return n
+end
 local before = anchor()
 
--- A click handled late: by then the mouse is on its way to the terminal. No drag events came: a click.
-stub.selected = nil
+-- A quick click: the release came before the tap started, so only the canvas saw it.
+stub.selected, stub.raised = nil, nil
 press()
 stub.mouse = { x = f.x + 300, y = f.y - 200 }
-stub.fire("leftMouseUp", f.x + 300, f.y - 200)
+release()
 stub.advance(0.2)
-check("a click handled late still selects its tab", stub.selected == "/dev/ttys001")
+check("a quick click selects its tab", stub.selected == "/dev/ttys001")
 check("one click raises the tab's own window, in a second iTerm window too", stub.raised == 102)
-check("a click handled late leaves the puppets where they were", anchor() == before)
+check("a quick click leaves the puppets where they were", anchor() == before)
+check("a quick click leaves no tap running", running() == 0)
 
--- A click with a small wobble of the hand selects, and leaves the row exactly where it was.
+-- A click the tap saw too, with a small wobble of the hand: selects once, and the row stays exactly put.
 stub.selected = nil
 press()
 stub.fire("leftMouseDragged", f.x + 10, f.y + 10)
 stub.fire("leftMouseDragged", f.x + 11, f.y + 8)
 stub.fire("leftMouseUp", f.x + 11, f.y + 8)
+release()
 stub.advance(0.2)
 check("a click with a wobble selects its tab", stub.selected == "/dev/ttys001")
 check("a click with a wobble does not creep the row", anchor() == before)
@@ -55,19 +64,20 @@ stub.mouse = { x = f.x + 500, y = f.y + 500 }
 stub.fire("leftMouseDragged", f.x + 10, f.y + 10)
 stub.fire("leftMouseDragged", f.x + 60, f.y - 20)
 stub.fire("leftMouseUp", f.x + 60, f.y - 20)
+release()
 stub.advance(0.2)
 check("a drag moves the row by what the mouse moved", anchor() == (from.x + 50) .. "," .. (from.y - 30))
 check("a drag selects nothing", stub.selected == nil)
+check("a drag leaves no tap running", running() == 0)
 
--- A press whose release never came (Hammerspoon missed it) does not leave a tap moving the row later.
+-- A press whose release Hammerspoon missed does not leave a tap moving the row later.
 local moved = anchor()
 press()
 press()
 stub.selected = nil
-stub.fire("leftMouseUp", f.x + 10, f.y + 10)
-local running = 0
-for _, tap in ipairs(stub.taps) do if tap.running then running = running + 1 end end
-check("only the last press is followed: no tap left running", running == 0)
+release()
+stub.advance(0.2)
+check("only the last press is followed: no tap left running", running() == 0)
 check("only the last press is followed: the row stays", anchor() == moved)
 
 -- A rabbit from Cursor's own chat (app "Cursor", no terminal) waits at its desk like any other, and a click
