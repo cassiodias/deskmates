@@ -12,7 +12,7 @@ printf '11\n12\n13\n'
 X
 cat > "$work/bin/ps" <<'X'
 #!/bin/sh
-case "$*" in *tty=*) case "$*" in *" 11"*) echo ttys011 ;; *" 12"*) echo ttys012 ;; *) echo '??' ;; esac ;; *) echo 1 ;; esac
+case "$*" in *tty=*) case "$*" in *" 11") echo ttys011 ;; *" 12") echo ttys012 ;; *) echo '??' ;; esac ;; *) echo 1 ;; esac
 X
 cat > "$work/bin/lsof" <<X
 #!/bin/sh
