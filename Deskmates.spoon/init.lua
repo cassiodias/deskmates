@@ -6,7 +6,8 @@
 --- Click a puppet to jump to its session's terminal.
 ---
 --- Agent hooks append one line per event to `~/.deskmates/events`; this Spoon reads it. This file is the
---- Spoon's public surface and its wiring; the parts live in lib/puppet/ (see docs/architecture.md).
+--- Spoon's public surface and its wiring; the parts (events, model, render, stage, terminals, ui and one
+--- module per agent) live in lib/puppet/.
 
 local root = hs.spoons.scriptPath()
 if not package.path:find(root .. "lib/?.lua", 1, true) then

@@ -1,8 +1,8 @@
-# claude-puppet-overlay
+# Deskmates
 
-Claude puppets that float over your Mac desktop, like the old Office paperclip, and act out what Claude Code is doing: one puppet per busy Claude session.
+Pixel puppets that float over your Mac desktop, like the old Office paperclip, and act out what your coding agents are doing: one puppet per busy session. Works with Claude Code and Codex.
 
-| When Claude is... | The puppet... |
+| When the agent is... | The puppet... |
 | --- | --- |
 | reading your prompt | rests its chin on its paw, with a thought bubble |
 | working | types on its laptop and shoots an invader on its monitor with every tool call, or watches green Matrix rain pour faster with each one; now and then it turns to smile at you |
@@ -11,8 +11,17 @@ Claude puppets that float over your Mac desktop, like the old Office paperclip, 
 | running subagents | plays ping pong: two puppets, one per subagent, each named after its task and scoring its own tool calls |
 | asking you something or showing a plan | shows a question mark: "I have a question for you", "Plan ready for you" |
 | waiting for a permission | holds up a sign with the tool's name: "May I use Bash?" |
-| done | says the first sentence of Claude's answer, like "Fixed the parser and added two tests. ✓" |
+| done | says the first sentence of the agent's answer, like "Fixed the parser and added two tests. ✓" |
 | between turns | rests at its desk with the monitor off, and dozes off after a while |
+
+## Agents
+
+| Agent | Creature | What it shows |
+| --- | --- | --- |
+| Claude Code | the puppet | every mood above |
+| Codex | an owl, in teal | every mood above except notifications, and no permission sign (Codex's default sandbox does not ask); the owl leaves a few seconds after you quit Codex |
+
+Codex shows the title Codex gives the session; its subagents show their short task name. Want to add an agent? Open an issue.
 
 ## What it looks like
 
@@ -24,44 +33,40 @@ Claude puppets that float over your Mac desktop, like the old Office paperclip, 
 | ![Left, a puppet thinking with a thought bubble; right, a puppet smiling at you](docs/images/coding-smiling-thinking.png) | **Thinking and smiling.** Left: reading your prompt, with a thought bubble. Right: now and then a working puppet turns to smile at you. |
 | ![Two puppets looking at you and smiling](docs/images/dev-planner-happy.png) | **Happy.** The smile, on two puppets at once. |
 | ![A coder puppet, and a puppet given a Matrix command thinking](docs/images/coding-planning.png) | **Side by side.** One tab codes while the other has just been given a prompt. |
-| ![A bubble saying Claude is waiting for your input above a resting puppet](docs/images/coding-waiting.png) | **Waiting for you.** Claude's own notifications show in the bubble of the session they come from. |
+| ![A bubble saying the agent is waiting for your input above a resting puppet](docs/images/coding-waiting.png) | **Waiting for you.** The agent's own notifications show in the bubble of the session they come from. |
 | ![The puppet holds up a Bash? sign and asks May I use Bash?](docs/images/bash-may-I-use-bash.png) | **Waiting for a permission.** It holds up the tool's name and asks. |
-| ![A question mark above the puppet and a bubble saying I have a question for you](docs/images/question.png) | **A question for you.** Claude asks something, or has a plan for you to read. |
-| ![A bubble with the first sentence of Claude's answer](docs/images/response-coder.png) | **Done.** The bubble says the first sentence of Claude's answer. |
+| ![A question mark above the puppet and a bubble saying I have a question for you](docs/images/question.png) | **A question for you.** The agent asks something, or has a plan for you to read. |
+| ![A bubble with the first sentence of the agent's answer](docs/images/response-coder.png) | **Done.** The bubble says the first sentence of the agent's answer. |
 | ![Three puppets side by side: coding, ping pong and Matrix](docs/images/planner-reviewer-ping-pong-coding.png) | **Several sessions.** One puppet per busy session, each in its own colour and scene. |
 | ![A card above a ping pong puppet: the session title, folder and tab, command, subagents and tool calls](docs/images/hover-card.png) | **Where it is and what it does.** Rest the mouse on a puppet for its card. |
 | ![Three puppets with Done bubbles](docs/images/3-desk-done.png) | **All done.** Each session says so above its own puppet. |
 | ![Three puppets dozing at their desks, monitors off](docs/images/3-desks-sleeping.png) | **Between turns.** Each puppet rests at its desk, monitor off, and dozes off. |
 | ![A single puppet waiting on an empty table](docs/images/big-desk.png) | **Nothing running.** One puppet waits at home. |
 
-Each agent will get its own creature in the same scenes. Drawn and waiting for their agents: an owl and a cat.
+Each agent has its own creature and colours in the same scenes: the puppet for Claude Code, the owl for Codex. A cat is drawn and waits for its agent.
 
 ![An owl and a cat coding, asking a question, playing ping pong and waiting at home](docs/images/bodies.png)
 
 - **One puppet per session:** with one tab coding and another reviewing, two puppets sit side by side, each in its own colour, with a name tag (the command you ran, or the project folder), its own scene and its own bubble. Between turns a puppet rests at its desk with the monitor off, and dozes; it leaves when its session ends or its iTerm tab closes (a session running in no iTerm tab leaves when it rests). With no session on stage, one puppet waits at home.
 - **Choose what plays** from the `▟▙` menu bar icon (or Option-click a puppet): list `my-coding-skill` under Coder, `my-planner` under Matrix and `my-reviewer` under Ping pong, and set the main conversation to Coder, Matrix, auto or Off. Each tab's puppet follows the command that tab runs.
-- **See where each one is:** under the name tag, a short line gives the project folder and how long the puppet has been at it (`my-app · 32m`, `idle 12m`, `waiting 3m`). Rest the mouse on a puppet for a card with the rest: the session's title (as Claude Code names it), its folder and tab, the command and what it is doing, its subagents (by their task while working, and how many are done), its tool calls and the last tool, and the first sentence of its last reply.
+- **See where each one is:** under the name tag, a short line gives the project folder and how long the puppet has been at it (`my-app · 32m`, `idle 12m`, `waiting 3m`). Rest the mouse on a puppet for a card with the rest: the session's title (as the agent names it), its folder and tab, the command and what it is doing, its subagents (by their task while working, and how many are done), its tool calls and the last tool, and the first sentence of its last reply.
 - **Click a puppet** (or its bubble) to jump to the terminal running that session. In iTerm2 it selects the exact window and tab, and the tab number is written under the puppet's table (`tab 3`, or `window 2 · tab 3` with several windows).
 - **Drag any puppet** to move the whole row, across screens too; it stays on top of every app and every desktop. The `▟▙` menu bar icon sends the row to the corner of any screen, and puppets left on a screen you unplug come back to the main one.
 - **Hide them** from the `▟▙` menu, or with ⌃⌥⌘P; they stay hidden until you show them again, even after a restart.
 
-It is two small pieces: a hook that writes one line per agent event to `~/.claude-puppet/events`, and a [Hammerspoon](https://www.hammerspoon.org) Spoon that reads them and draws the puppets. Claude Code is the first agent it supports; each agent is a separate *harness*, so Codex, Cursor, OpenCode and others can be added (see [Contributing](CONTRIBUTING.md)). Nothing leaves your machine. From your prompts it keeps only a leading `/command`; from Claude's answers, only the first sentence; otherwise the tool names, the project folder's name and the terminal tab; never commands or code.
+It is two small pieces: hooks that write one line per agent event to `~/.deskmates/events`, and a [Hammerspoon](https://www.hammerspoon.org) Spoon that reads them and draws the puppets. Nothing leaves your machine. From your prompts it keeps only a leading `/command`; from the agent's answers, only the first sentence; otherwise the tool names, the project folder's name and the terminal tab; never commands or code.
 
 ## Install
 
 **[INSTALL.md](INSTALL.md)** walks through it in about 5 minutes, on macOS 13 or later with Homebrew. What it changes on your Mac:
 
 - installs Hammerspoon, a free macOS automation app (Homebrew);
-- adds `~/.claude-puppet/` (the source and the events file) and links `~/.hammerspoon/Spoons/ClaudePuppet.spoon` to it;
+- adds `~/.deskmates/` (the source and the events file) and links `~/.hammerspoon/Spoons/Deskmates.spoon` to it;
 - adds three lines to `~/.hammerspoon/init.lua`;
-- adds the puppet's hook to `~/.claude/settings.json`, after saving a backup, keeping your other settings and hooks;
+- adds Deskmates' hooks to the settings of each agent it finds (`~/.claude/settings.json` for Claude Code, `~/.codex/hooks.json` for Codex), after saving a backup, keeping your other settings and hooks;
 - asks you to allow Hammerspoon in **Accessibility** (to drag and click the puppets) and, with iTerm2, **Automation** (to show and select each session's tab), and to start it at login.
 
 INSTALL.md also covers [choosing what plays](INSTALL.md#choose-what-plays), [updating](INSTALL.md#update) and [uninstalling](INSTALL.md#uninstall).
-
-## Contributing
-
-New agents, animations and fixes are welcome: [CONTRIBUTING.md](CONTRIBUTING.md) explains the layout, how to run the tests, and how to add an agent or an animation. The design is in [docs/architecture.md](docs/architecture.md).
 
 ## More
 

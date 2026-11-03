@@ -1,5 +1,5 @@
--- Claude Code: the first harness, and the reference for the others (a harness is one module like this, one line in init.lua, and a hook side).
--- Its hook side is harnesses/claude/ at the repo root.
+-- Claude Code's harness, and the reference for the others (a harness is one module like this, one line in
+-- harnesses/init.lua, and a hook side). Its hook side is harnesses/claude/ at the repo root.
 
 local TOOL_KINDS = {
   Read = "reading", Grep = "reading", Glob = "reading", LSP = "reading", WebFetch = "reading", WebSearch = "reading",
