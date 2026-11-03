@@ -15,5 +15,5 @@ jq --arg home "$HOME" '.hooks[][].command |= sub("^~"; $home)' "$here/hooks.json
 ok=$?
 rm -f "$snippet"
 [ "$ok" = 0 ] || exit 1
-say "Cursor hooks in ~/.cursor/hooks.json (backup in ~/.cursor/hooks.json.bak)"
+say "Cursor hooks in ~/.cursor/hooks.json (backups in ~/.cursor/hooks.json.bak and .last.bak)"
 todo "start a new Cursor agent session (agent) to pick them up"

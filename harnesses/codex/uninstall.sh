@@ -11,4 +11,4 @@ if ! hooks_present "$hooks"; then
 fi
 backup "$hooks"
 hooks_remove "$hooks" || exit 1
-say "Codex hooks removed from ~/.codex/hooks.json (backup in ~/.codex/hooks.json.bak)"
+say "Codex hooks removed from ~/.codex/hooks.json (backups in ~/.codex/hooks.json.bak and .last.bak)"

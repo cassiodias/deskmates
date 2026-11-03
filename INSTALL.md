@@ -28,7 +28,7 @@ This one command:
 
 - links `~/.hammerspoon/Spoons/Deskmates.spoon` to the source, so an update is a `git pull`;
 - adds three lines to `~/.hammerspoon/init.lua` (Hammerspoon's config, created if you have none), unless they are there already; anything else in that file stays;
-- adds Deskmates' hooks for each agent it finds on your Mac: Claude Code in `~/.claude/settings.json`, Codex in `~/.codex/hooks.json`, Cursor in `~/.cursor/hooks.json`. Each file is saved to a `.bak` first, everything else in it (your other hooks included) is kept, and Deskmates' own hooks are replaced, so it is safe to run again.
+- adds Deskmates' hooks for each agent it finds on your Mac: Claude Code in `~/.claude/settings.json`, Codex in `~/.codex/hooks.json`, Cursor in `~/.cursor/hooks.json`. Before changing a file it saves a copy beside it: `.bak` is the file as it was before Deskmates first changed it, and is never overwritten; `.last.bak` is the file as it was before the latest change. Everything else in the file (your other hooks included) is kept, and Deskmates' own hooks are replaced, so it is safe to run again.
 
 To install for one agent only, name it: `~/.deskmates/src/bin/deskmates install codex` (or `claude`, `cursor`).
 

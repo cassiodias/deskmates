@@ -64,7 +64,7 @@ hooks_on() {
   hooks_present "$("$root/harnesses/$1/config.sh")"
 }
 
-# Copies init.lua to init.lua.bak before this run's first change to it.
+# Backs init.lua up (install-lib.sh's backup) before this run's first change to it.
 init_backup() {
   [ -n "$init_backed" ] && return 0
   backup "$init" || exit 1
@@ -148,7 +148,7 @@ init_rename() {
   sed -E 's/loadSpoon\("ClaudePuppet"\)/loadSpoon("Deskmates")/g; s/spoon\.ClaudePuppet([^A-Za-z0-9_]|$)/spoon.Deskmates\1/g' \
     "$renamed.in" > "$renamed"
   cat "$renamed" > "$init" && rm -f "$renamed" "$renamed.in"
-  say "~/.hammerspoon/init.lua: ClaudePuppet lines renamed to Deskmates (backup in ~/.hammerspoon/init.lua.bak)"
+  say "~/.hammerspoon/init.lua: ClaudePuppet lines renamed to Deskmates (backups in ~/.hammerspoon/init.lua.bak and .last.bak)"
 }
 init_lines() {
   init_rename
@@ -225,7 +225,7 @@ uninstall() {
   say "Spoon links removed"
   init_drop "$OLD_LOAD|$OLD_NAME|loadSpoon\\(\"Deskmates\"\\)|spoon\\.Deskmates([^A-Za-z0-9_]|\$)"
   say "Deskmates lines removed from ~/.hammerspoon/init.lua"
-  [ -n "$init_backed" ] && todo "a setting of yours that spread over several lines may have lost a line: the original is ~/.hammerspoon/init.lua.bak"
+  [ -n "$init_backed" ] && todo "a setting of yours that spread over several lines may have lost a line: the copy from before this change is ~/.hammerspoon/init.lua.last.bak"
   if [ "${DESKMATES_NO_DEFAULTS:-}" != 1 ]; then
     for key in Deskmates.choice Deskmates.position Deskmates.hidden ClaudePuppet.choice ClaudePuppet.position \
       ClaudePuppet.hidden ClaudePuppet.commands ClaudePuppet.scenes ClaudePuppet.seenCommands; do

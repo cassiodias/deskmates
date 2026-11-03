@@ -9,5 +9,5 @@ if [ -f "$hooks" ]; then
   backup "$hooks"
 fi
 hooks_merge "$hooks" "$here/hooks.json" || exit 1
-say "Codex hooks in ~/.codex/hooks.json (backup in ~/.codex/hooks.json.bak)"
+say "Codex hooks in ~/.codex/hooks.json (backups in ~/.codex/hooks.json.bak and .last.bak)"
 todo "open codex, type /hooks and trust the Deskmates hooks"

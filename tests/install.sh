@@ -55,6 +55,8 @@ check "user: backup is the original" 'cmp -s "$s.bak" tests/install/claude-setti
 cp "$s" "$HOME/once.json"
 "$claude/install.sh" > /dev/null
 check "twice: same file" 'cmp -s "$s" "$HOME/once.json"'
+check "twice: the first backup is still the original" 'cmp -s "$s.bak" tests/install/claude-settings-user.json'
+check "twice: the last backup is the file before this run" 'cmp -s "$s.last.bak" "$HOME/once.json"'
 
 # Uninstall leaves the user's hooks only.
 "$claude/uninstall.sh" > /dev/null
@@ -199,7 +201,8 @@ check "migrate: status counts the old line" '"$deskmates" status | grep -Eq "^cl
 check "uninstall all: no ~/.deskmates" '[ ! -e "$HOME/.deskmates" ]'
 check "uninstall all: no Spoon link" '[ ! -L "$(spoon_link)" ] && [ ! -e "$(spoon_link)" ]'
 check "uninstall all: init.lua mine only" '[ "$(cat "$(init)")" = "$mine_init" ]'
-check "uninstall all: init.lua backed up" '[ "$(cat "$(init).bak")" = "-- mine
+check "uninstall all: the first init.lua backup stays" '[ "$(cat "$(init).bak")" = "$(printf -- "-- mine\nhs.loadSpoon(\"ClaudePuppet\")\nspoon.ClaudePuppet:start()\n-- mine too")" ]'
+check "uninstall all: init.lua last backed up" '[ "$(cat "$(init).last.bak")" = "-- mine
 hs.loadSpoon(\"Deskmates\")
 spoon.Deskmates:start()
 -- mine too" ]'
@@ -348,7 +351,7 @@ if command -v luac > /dev/null 2>&1; then
 fi
 # Uninstall points at the backup.
 out=$("$deskmates" uninstall)
-check "init uninstall: names the backup" 'echo "$out" | grep -q "init.lua.bak"'
+check "init uninstall: names the backup" 'echo "$out" | grep -q "init.lua.last.bak"'
 
 # Only this Spoon's names change: another Spoon whose name holds the word, and comments, stay as they are.
 fresh_home
@@ -424,6 +427,9 @@ fresh_home
 echo '{}' > "$HOME/s.json"
 chmod 600 "$HOME/s.json"
 check "backup: mode kept" '(. hook/install-lib.sh; backup "$HOME/s.json") && [ "$(stat -f %Lp "$HOME/s.json.bak")" = 600 ]'
+echo '{"changed":1}' > "$HOME/s.json"
+check "backup: a second one keeps the first" '(. hook/install-lib.sh; backup "$HOME/s.json") && [ "$(cat "$HOME/s.json.bak")" = "{}" ] && cmp -s "$HOME/s.json" "$HOME/s.json.last.bak"'
+check "backup: the last one keeps the mode too" '[ "$(stat -f %Lp "$HOME/s.json.last.bak")" = 600 ]'
 
 # Every harness, with nothing written for it here: its hooks file holding a hook of the user's for each of its
 # events, install, install again, status, uninstall. Harnesses with their own present.sh are not JSON-based and

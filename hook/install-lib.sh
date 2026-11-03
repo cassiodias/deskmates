@@ -26,9 +26,12 @@ need_jq() {
   return 1
 }
 
+# Copies file $1 to $1.last.bak, keeping its mode. The first copy also goes to $1.bak, which is never
+# overwritten: the file as it was before Deskmates first changed it (or a .bak of the user's own, left alone).
 backup() {
-  [ -f "$1" ] && cp -p "$1" "$1.bak"
-  return 0
+  [ -f "$1" ] || return 0
+  [ -e "$1.bak" ] || cp -p "$1" "$1.bak" || return 1
+  cp -p "$1" "$1.last.bak"
 }
 
 # Fails, leaving file $1 as it was, unless it holds a JSON object.

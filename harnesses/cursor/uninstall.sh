@@ -11,4 +11,4 @@ if ! hooks_present "$hooks"; then
 fi
 backup "$hooks"
 hooks_remove "$hooks" || exit 1
-say "Cursor hooks removed from ~/.cursor/hooks.json (backup in ~/.cursor/hooks.json.bak)"
+say "Cursor hooks removed from ~/.cursor/hooks.json (backups in ~/.cursor/hooks.json.bak and .last.bak)"

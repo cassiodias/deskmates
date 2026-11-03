@@ -9,5 +9,5 @@ if [ -f "$settings" ]; then
   backup "$settings"
 fi
 hooks_merge "$settings" "$here/hooks.json" || exit 1
-say "Claude Code hooks in ~/.claude/settings.json (backup in ~/.claude/settings.json.bak)"
+say "Claude Code hooks in ~/.claude/settings.json (backups in ~/.claude/settings.json.bak and .last.bak)"
 todo "start a new Claude Code session"

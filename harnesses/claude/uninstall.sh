@@ -11,4 +11,4 @@ if ! hooks_present "$settings"; then
 fi
 backup "$settings"
 hooks_remove "$settings" || exit 1
-say "Claude Code hooks removed from ~/.claude/settings.json (backup in ~/.claude/settings.json.bak)"
+say "Claude Code hooks removed from ~/.claude/settings.json (backups in ~/.claude/settings.json.bak and .last.bak)"
