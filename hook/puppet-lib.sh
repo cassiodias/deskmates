@@ -107,36 +107,80 @@ leading_command() {
   printf '/%s' "$name"
 }
 
-# True when a shell command runs tests, so the puppet shows a progress bar and the result. It looks at the word
-# in each command's place (after variable settings and wrappers like npx, uv run or python -m), so a test runner's
-# name in an argument (cat jest.config.js) is not a test run.
+# True when a shell command runs tests, so the puppet shows a progress bar and the result. It reads the command
+# as the shell would, roughly: quotes, ; & | ( ) between commands, sh -c "…" inside, and here-document bodies
+# skipped. Each command's program counts, past variable settings and wrappers (env, nohup, timeout 300, npx, uv
+# run, bundle exec, python -m, with their flags), so a runner's name in an argument (cat jest.config.js) is not
+# a test run. Scripts named test, or test-…, test_…, test:… count (npm run test:unit).
 is_test_command() {
   printf '%s\n' "$1" | awk '
     function base(word) { sub(/.*\//, "", word); return word }
-    function isTest(word) { return word == "test" || word ~ /^test:/ }
+    function isTest(word) { return word ~ /^test([-_:].*)?$/ }
+    function isRunner(word) { return base(word) ~ /^(pytest|py\.test|unittest|jest|vitest|mocha|rspec|tox|phpunit)$/ }
+    # Whether the command in words w[1..n] runs tests.
+    function judge(w, n,   i, program, first, second) {
+      i = 1
+      while (i <= n) {
+        if (w[i] ~ /^[A-Za-z_][A-Za-z0-9_]*=/) i++
+        else if (base(w[i]) ~ /^(env|nohup|timeout|time|nice|sudo|exec|command|caffeinate|npx|bunx|pnpx)$/) {
+          i++
+          while (i <= n && (w[i] ~ /^-/ || w[i] ~ /^[0-9.]+[smhd]?$/)) i++
+        } else if ((w[i] ~ /^(uv|poetry|pipenv|pdm|hatch|rye)$/ && w[i + 1] == "run") ||
+          (w[i] == "bundle" && w[i + 1] == "exec")) {
+          i += 2
+          while (i <= n && w[i] ~ /^-/) i++
+        } else if (base(w[i]) ~ /^python[0-9.]*$/ && w[i + 1] == "-m") i += 2
+        else break
+      }
+      if (i > n) return 0
+      program = base(w[i]); first = w[i + 1]; second = w[i + 2]
+      if (program ~ /^(ba|z|da|k)?sh$/ && first ~ /^-[A-Za-z]*c[A-Za-z]*$/) return scan(second)
+      if (isRunner(program)) return 1
+      if (program ~ /^(go|cargo|mvn|gradle|gradlew|make|dotnet|swift|mix|deno)$/) return isTest(first)
+      if (program ~ /^(npm|yarn|pnpm|bun)$/) {
+        if (isTest(first) || (first == "run" && isTest(second))) return 1
+        if (first ~ /^(exec|dlx|x)$/) first = second
+        return first ~ /^(jest|vitest|mocha)$/
+      }
+      return 0
+    }
+    # Whether any command on line runs tests: splits it into words, as the shell would, roughly.
+    function scan(line,   w, n, i, c, quote, word, inWord, hit) {
+      n = 0; quote = ""; word = ""; inWord = 0; hit = 0
+      split("", w)
+      for (i = 1; i <= length(line); i++) {
+        c = substr(line, i, 1)
+        if (quote != "") {
+          if (c == quote) quote = ""; else word = word c
+        } else if (c == "\"" || c == "\047") {
+          quote = c; inWord = 1
+        } else if (c == "\\") {
+          i++; word = word substr(line, i, 1); inWord = 1
+        } else if (c == " " || c == "\t" || c ~ /[;&|()]/) {
+          if (inWord) { w[++n] = word; word = ""; inWord = 0 }
+          if (c ~ /[;&|()]/) {
+            if (n > 0 && judge(w, n)) hit = 1
+            n = 0; split("", w)
+          }
+        } else {
+          word = word c; inWord = 1
+        }
+      }
+      if (inWord) w[++n] = word
+      if (n > 0 && judge(w, n)) hit = 1
+      return hit
+    }
+    # A here-document body is text, not commands.
+    heredoc != "" {
+      line = $0; sub(/^[ \t]+/, "", line); sub(/[ \t]+$/, "", line)
+      if (line == heredoc) heredoc = ""
+      next
+    }
     {
-      gsub(/[;&|()]/, "\n")
-      n = split($0, commands, "\n")
-      for (c = 1; c <= n; c++) {
-        m = split(commands[c], w, /[ \t]+/)
-        i = 1
-        while (i <= m && w[i] == "") i++
-        while (i <= m) {
-          if (w[i] ~ /^[A-Za-z_][A-Za-z0-9_]*=/ || w[i] ~ /^(npx|bunx|pnpx|exec|time|env|sudo|nice|command)$/) i++
-          else if (w[i] ~ /^(uv|poetry|pipenv|pdm|hatch)$/ && w[i + 1] == "run") i += 2
-          else if (w[i] == "bundle" && w[i + 1] == "exec") i += 2
-          else if (base(w[i]) ~ /^python[0-9.]*$/ && w[i + 1] == "-m") i += 2
-          else break
-        }
-        if (i > m) continue
-        program = base(w[i]); first = w[i + 1]; second = w[i + 2]
-        if (program ~ /^(pytest|py\.test|unittest|jest|vitest|mocha|rspec|tox|phpunit)$/) found = 1
-        else if (program ~ /^(go|cargo|mvn|gradle|gradlew|make|dotnet|swift|mix|deno)$/ && isTest(first)) found = 1
-        else if (program ~ /^(npm|yarn|pnpm|bun)$/) {
-          if (isTest(first) || (first == "run" && isTest(second))) found = 1
-          else if (first ~ /^(exec|dlx|x)$/ && base(second) ~ /^(jest|vitest|mocha)$/) found = 1
-          else if (base(first) ~ /^(jest|vitest|mocha)$/) found = 1
-        }
+      if (scan($0)) found = 1
+      line = $0; gsub(/<<</, "", line)
+      if (match(line, /<<-?[ \t]*["\047]?[A-Za-z_][A-Za-z0-9_]*/)) {
+        heredoc = substr(line, RSTART, RLENGTH); sub(/^<<-?[ \t]*["\047]?/, "", heredoc)
       }
     }
     END { exit !found }'
@@ -159,7 +203,8 @@ puppet_program() {
 terminal_runs() {
   [ -n "$1" ] || return 1
   ps -o comm= -t "${1#/dev/}" 2>/dev/null | awk -v names=" $2 " '
-    { name = $0; sub(/.*\//, "", name); sub(/^-/, "", name); if (names == "  " || index(names, " " name " ")) found = 1 }
+    { name = $0; sub(/.*\//, "", name); sub(/^-/, "", name) }
+    names == "  " || index(names, " " name " ") { found = 1 }
     END { exit !found }'
 }
 

@@ -31,11 +31,26 @@ for command in "pytest -q" "python -m pytest tests" "python3 -m unittest discove
   "yarn test" "pnpm test" "pnpm run test" "pnpm vitest run" "bun test" "npx jest --watch=false" "go test ./..." \
   "cargo test" "mvn test" "./gradlew test" "make test" "tox -e py312" "bundle exec rspec spec" \
   "./node_modules/.bin/vitest run" "cd app && npm test" "cd app
-  npm test" "CI=1 npm test" "uv run pytest"; do
+  npm test" "CI=1 npm test" "uv run pytest" "timeout 300 pytest" "timeout -k 5 300 pytest" "nohup pytest &" \
+  "npm run test-unit" "yarn test_e2e" "uv run --frozen pytest" "npx --yes jest" "FOO=\"a b\" pytest" \
+  "bash -c \"npm test\"" "sh -lc 'cd app && pytest'" "nice -n 10 pytest" "env -i CI=1 npm test" \
+  "cat > notes.txt <<EOF
+hello
+EOF
+pytest -q"; do
   expect "a test command: $command" "$(is_test_command "$command" && echo yes)" yes
 done
 for command in "cat jest.config.js" "grep -r pytest src" "npm install" "go build ./..." "cargo build" \
-  "vim tests/test_api.py" "ls pytest.ini" "echo make test" "git commit -m 'npm test passes'" "pnpm install"; do
+  "vim tests/test_api.py" "ls pytest.ini" "echo make test" "git commit -m 'npm test passes'" "pnpm install" \
+  "cat > notes.txt <<EOF
+pytest
+EOF" "cat > notes.txt <<EOF
+hello
+npm test
+EOF" "cat <<-'EOF' > plan.md
+	npm test
+	EOF" "npm run testing-docs-build" "echo \"a; pytest\"" \
+  "bash -c \"echo pytest\""; do
   expect "not a test command: $command" "$(is_test_command "$command" && echo yes)" ""
 done
 
