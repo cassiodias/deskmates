@@ -118,6 +118,12 @@ function obj:render()
 end
 
 function obj:refreshTabs()
+  -- Whether each app a harness runs sessions in is still running (checked even without iTerm).
+  local apps = {}
+  for _, harness in pairs(harnesses.all) do
+    for _, bundle in pairs(harness.apps or {}) do apps[bundle] = hs.application.get(bundle) ~= nil end
+  end
+  self.sessions:closeQuitApps(apps)
   if not self.iterm:refresh() then return end
   local ps, ok = hs.execute("/bin/ps -axo tty=,comm=")
   self.sessions:closeMissing(self.iterm.tabs, ok and Programs.parse(ps) or nil)

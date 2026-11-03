@@ -91,5 +91,11 @@ stub.focused = nil
 P:focus("chat1")
 check("a click on Cursor's chat rabbit brings Cursor forward", stub.focused == "com.todesktop.230313mzl4w4u92")
 
+-- Cursor says nothing when it quits: its chat rabbit leaves once the app is gone.
+stub.quitApps = { ["com.todesktop.230313mzl4w4u92"] = true }
+stub.advance(10)
+check("Cursor's chat rabbit leaves when Cursor quits", not (P.stage.puppets.chat1 and P.stage.puppets.chat1.canvas:isShowing()))
+check("the iTerm puppet stays when Cursor quits", P.stage.puppets.tab1 ~= nil and P.stage.puppets.tab1.canvas:isShowing())
+
 os.remove(eventsFile)
 check.done("click")

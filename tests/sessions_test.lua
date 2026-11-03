@@ -180,6 +180,25 @@ plain:apply(event("UserPromptSubmit", { session = "p1", text = "/build", tty = "
   { mapping = mapping, harness = fake, frame = 1, now = 100 })
 plain:closeMissing(tabs, Programs.parse(""))
 check("a harness with no program is judged by its tab only", onStageOf(plain, "p1"))
+
+-- An agent whose sessions also run inside its own app (no terminal): such a session ends once that app quits.
+local rabbit = { id = "rabbit", name = "Rabbit", apps = { Burrow = "com.example.burrow" }, toolKind = function() return nil end }
+local app = Sessions.new(100)
+app:apply(event("UserPromptSubmit", { session = "r1", text = "/build", app = "Burrow" }),
+  { mapping = mapping, harness = rabbit, frame = 1, now = 100 })
+app:apply(event("Stop", { session = "r1", text = "Done." }), { mapping = mapping, harness = rabbit, frame = 1, now = 100 })
+app:apply(event("UserPromptSubmit", { session = "r2", text = "/build", tty = "/dev/ttys004", app = "iTerm.app" }),
+  { mapping = mapping, harness = rabbit, frame = 1, now = 100 })
+app:closeQuitApps(nil)
+check("apps: an unknown app list closes nothing", onStageOf(app, "r1", 200))
+app:closeQuitApps({ ["com.example.burrow"] = true })
+check("apps: a session in its running app waits at its desk", onStageOf(app, "r1", 200))
+app:closeQuitApps({ ["com.example.burrow"] = false })
+check("apps: a session whose app quit leaves", not onStageOf(app, "r1", 200))
+check("apps: the agent's terminal sessions stay", onStageOf(app, "r2", 200))
+app:apply(event("UserPromptSubmit", { session = "r1", text = "/build", app = "Burrow" }),
+  { mapping = mapping, harness = rabbit, frame = 1, now = 300 })
+check("apps: a new prompt from the app brings it back", onStageOf(app, "r1", 300))
 -- A program given as a list (an agent that shows up under more than one name): any of them keeps it.
 local hare = { id = "hare", name = "Hare", program = { "hare", "hare-agent" }, toolKind = function() return nil end }
 local listed = Sessions.new(100)

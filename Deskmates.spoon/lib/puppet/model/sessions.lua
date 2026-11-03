@@ -96,6 +96,17 @@ function Sessions:closeMissing(tabs, running)
   end
 end
 
+-- With running ({ [bundle id] = true or false }; nil when unknown): a session in an app its harness names
+-- (harness.apps, by the app on its lines) has ended once that app no longer runs. For agents whose own app
+-- runs their sessions with no terminal, and says nothing when it quits.
+function Sessions:closeQuitApps(running)
+  if not running then return end
+  for _, s in pairs(self.all) do
+    local bundle = s.apps and s.app and s.apps[s.app]
+    if bundle and running[bundle] == false then s.isClosed = true end
+  end
+end
+
 -- Ends the turn's show once the main thread and every subagent are done, saying what the agent did.
 local function finish(intents, sid, s)
   if s.isListed and not s.isWorking and liveAgents(s) == 0 then
@@ -130,6 +141,7 @@ function Sessions:apply(e, ctx)
   s.seenAt = at
   s.harness = harness.id
   s.program = harness.program
+  s.apps = harness.apps
   if e.folder ~= "" then s.folder = e.folder end
   if e.app ~= "" then s.app = e.app end
   if e.tty:match("^/dev/ttys%d+$") then s.tty = e.tty end

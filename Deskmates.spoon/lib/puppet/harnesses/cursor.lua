@@ -21,6 +21,9 @@ return {
   toolKind = function(tool) return TOOL_KINDS[tool] end,
   -- The CLI runs as agent or cursor-agent, by the name it was started with. Ends a session whose tab quit it.
   program = { "agent", "cursor-agent" },
+  -- Cursor's own chat runs sessions with no terminal (its lines name the app "Cursor") and says nothing when
+  -- Cursor quits: they end when the app does.
+  apps = { Cursor = CURSOR_APP },
   -- A click brings its terminal forward. Cursor comes forward instead for a session in Cursor's own terminal
   -- (TERM_PROGRAM "vscode", like VS Code's: a Cursor session there is in Cursor) or in Cursor's chat (app
   -- "Cursor", written by the translator when there is no terminal).

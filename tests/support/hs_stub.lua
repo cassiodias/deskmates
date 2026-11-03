@@ -92,6 +92,7 @@ hs = {
   application = {
     get = function(bundle)
       if bundle == "com.googlecode.iterm2" and not stub.itermRunning then return nil end
+      if stub.quitApps and stub.quitApps[bundle] then return nil end
       return { allWindows = function() return {} end }
     end,
     launchOrFocusByBundleID = function(id) stub.focused = id end,

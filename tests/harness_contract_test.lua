@@ -66,6 +66,11 @@ for id, h in pairs(harnesses.all) do
   local names = type(h.program) == "table" and #h.program > 0
   for _, name in ipairs(type(h.program) == "table" and h.program or {}) do names = names and type(name) == "string" end
   check(id .. ": program is nil, a name or a list of names", h.program == nil or type(h.program) == "string" or names)
+  local apps = h.apps == nil or type(h.apps) == "table"
+  for app, bundle in pairs(type(h.apps) == "table" and h.apps or {}) do
+    apps = apps and type(app) == "string" and type(bundle) == "string"
+  end
+  check(id .. ": apps is nil or a map of app names to bundle ids", apps)
   check(id .. ": has a palette", type(h.character.palette) == "table" and #h.character.palette > 0)
   check(id .. ": toolKind is a function", type(h.toolKind) == "function")
   local kind = h.toolKind("no-such-tool")

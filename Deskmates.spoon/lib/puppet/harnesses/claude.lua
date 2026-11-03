@@ -30,6 +30,8 @@ return {
   toolKind = function(tool) return TOOL_KINDS[tool] end,
   -- Optional: program = "name" or { "name", … }, the program its sessions run in their terminal (`ps -o comm`'s
   -- last part). A session then ends once its terminal no longer runs it; for agents that report the end late.
+  -- Optional: apps = { [app on its lines] = bundle id }, the apps its sessions run inside with no terminal. Such a
+  -- session ends once its app no longer runs; for agents whose app says nothing when it quits (Cursor's chat).
   -- A click on the puppet. A command-line agent brings its terminal tab forward; an agent that runs in its own
   -- app would call terminals.app(bundleId, session.folder) instead (terminals/focus.lua).
   focus = function(session, terminals) return terminals.focus(session) end,
