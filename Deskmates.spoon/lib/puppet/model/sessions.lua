@@ -130,6 +130,8 @@ function Sessions:apply(e, ctx)
   local function say(text, seconds) intents[#intents + 1] = { key = sid, text = text, seconds = seconds } end
 
   if e.name == "UserPromptSubmit" then
+    -- Someone typed into it, so it runs (a session resumed after it was judged closed).
+    s.isClosed = false
     local command = e.text:match("^/(%S+)")
     -- A message without a /command while the session is still busy (its turn running, or subagents it
     -- started still working) belongs to that work: it keeps the command, its animation and its subagents.

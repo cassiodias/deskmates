@@ -108,7 +108,7 @@ hs = {
   dialog = { textPrompt = function() return "Cancel", "" end },
   focus = function() end,
   -- A shell command's output: only `ps` is run; stub.ps holds what it prints (nil: it failed).
-  execute = function() return stub.ps end,
+  execute = function() return stub.ps, stub.ps ~= nil end,
   spoons = {
     scriptPath = function() return stub.spoonPath end,
     resourcePath = function(name) return stub.spoonPath .. name end,

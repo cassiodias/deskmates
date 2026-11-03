@@ -6,14 +6,26 @@
 puppet_read_payload
 
 # Codex runs hooks from a background process with no terminal: the terminal is the one of the codex process
-# working in the session's folder.
+# working in the session's folder. With several there, the first one no other session has claimed.
 puppet_tty_fallback() {
   folder=$(cd "$(path_field cwd)" 2>/dev/null && pwd -P) || return 0
+  first=""
   for pid in $(pgrep -x codex); do
     name=$(ps -o tty= -p "$pid" | tr -d ' ')
     case "$name" in ""|"??") continue ;; esac
-    [ "$(lsof -a -d cwd -p "$pid" -Fn 2>/dev/null | sed -n 's/^n//p')" = "$folder" ] && { printf '/dev/%s' "$name"; return 0; }
+    [ "$(lsof -a -d cwd -p "$pid" -Fn 2>/dev/null | sed -n 's/^n//p')" = "$folder" ] || continue
+    [ -n "$first" ] || first="/dev/$name"
+    claimed_by_other "/dev/$name" || { printf '/dev/%s' "$name"; return 0; }
   done
+  printf '%s' "$first"
+}
+
+# Whether a session other than this one already has terminal $1.
+claimed_by_other() {
+  for cache in "$PUPPET_DIR"/tty-*; do
+    [ -f "$cache" ] && [ "$cache" != "$PUPPET_DIR/tty-$(field session_id)" ] && [ "$(cat "$cache")" = "$1" ] && return 0
+  done
+  return 1
 }
 
 # A command's exit code, from the transcript's record of the call (the hook's result has only its output).
@@ -44,8 +56,10 @@ case "$event" in
       "Exit code: 0"*) ;;
       "Exit code: "[0-9]*|"Exit code: -"[0-9]*) event=PostToolUseFailure ;;
     esac
-    code=$(exit_code "$(path_field transcript_path)" "$(field tool_use_id)")
-    [ -n "$code" ] && [ "$code" != 0 ] && event=PostToolUseFailure ;;
+    if [ "$tool" = Bash ]; then
+      code=$(exit_code "$(path_field transcript_path)" "$(field tool_use_id)")
+      [ -n "$code" ] && [ "$code" != 0 ] && event=PostToolUseFailure
+    fi ;;
   PreToolUse|PermissionRequest|SubagentStart|SessionEnd) ;;
   *) exit 0 ;;
 esac

@@ -119,8 +119,8 @@ end
 
 function obj:refreshTabs()
   if not self.iterm:refresh() then return end
-  local ps = hs.execute("/bin/ps -axo tty=,comm=")
-  self.sessions:closeMissing(self.iterm.tabs, ps and Programs.parse(ps) or nil)
+  local ps, ok = hs.execute("/bin/ps -axo tty=,comm=")
+  self.sessions:closeMissing(self.iterm.tabs, ok and Programs.parse(ps) or nil)
 end
 
 --- Deskmates:focus(key)

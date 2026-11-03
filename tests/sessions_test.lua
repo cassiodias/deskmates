@@ -168,8 +168,13 @@ quit:apply(event("UserPromptSubmit", { session = "o1", text = "/build", tty = "/
 quit:apply(event("Stop", { session = "o1", text = "Done." }), { mapping = mapping, harness = owl, frame = 1, now = 100 })
 quit:closeMissing(tabs, running)
 check("a session whose program still runs stays", onStageOf(quit, "o1"))
+check("programs: a ps that printed nothing is unknown", Programs.parse("") == nil and Programs.parse(nil) == nil)
+quit:closeMissing(tabs, Programs.parse(""))
+check("an unknown program list closes nothing", onStageOf(quit, "o1"))
 quit:closeMissing(tabs, Programs.parse("ttys004  -zsh\n"))
 check("a session whose program left its terminal leaves", not onStageOf(quit, "o1"))
+quit:apply(event("UserPromptSubmit", { session = "o1", text = "/build" }), { mapping = mapping, harness = owl, frame = 1, now = 100 })
+check("a resumed session (a new prompt) comes back", onStageOf(quit, "o1"))
 local plain = Sessions.new(100)
 plain:apply(event("UserPromptSubmit", { session = "p1", text = "/build", tty = "/dev/ttys004", app = "iTerm.app" }),
   { mapping = mapping, harness = fake, frame = 1, now = 100 })
