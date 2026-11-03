@@ -60,6 +60,10 @@ PUPPET_PAYLOAD="{\"message\":\"${a119}éèê\",\"last_assistant_message\":\"$(pr
 expect "field cuts at 120 characters" "$(export LC_ALL=C; field message)" "${a119}é"
 expect "first_sentence cuts at 90 characters" "$(export LC_ALL=C; first_sentence last_assistant_message)" \
   "$(printf '%89s' '' | tr ' ' b)€"
+# A byte that is not UTF-8 is dropped; the characters around it stay.
+expect "cut_chars drops a stray byte" "$(printf 'abc\351def' | cut_chars 5)" abcde
+expect "cut_chars drops a stray byte before the last character" "$(printf 'a\303\251\351x' | cut_chars 5)" "$(printf 'a\303\251x')"
+expect "cut_chars keeps a text without one" "$(printf '\303\251t\303\251' | LC_ALL=C cut_chars 2)" "$(printf '\303\251t')"
 mkdir -p "$HOME/.deskmates"
 (export LC_ALL=C PUPPET_NOW=0 PUPPET_TTY=; write_event claude Stop s1 "" "" "" "" "/Users/me/${a119}ü✓" "" "")
 expect "the folder is cut at 120 characters" "$(LC_ALL=C cut -d'|' -f8 "$HOME/.deskmates/events")" "${a119}ü"

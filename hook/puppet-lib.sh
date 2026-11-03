@@ -58,10 +58,11 @@ payload_value() {
   printf '%s\n' "$value"
 }
 
-# The first $1 characters of stdin, never cutting one in two: hooks may run with the C locale (from a
-# background process), where cut counts bytes.
+# The first $1 characters of each line of stdin, never cutting one in two: hooks may run with the C locale (from
+# a background process), where cut counts bytes. A byte that is not UTF-8 is dropped and the rest kept (cut alone
+# stops there); the newline added first lets iconv judge a stray byte at the very end.
 cut_chars() {
-  LC_ALL=en_US.UTF-8 cut -c "1-$1" 2>/dev/null
+  { cat; echo; } | iconv -c -f UTF-8 -t UTF-8 2>/dev/null | LC_ALL=en_US.UTF-8 cut -c "1-$1" 2>/dev/null
 }
 
 # Value $1 on one line, without "|", cut to 120 characters.
