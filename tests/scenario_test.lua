@@ -121,7 +121,9 @@ write("PreToolUse|tab1||AskUserQuestion|||app|iTerm.app||/dev/ttys001")
 stub.advance(0.3)
 snapshot(P, "tab1 has a question")
 
+-- iTerm starts, with two tabs; ps sees each tab's terminal running the agent.
 stub.tabs, stub.itermRunning = "/dev/ttys001=1/1;/dev/ttys002=1/2;", true
+stub.ps = "ttys001  claude\nttys002  claude\n"
 write("UserPromptSubmit|tab2||||/qa CON-1|app||iTerm.app||/dev/ttys002")
 write("PreToolUse|tab2||Agent||Check the contract|app|iTerm.app||/dev/ttys002|claude|Shop-api PR 12 review")
 write("SubagentStart|tab2|a1||contract||app|iTerm.app||/dev/ttys002")
@@ -169,7 +171,7 @@ line("== click on tab3 brings forward " .. tostring(stub.focused))
 menu()
 
 write("SessionEnd|tab3||||||ghostty||")
-stub.tabs = "/dev/ttys002=1/1;"
+stub.tabs, stub.ps = "/dev/ttys002=1/1;", "ttys002  claude\n"
 stub.advance(3.1)
 snapshot(P, "tab3 ends and tab1's iTerm tab closes")
 

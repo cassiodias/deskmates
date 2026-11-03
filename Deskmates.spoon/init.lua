@@ -24,7 +24,7 @@ local harnesses = require("puppet.harnesses")
 local scenes = require("puppet.render.scenes")
 local Stage = require("puppet.stage.stage")
 local Iterm = require("puppet.terminals.iterm")
-local Programs = require("puppet.terminals.programs")
+local Liveness = require("puppet.terminals.liveness")
 local newTerminals = require("puppet.terminals.focus")
 local menuItems = require("puppet.ui.menu")
 
@@ -117,16 +117,10 @@ function obj:render()
   end
 end
 
-function obj:refreshTabs()
-  -- Whether each app a harness runs sessions in is still running (checked even without iTerm).
-  local apps = {}
-  for _, harness in pairs(harnesses.all) do
-    for _, bundle in pairs(harness.apps or {}) do apps[bundle] = hs.application.get(bundle) ~= nil end
-  end
-  self.sessions:closeQuitApps(apps)
-  if not self.iterm:refresh() then return end
-  local ps, ok = hs.execute("/bin/ps -axo tty=,comm=")
-  self.sessions:closeMissing(self.iterm.tabs, ok and Programs.parse(ps) or nil)
+-- Takes one look at what runs (terminals, their programs, the agents' apps, iTerm's tabs) and lets the sessions
+-- judge which are still there: the same for every terminal app.
+function obj:refreshLiveness()
+  self.sessions:applyLiveness(Liveness.look(harnesses.all, self.iterm))
 end
 
 --- Deskmates:focus(key)
@@ -327,8 +321,8 @@ function obj:start()
     self.reader:read(function(line) self:handle(line) end)
     self:render()
   end)
-  self.tabsTimer = hs.timer.doEvery(config.TABS_SECONDS, function() self:refreshTabs() end)
-  self:refreshTabs()
+  self.tabsTimer = hs.timer.doEvery(config.TABS_SECONDS, function() self:refreshLiveness() end)
+  self:refreshLiveness()
   self:render()
   return self
 end

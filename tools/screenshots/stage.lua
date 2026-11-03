@@ -18,10 +18,10 @@ function D.begin(eventsFile)
     self.windows = 1
     return true
   end
-  -- Staged sessions run no real program in their fake tabs: judge them by the tabs only.
-  P.unstagedRefreshTabs = P.unstagedRefreshTabs or P.refreshTabs
-  P.refreshTabs = function(self) if self.iterm:refresh() then self.sessions:closeMissing(self.iterm.tabs) end end
-  P:refreshTabs()
+  -- Staged sessions run in fake tabs, with no real terminal: only their SessionEnd takes them away.
+  P.unstagedRefreshLiveness = P.unstagedRefreshLiveness or P.refreshLiveness
+  P.refreshLiveness = function(self) self.iterm:refresh() end
+  P:refreshLiveness()
   return "staged"
 end
 
@@ -73,7 +73,7 @@ end
 
 function D.finish()
   if D.mouse then hs.mouse.absolutePosition(D.mouse) end
-  if P.unstagedRefreshTabs then P.refreshTabs, P.unstagedRefreshTabs = P.unstagedRefreshTabs, nil end
+  if P.unstagedRefreshLiveness then P.refreshLiveness, P.unstagedRefreshLiveness = P.unstagedRefreshLiveness, nil end
   P:stop()
   P.eventsFile = os.getenv("HOME") .. "/.deskmates/events"
   P:start()

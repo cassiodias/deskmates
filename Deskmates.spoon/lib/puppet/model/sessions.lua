@@ -44,12 +44,12 @@ function Sessions.sceneFor(s, mapping)
   return "code"
 end
 
--- The sessions with a puppet, oldest first: one that has played keeps it until it ends, its terminal tab
--- closes, it rests with no tab, or it has been silent for hours. With none, the home puppet.
+-- The sessions with a puppet, oldest first: one that has played keeps it until it ends, it is closed or away
+-- and resting (applyLiveness), or it has been silent for hours. With none, the home puppet.
 function Sessions:stageKeys(now)
   local keys = {}
   for sid, s in pairs(self.all) do
-    -- A session away from any tab first says what it did, then leaves.
+    -- A session away (no terminal) first says what it did, then leaves.
     local isResting = isAtRest(s) and now - s.seenAt >= config.DONE_SECONDS
     local isGone = s.isClosed or (s.isAway and isResting) or now - s.seenAt >= config.STALE_SECONDS
     if s.hasPlayed and not isGone then keys[#keys + 1] = sid end
@@ -67,16 +67,6 @@ function Sessions:remap(mapping)
   end
 end
 
--- Sessions iTerm should hold: those it ran in, and those with no terminal app at all (run in the background).
-local function wantsItermTab(s)
-  return s.app == nil or s.app == "" or s.app == "iTerm.app"
-end
-
--- Given the terminal tabs iTerm holds now: a session whose tab was there and is gone was closed without saying
--- so. One never seen in a tab (closed before Hammerspoon started, or a background session) is away while it
--- rests: no tab to jump to, nothing to show; it comes back when it works again. With running (each terminal's
--- programs, terminals/programs.lua), a session whose harness names its program has ended once its terminal no
--- longer runs it.
 -- Whether a terminal's programs include the harness's program: one name, or any of a list.
 local function runs(programs, program)
   if type(program) == "string" then return programs[program] == true end
@@ -86,24 +76,21 @@ local function runs(programs, program)
   return false
 end
 
-function Sessions:closeMissing(tabs, running)
+-- Applies one look at what runs (terminals/liveness.lua): live.terminals ({ [tty] = { [program] = true } }, nil
+-- when unknown) and live.apps ({ [bundle id] = running? }). The same for every terminal app:
+--   closed: its terminal is gone (nothing runs in its tty: the tab or window closed), its terminal no longer
+--     runs the harness's program, or the app it runs inside (harness.apps) quit. It leaves at once, and comes
+--     back with its next prompt.
+--   away: it has no terminal and no app to watch (run in the background). It leaves once it rests, after saying
+--     what it did, and comes back when it works again.
+function Sessions:applyLiveness(live)
   for _, s in pairs(self.all) do
-    local inTab = s.tty and tabs[s.tty]
-    if inTab then s.wasInTab = true end
-    if s.tty and s.wasInTab and not inTab then s.isClosed = true end
-    if running and s.program and s.tty and not runs(running[s.tty] or {}, s.program) then s.isClosed = true end
-    s.isAway = not inTab and not s.wasInTab and wantsItermTab(s)
-  end
-end
-
--- With running ({ [bundle id] = true or false }; nil when unknown): a session in an app its harness names
--- (harness.apps, by the app on its lines) has ended once that app no longer runs. For agents whose own app
--- runs their sessions with no terminal, and says nothing when it quits.
-function Sessions:closeQuitApps(running)
-  if not running then return end
-  for _, s in pairs(self.all) do
+    local programs = s.tty and live.terminals and live.terminals[s.tty]
     local bundle = s.apps and s.app and s.apps[s.app]
-    if bundle and running[bundle] == false then s.isClosed = true end
+    if s.tty and live.terminals and not programs then s.isClosed = true end
+    if programs and s.program and not runs(programs, s.program) then s.isClosed = true end
+    if bundle and live.apps and live.apps[bundle] == false then s.isClosed = true end
+    s.isAway = not s.tty and not bundle
   end
 end
 

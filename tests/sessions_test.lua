@@ -119,7 +119,9 @@ said("UserPromptSubmit", { text = "/build" })
 said("SubagentStart", { agentId = "a4", agentType = "lens" })
 check("a new turn forgets descriptions queued in the last one", named.all.s1.agents.a4.label == "lens")
 
--- Terminal tabs: a closed tab takes its puppet away, and so does having no tab at all while resting.
+-- Liveness: one look at what runs (terminals/liveness.lua), applied the same way whatever the terminal app.
+-- A session whose terminal closed leaves; one with no terminal (run in the background) leaves once it rests.
+local Programs = require("puppet.terminals.programs")
 local tabbed = Sessions.new(100)
 local function tab(sid, name, fields)
   fields = fields or {}
@@ -130,56 +132,62 @@ local function onStageOf(model, sid, now)
   for _, key in ipairs(model:stageKeys(now or 160)) do if key == sid then return true end end
   return false
 end
-local function onStage(sid, now)
-  for _, key in ipairs(tabbed:stageKeys(now or 160)) do if key == sid then return true end end
-  return false
-end
+local function onStage(sid, now) return onStageOf(tabbed, sid, now) end
+local function look(ps, apps) return { terminals = Programs.parse(ps), apps = apps or {} } end
 tab("here", "UserPromptSubmit", { text = "/build", tty = "/dev/ttys002", app = "iTerm.app" })
-tab("ghost", "UserPromptSubmit", { text = "/build", tty = "/dev/ttys001" })
+tab("ghost", "UserPromptSubmit", { text = "/build" })
 tab("other", "UserPromptSubmit", { text = "/build", tty = "/dev/ttys009", app = "Apple_Terminal" })
-tabbed:closeMissing({ ["/dev/ttys002"] = { window = 1, tab = 1 } })
-check("a working session with no tab still plays", onStage("ghost"))
+tab("ghostty", "UserPromptSubmit", { text = "/build", tty = "/dev/ttys010", app = "ghostty" })
+local allOpen = "ttys002  -zsh\nttys009  -zsh\nttys010  -zsh\n??       launchd\n"
+tabbed:applyLiveness(look(allOpen))
+check("a working session with no terminal still plays", onStage("ghost"))
 tab("ghost", "Stop", { text = "Done." })
 tab("here", "Stop", { text = "Done." })
 tab("other", "Stop", { text = "Done." })
-tabbed:closeMissing({ ["/dev/ttys002"] = { window = 1, tab = 1 } })
-check("a session with no tab stays to say what it did", onStage("ghost", 100))
+tab("ghostty", "Stop", { text = "Done." })
+tabbed:applyLiveness(look(allOpen))
+check("a session with no terminal stays to say what it did", onStage("ghost", 100))
 check("then, resting, leaves", not onStage("ghost"))
-check("a resting session in its tab stays at its desk", onStage("here"))
-check("another terminal's session is not judged by iTerm's tabs", onStage("other"))
+check("a resting session in its iTerm tab stays at its desk", onStage("here"))
+check("so does one in Terminal.app", onStage("other"))
+check("and one in Ghostty", onStage("ghostty"))
 tab("ghost", "UserPromptSubmit", { text = "/build" })
-check("the tabless session comes back when it works again", onStage("ghost"))
-tabbed:closeMissing({})
-check("a session whose tab closed leaves", not onStage("here"))
-tabbed:closeMissing({ ["/dev/ttys002"] = { window = 1, tab = 1 } })
+check("the background session comes back when it works again", onStage("ghost"))
+tabbed:applyLiveness(look("ttys002  -zsh\nttys010  -zsh\n"))
+check("a session whose Terminal.app window closed leaves", not onStage("other"))
+check("the others stay", onStage("here") and onStage("ghostty"))
+tabbed:applyLiveness({ terminals = nil, apps = {} })
+check("not knowing what runs closes nothing", onStage("here") and onStage("ghostty"))
+tabbed:applyLiveness(look("??       launchd\n"))
+check("with every terminal closed, each session in one leaves", not onStage("here") and not onStage("ghostty"))
+tabbed:applyLiveness(look(allOpen))
 check("and stays gone when another tab takes its terminal", not onStage("here"))
 
 -- An agent that names its program (and says late that it ended): its session ends when its terminal stops
--- running that program, even though the tab stays open.
-local Programs = require("puppet.terminals.programs")
-local running = Programs.parse("ttys004  codex\nttys004  -zsh\n??       /Users/me/.codex/bin/codex\nttys005  /opt/bin/codex\n")
+-- running that program, even though the tab stays open; in any terminal app, iTerm running or not.
+local running = assert(Programs.parse("ttys004  codex\nttys004  -zsh\n??       /Users/me/.codex/bin/codex\nttys005  /opt/bin/codex\n"))
 check("programs: by terminal, by name", running["/dev/ttys004"].codex and running["/dev/ttys005"].codex)
 check("programs: none without a terminal", running["??"] == nil and running["/dev/??"] == nil)
+check("programs: a ps that printed nothing is unknown", Programs.parse("") == nil and Programs.parse(nil) == nil)
+check("programs: a ps with no terminal at all knows there are none", next(assert(Programs.parse("??  launchd\n"))) == nil)
 local owl = { id = "owl", name = "Owl", program = "codex", toolKind = function() return nil end }
 local quit = Sessions.new(100)
-local tabs = { ["/dev/ttys004"] = { window = 1, tab = 1 } }
-quit:apply(event("UserPromptSubmit", { session = "o1", text = "/build", tty = "/dev/ttys004", app = "iTerm.app" }),
+quit:apply(event("UserPromptSubmit", { session = "o1", text = "/build", tty = "/dev/ttys004", app = "ghostty" }),
   { mapping = mapping, harness = owl, frame = 1, now = 100 })
 quit:apply(event("Stop", { session = "o1", text = "Done." }), { mapping = mapping, harness = owl, frame = 1, now = 100 })
-quit:closeMissing(tabs, running)
+quit:applyLiveness({ terminals = running, apps = {} })
 check("a session whose program still runs stays", onStageOf(quit, "o1"))
-check("programs: a ps that printed nothing is unknown", Programs.parse("") == nil and Programs.parse(nil) == nil)
-quit:closeMissing(tabs, Programs.parse(""))
+quit:applyLiveness({ terminals = nil, apps = {} })
 check("an unknown program list closes nothing", onStageOf(quit, "o1"))
-quit:closeMissing(tabs, Programs.parse("ttys004  -zsh\n"))
+quit:applyLiveness(look("ttys004  -zsh\n"))
 check("a session whose program left its terminal leaves", not onStageOf(quit, "o1"))
 quit:apply(event("UserPromptSubmit", { session = "o1", text = "/build" }), { mapping = mapping, harness = owl, frame = 1, now = 100 })
 check("a resumed session (a new prompt) comes back", onStageOf(quit, "o1"))
 local plain = Sessions.new(100)
 plain:apply(event("UserPromptSubmit", { session = "p1", text = "/build", tty = "/dev/ttys004", app = "iTerm.app" }),
   { mapping = mapping, harness = fake, frame = 1, now = 100 })
-plain:closeMissing(tabs, Programs.parse(""))
-check("a harness with no program is judged by its tab only", onStageOf(plain, "p1"))
+plain:applyLiveness(look("ttys004  -zsh\n"))
+check("a harness with no program is judged by its terminal only", onStageOf(plain, "p1"))
 
 -- An agent whose sessions also run inside its own app (no terminal): such a session ends once that app quits.
 local rabbit = { id = "rabbit", name = "Rabbit", apps = { Burrow = "com.example.burrow" }, toolKind = function() return nil end }
@@ -189,11 +197,12 @@ app:apply(event("UserPromptSubmit", { session = "r1", text = "/build", app = "Bu
 app:apply(event("Stop", { session = "r1", text = "Done." }), { mapping = mapping, harness = rabbit, frame = 1, now = 100 })
 app:apply(event("UserPromptSubmit", { session = "r2", text = "/build", tty = "/dev/ttys004", app = "iTerm.app" }),
   { mapping = mapping, harness = rabbit, frame = 1, now = 100 })
-app:closeQuitApps(nil)
-check("apps: an unknown app list closes nothing", onStageOf(app, "r1", 200))
-app:closeQuitApps({ ["com.example.burrow"] = true })
-check("apps: a session in its running app waits at its desk", onStageOf(app, "r1", 200))
-app:closeQuitApps({ ["com.example.burrow"] = false })
+local terminal = Programs.parse("ttys004  -zsh\n")
+app:applyLiveness({ terminals = terminal, apps = {} })
+check("apps: an unknown app closes nothing", onStageOf(app, "r1", 200))
+app:applyLiveness({ terminals = terminal, apps = { ["com.example.burrow"] = true } })
+check("apps: a session in its running app waits at its desk, not away", onStageOf(app, "r1", 200))
+app:applyLiveness({ terminals = terminal, apps = { ["com.example.burrow"] = false } })
 check("apps: a session whose app quit leaves", not onStageOf(app, "r1", 200))
 check("apps: the agent's terminal sessions stay", onStageOf(app, "r2", 200))
 app:apply(event("UserPromptSubmit", { session = "r1", text = "/build", app = "Burrow" }),
@@ -204,9 +213,9 @@ local hare = { id = "hare", name = "Hare", program = { "hare", "hare-agent" }, t
 local listed = Sessions.new(100)
 listed:apply(event("UserPromptSubmit", { session = "h1", text = "/build", tty = "/dev/ttys004", app = "iTerm.app" }),
   { mapping = mapping, harness = hare, frame = 1, now = 100 })
-listed:closeMissing(tabs, Programs.parse("ttys004  /opt/bin/hare-agent\n"))
+listed:applyLiveness(look("ttys004  /opt/bin/hare-agent\n"))
 check("a program list: any name in it keeps the session", onStageOf(listed, "h1"))
-listed:closeMissing(tabs, Programs.parse("ttys004  -zsh\n"))
+listed:applyLiveness(look("ttys004  -zsh\n"))
 check("a program list: none of them running ends it", not onStageOf(listed, "h1"))
 
 check.done("sessions")

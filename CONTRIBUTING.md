@@ -20,6 +20,13 @@ agent ──hook──▶ harnesses/<agent>/translate.sh ──▶ ~/.deskmates/
   puppet per busy session. The core never asks which agent it is: it asks the session's harness module
   (`Deskmates.spoon/lib/puppet/harnesses/<agent>.lua`) what a tool means, how the puppet looks, and how to
   bring its terminal forward.
+- **When a puppet leaves.** Every 3 seconds `terminals/liveness.lua` takes one look at what runs: the terminals
+  something runs in and their programs (`ps`), the agents' apps, and iTerm's tabs when iTerm runs (only for the
+  tab label and a click). `Sessions:applyLiveness` judges every session alike, whatever its terminal app. It is
+  *closed*, and its puppet leaves at once, when nothing runs in its terminal any more (the tab or window
+  closed), its terminal no longer runs the harness's `program`, or the app it runs inside (`apps`) quit. It is
+  *away*, and its puppet leaves once it rests, when it has no terminal and no app to watch (a background
+  session). Its next prompt brings it back. `SessionEnd`, or 2 hours of silence, ends it for good.
 
 ## Layout
 
@@ -43,7 +50,7 @@ Deskmates.spoon/
     harnesses/                the Spoon side of each agent, and the registry
     render/                   pixels, text, sprites (the creatures), and scenes/ (one file per animation)
     stage/                    the puppet windows and their bubbles
-    terminals/                bringing a session's terminal forward; the programs each terminal runs
+    terminals/                bringing a session's terminal forward; one look at what runs (liveness.lua)
     ui/menu.lua               the menu bar menu
 tests/                        run.sh runs them all
 tools/screenshots/            makes the README's pictures
@@ -185,7 +192,7 @@ order (it adds the time, the terminal app and the tty itself). What each event m
 | `SubagentStop` | a subagent ends | the same `agent_id` | ping pong never ends |
 | `Notification` | the agent wants your attention | `text` | no bubble |
 | `Stop` | the turn ends | `text`: the reply's first sentence (`first_sentence`); `title` | **required**: the puppet keeps working for 2 hours |
-| `SessionEnd` | the session closes | nothing | the puppet stays until its tab closes |
+| `SessionEnd` | the session closes | nothing | the puppet stays until its terminal closes (or, with `program`, the agent quits) |
 
 On every event: `session` is a stable id per session, `cwd` the project folder, and `agent_id` is empty on
 the main conversation and set to the subagent's id inside one. `title` is the name the agent gives the
@@ -261,10 +268,10 @@ Make every script executable (`chmod +x`).
   `terminals.app(bundleId, session.folder)` brings an app's window forward, for an agent that runs in its own
   app. `session.app` is the `TERM_PROGRAM` the hook saw; when that is ambiguous for your agent, decide here
   (Cursor's terminal says `vscode`, like VS Code's, so `cursor.lua` brings Cursor forward). An agent with an app
-  of its own may fire the same hooks from the app's chat, with no terminal at all. A line with no terminal app
-  is read as a background session, which leaves once it rests; to keep its puppet at the desk, have the
-  translator name the app when `TERM_PROGRAM` is empty (Cursor's writes `Cursor`), bring the app forward
-  for it in `focus`, and name it in `apps` so the puppet leaves when the app quits. The contract test
+  of its own may fire the same hooks from the app's chat, with no terminal at all. A session with no terminal
+  (no tty on its lines) is read as a background session, which leaves once it rests; to keep its puppet at the
+  desk, have the translator name the app when `TERM_PROGRAM` is empty (Cursor's writes `Cursor`), bring the
+  app forward for it in `focus`, and name it in `apps` so the puppet leaves when the app quits. The contract test
   can check it with a stand-in `terminals` table.
 - `program` (optional): the program name, or a list of names, its sessions run in their terminal (the last
   part of `ps -o comm`). The session ends once its terminal no longer runs it; for agents that report the end
