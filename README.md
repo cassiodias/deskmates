@@ -19,7 +19,7 @@ Pixel puppets that float over your Mac desktop, like the old Office paperclip, a
 | Agent | Creature | What it shows |
 | --- | --- | --- |
 | Claude Code | the puppet | every mood above |
-| Codex | an owl, in teal | every mood above except three: no notifications, no question (plans only), and no permission sign (Codex's default sandbox does not ask). The owl leaves a few seconds after you quit Codex |
+| Codex | an owl, in teal | every mood above except two: no notifications, and no question (plans only). Its permission sign follows Codex's permission requests, but its default sandbox has not asked for one in our tries, so you may never see it. The owl leaves a few seconds after you quit Codex, in any terminal |
 | Cursor CLI (`agent`) | a rabbit, in lavender | every mood above except three: no notifications, no question, and no permission sign (Cursor's hooks are not told when it asks you). A chat in the Cursor app gets a rabbit too, which waits at its desk until you quit Cursor; a click on it brings Cursor forward |
 
 Codex and Cursor show the title each gives the session; Codex's subagents show their short task name, Cursor's their description. Want to add an agent, a creature or an animation? [CONTRIBUTING.md](CONTRIBUTING.md) has the steps.
@@ -56,7 +56,7 @@ Each agent has its own creature and colours in the same scenes: the puppet for C
 - **Drag any puppet** to move the whole row, across screens too; it stays on top of every app and every desktop. The `▟▙` menu bar icon sends the row to the corner of any screen, and puppets left on a screen you unplug come back to the main one.
 - **Hide them** from the `▟▙` menu, or with ⌃⌥⌘P; they stay hidden until you show them again, even after a restart.
 
-It is two small pieces: hooks that write one line per agent event to `~/.deskmates/events`, and a [Hammerspoon](https://www.hammerspoon.org) Spoon that reads them and draws the puppets. Nothing leaves your machine. From your prompts it keeps only a leading `/command`; from the agent's answers, only the first sentence; otherwise the tool names, the project folder's name and the terminal tab; never commands or code.
+It is two small pieces: hooks that write one line per agent event to `~/.deskmates/events`, and a [Hammerspoon](https://www.hammerspoon.org) Spoon that reads them and draws the puppets. Nothing leaves your machine. From your prompts it keeps only a leading `/command` (never a path); from the agent's answers, only the first sentence; from the agent itself, the session's title, a subagent's short description, a skill's name and the agent's notifications; otherwise the tool names, the project folder's name and the terminal; never commands or code.
 
 ## Install
 

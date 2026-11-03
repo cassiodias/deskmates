@@ -60,8 +60,8 @@ Rules that keep it easy to change:
 
 - `events`, `model` and `render` never call Hammerspoon (`hs.*`), except text styling; they get what they need
   passed in, so they run in the tests.
-- The core never asks which agent it is; it asks the session's harness (`toolKind`, `character`, `focus`,
-  `program`).
+- The core never asks which agent it is; it asks the session's harness (`name`, `toolKind`, `character`,
+  `focus`, `program`, `apps`).
 - The event line format lives in `hook/puppet-lib.sh` and `events/parse.lua` only.
 
 ## Run the tests
@@ -75,10 +75,14 @@ tests/run.sh
 - `scenario_test.lua` and `codex_scenario_test.lua` drive the whole Spoon through every scene with a stand-in
   for Hammerspoon and compare every frame with `tests/snapshots/`. If you changed a drawing on purpose, record
   it again with `UPDATE=1 lua5.4 tests/scenario_test.lua` and check the diff.
-- `sessions_test.lua` runs the session model with a fake agent; `status_test.lua` checks the status line and
-  the card's text; `settings_test.lua` checks the saved settings carry over from the old name.
+- `sessions_test.lua` runs the session model with a fake agent; `liveness_test.lua` checks when puppets leave,
+  with iTerm not running; `status_test.lua` checks the status line and the card's text; `settings_test.lua`
+  checks the saved settings carry over from the old name.
 - `harness_contract_test.lua` checks every harness and every creature (see "What the tests check for you").
-- `harnesses.sh` runs every translator on its fixtures; `codex_tty.sh` checks how Codex finds its terminal;
+- `puppet_lib.sh` checks the hook library's helpers on their own (what they keep and drop, cutting text,
+  reading a large payload quickly, with jq and without).
+- `harnesses.sh` runs every translator on its fixtures, reading payloads with jq and with plutil;
+  `codex_tty.sh` checks how Codex finds its terminal, and that what sessions leave behind expires;
   `cursor_turns.sh` replays Cursor's end-of-turn events in the orders it sends them.
 - `install.sh` runs the installer against a fake `HOME`, for every harness; it never touches your real files.
 
@@ -150,7 +154,8 @@ In `harnesses/<agent>/fixtures/`, one case per behaviour: `NAME.json` (a trimmed
 line it must write, without the time field). An empty `NAME.line` means "writes nothing" (an event you drop).
 Add `NAME.stdout` when the translator must print something for the agent, and a `NAME.home/` folder for files
 the case needs in its home (it is copied into a fresh fake `HOME`). The translator runs with
-`PUPPET_TTY=/dev/ttys009 TERM_PROGRAM=iTerm.app`.
+`PUPPET_TTY=/dev/ttys009 TERM_PROGRAM=iTerm.app LC_ALL=C`, twice: reading the payload with jq, and with
+plutil alone.
 
 Have at least a Stop: without it the puppet never finishes a turn, and the contract test fails.
 
@@ -201,7 +206,11 @@ session, when it has one. Never pass prompts, commands or code: only what the ta
 Helpers in `hook/puppet-lib.sh`:
 
 - `field key.path` (one line, `|` removed, cut to 120 characters), `path_field key` (a whole path),
-  `first_sentence key`, `leading_command text`, `is_test_command command`, `json_value key` (JSON on stdin).
+  `payload_value key` (the value as it is, newlines kept, up to 4000 characters), `first_sentence key`,
+  `leading_command text`, `is_test_command command` (pass it the whole command: `payload_value`),
+  `json_value key` (JSON on stdin, for a file of the agent's). `puppet_read_payload` reads the payload once and,
+  when jq is there, parses it once; without jq (macOS 13 and 14) plutil reads each field. A missing key is
+  empty. Text is cut by characters, never inside one, whatever the locale.
 - `respond json`: prints `json` when the translator exits, however it exits, for agents that wait for an
   answer (Codex wants `{}` after `Stop`). Call it before anything that may exit, including the `exit 0` that
   drops an event, when the agent waits on that event. Print nothing otherwise: the tests expect no output
@@ -223,8 +232,9 @@ When the agent's events do not line up with the table (`harnesses/cursor/transla
   what tells them apart in the capture (Cursor: the generation id equals the session id).
 - **The reply comes on its own event, before or after the end of the turn, sometimes after the next prompt.**
   Pair them by the agent's own id for the turn (Cursor: `generation_id`), not by arrival order, and keep what
-  came first in a file `$PUPPET_DIR/<agent>-<session>.<turn>.<what>`; remove the files on `SessionEnd`. Write
-  `Stop` when the turn ends, so the puppet stops working then; a reply that comes later for the same turn may
+  came first in a file `$PUPPET_DIR/<agent>-<session>.<turn>.<what>`; remove the files on `SessionEnd` (every
+  file there but the events file also goes once untouched for 2 hours, for sessions that end without one).
+  Write `Stop` when the turn ends, so the puppet stops working then; a reply that comes later for the same turn may
   send a second `Stop` with its text (the bubble just changes), but drop one whose turn is over.
 - **Another agent's payloads reach your translator** (step 1): drop them by a field only that agent sends
   (Claude's translator drops payloads with `cursor_version`).
@@ -297,7 +307,8 @@ For every harness and creature, with nothing to add:
 
 - every body has `SIDE` and `SMILE` (9 × 9) and `FRONT` and `FRONT_ASLEEP` (9 wide, up to 8 tall), in colours
   `config.COLORS` has; the harness's body exists;
-- the harness has its fields, and its scripts are executable;
+- the harness has its fields, and its scripts are executable; the folders under `harnesses/` and the Spoon's
+  registry (`harnesses/init.lua`) name the same agents;
 - every fixture line names this harness and one of the events above, and the Spoon takes them all without an
   error; there is a Stop among them; every `true` capability has a fixture that shows it; a translator prints
   nothing unless the case has a `.stdout` file;
