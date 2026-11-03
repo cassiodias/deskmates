@@ -318,9 +318,9 @@ brand's mascot.
 Animations come in two kinds, and each is chosen per command in the menu (`model/mapping.lua`).
 
 - **A new monitor screen**, shown on the desk like Matrix: one file like `render/scenes/matrix.lua` with
-  `draw(buf, session, ctx)`, registered in `SCREENS` in `render/scenes/monitor.lua`. The Spoon picks the
-  screen in `Deskmates.spoon/init.lua` (the `monitor =` line, which today chooses between `matrix` and
-  `invaders`); add yours there.
+  `draw(buf, session, ctx)`, registered in `SCREENS` in `render/scenes/monitor.lua`, and a branch in
+  `Sessions.sceneFor` in `model/sessions.lua`, which picks each session's scene and screen (today `matrix` or
+  `invaders`).
 - **A new whole scene**, like ping pong: one file in `render/scenes/` with `draw(buf, texts, session, ctx)`,
   a line in `SCENES` in `render/scenes/init.lua`, and a branch in `Sessions.sceneFor` in `model/sessions.lua`
   saying when a session plays it.

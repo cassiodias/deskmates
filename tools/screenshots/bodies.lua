@@ -30,7 +30,7 @@ return function(out)
     for col, pose in ipairs(poses) do
       local elements = scenes.elements(pose[3], {
         frame = pose[4], pixel = px, now = now, lastEventAt = now - (pose[1] == "home" and 0 or 60),
-        scene = pose[2], monitor = "invaders", harness = harness, colors = pixels.colorsFor(body[2]),
+        scene = pose[2], screen = "invaders", harness = harness, colors = pixels.colorsFor(body[2]),
         tag = body[1] .. " · " .. pose[1],
       })
       local ox, oy = (col - 1) * cellW + 8, (row - 1) * cellH + 28

@@ -30,18 +30,22 @@ local function markPlayed(s)
   if s.isListed and (s.isWorking or s.mood ~= nil or liveAgents(s) > 0) then s.hasPlayed = true end
 end
 
--- The scene for a session now: its command's animation while it works, its desk at rest otherwise.
+-- What a puppet shows now, in the two words render/scenes takes: the scene ("home" with no session; "code",
+-- "rest" or "pingpong") and, at the desk, the monitor's screen ("matrix" or "invaders"). The menu's choice for the
+-- turn's command (model/mapping.lua: "coder", "matrix", "pingpong", "auto" or "off") decides both, here only.
 function Sessions.sceneFor(s, mapping)
-  local live = liveAgents(s)
-  if not s.isListed then return "rest" end
-  if s.mood == "asking" or s.mood == "permission" then return "code" end
-  if not (s.isWorking or live > 0) then return "rest" end
+  if not s then return "home" end
   local choice = mapping:choiceFor(s.command)
+  local screen = choice == "matrix" and "matrix" or "invaders"
+  local live = liveAgents(s)
+  if not s.isListed then return "rest", screen end
+  if s.mood == "asking" or s.mood == "permission" then return "code", screen end
+  if not (s.isWorking or live > 0) then return "rest", screen end
   -- Once every subagent the turn started is done, the main conversation carries on at the laptop: no rally
   -- between players who have left the table.
-  if choice == "pingpong" and (#s.order == 0 or live > 0) then return "pingpong" end
-  if choice == "auto" and #s.order >= 2 and live > 0 then return "pingpong" end
-  return "code"
+  if choice == "pingpong" and (#s.order == 0 or live > 0) then return "pingpong", screen end
+  if choice == "auto" and #s.order >= 2 and live > 0 then return "pingpong", screen end
+  return "code", screen
 end
 
 -- The sessions with a puppet, oldest first: one that has played keeps it until it ends, it is closed or away

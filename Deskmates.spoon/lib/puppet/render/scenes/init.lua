@@ -1,5 +1,5 @@
--- Draws one puppet: picks the scene for its session and returns the canvas elements.
--- A scene is a module with draw(buf, texts, session, ctx); adding an animation is one file and one line here.
+-- Draws one puppet: the scene Sessions.sceneFor picked for its session, as canvas elements. A scene is a module
+-- with draw(buf, texts, session, ctx), listed in SCENES; CONTRIBUTING.md ("Add an animation") has every step.
 
 local pixels = require("puppet.render.pixels")
 local text = require("puppet.render.text")
@@ -13,8 +13,8 @@ local SCENES = {
 
 local scenes = {}
 
--- ctx: frame, pixel, now, lastEventAt, scene, monitor, harness, colors, tag (the name tag, or nil),
--- status (the line under the name tag, or nil).
+-- ctx: frame, pixel, now, lastEventAt, scene and screen (from Sessions.sceneFor), harness, colors, tag (the name
+-- tag, or nil), status (the line under the name tag, or nil).
 function scenes.elements(s, ctx)
   local buf, texts = pixels.newBuffer(), {}
   ctx.isResting = ctx.scene == "rest"

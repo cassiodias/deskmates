@@ -33,6 +33,6 @@ return {
       stamp(buf, sprites.LENS, 19 + bounce(frame, 20), 6)
       return
     end
-    SCREENS[ctx.monitor].draw(buf, s, ctx)
+    SCREENS[ctx.screen].draw(buf, s, ctx)
   end,
 }

@@ -104,12 +104,12 @@ function obj:render()
   if self.hovered and not self:isUnderMouse(self.hovered) then self:hover(self.hovered, false) end
   for _, key in ipairs(self.stage.keys) do
     local puppet, s = self.stage.puppets[key], self.sessions.all[key]
+    local scene, screen = Sessions.sceneFor(s, self.mapping)
     local tab = s and self.iterm:label(s.tty)
     if s and key == self.hovered then self.stage:showCard(key, status.card(s, now, tab)) end
     puppet.canvas:replaceElements(scenes.elements(s, {
       frame = self.frame, pixel = self.pixel, now = now, lastEventAt = self.sessions.lastEventAt,
-      scene = s and Sessions.sceneFor(s, self.mapping) or "home",
-      monitor = s and self.mapping:choiceFor(s.command) == "matrix" and "matrix" or "invaders",
+      scene = scene, screen = screen,
       harness = harnesses.get(s and s.harness), colors = puppet.colors,
       tag = s and (tab and (s.tag .. " · " .. tab) or s.tag),
       status = s and status.line(s, now),

@@ -77,6 +77,25 @@ check("and goes back to coding when its only subagent is done", Sessions.sceneFo
 on("UserPromptSubmit", { text = "/build" })
 check("a new /command always wins", busy.all.s1.command == "build" and #busy.all.s1.order == 0)
 
+-- One place picks both what a puppet plays and, at its desk, its monitor's screen.
+local screens = Mapping.new({ coder = { "build" }, matrix = { "rain" }, conversation = "auto" })
+local shown = Sessions.new(100)
+local function show(name, fields)
+  return shown:apply(event(name, fields), { mapping = screens, harness = fake, frame = 1, now = 100 })
+end
+local function both(...) return table.concat({ ... }, " ") end
+check("no session: the home puppet", both(Sessions.sceneFor(nil, screens)) == "home")
+show("UserPromptSubmit", { text = "/rain" })
+check("a Matrix command codes with rain on its monitor", both(Sessions.sceneFor(shown.all.s1, screens)) == "code matrix")
+show("Stop", {})
+check("at rest, its monitor keeps its screen (dark)", both(Sessions.sceneFor(shown.all.s1, screens)) == "rest matrix")
+show("UserPromptSubmit", { text = "/build" })
+check("a coder command shoots invaders", both(Sessions.sceneFor(shown.all.s1, screens)) == "code invaders")
+show("UserPromptSubmit", { text = "/review" })
+show("SubagentStart", { agentId = "a1" })
+show("SubagentStart", { agentId = "a2" })
+check("the main conversation's subagents play ping pong", both(Sessions.sceneFor(shown.all.s1, screens)) == "pingpong invaders")
+
 -- What the status line and card need: when the turn started, and its tool calls.
 local timed = Sessions.new(100)
 local function at(time, name, fields)
