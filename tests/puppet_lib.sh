@@ -25,6 +25,19 @@ expect "a path is not a command" "$(leading_command "/Users/me/my-app/notes.pdf 
 expect "a path with a dot is not a command" "$(leading_command "/notes.pdf summarise")" ""
 expect "a lone slash" "$(leading_command "/ hello")" ""
 
+# is_test_command: a test runner in a command's place, not a word that merely contains one.
+for command in "pytest -q" "python -m pytest tests" "python3 -m unittest discover" "npm test" "npm run test:unit" \
+  "yarn test" "pnpm test" "pnpm run test" "pnpm vitest run" "bun test" "npx jest --watch=false" "go test ./..." \
+  "cargo test" "mvn test" "./gradlew test" "make test" "tox -e py312" "bundle exec rspec spec" \
+  "./node_modules/.bin/vitest run" "cd app && npm test" "cd app
+  npm test" "CI=1 npm test" "uv run pytest"; do
+  expect "a test command: $command" "$(is_test_command "$command" && echo yes)" yes
+done
+for command in "cat jest.config.js" "grep -r pytest src" "npm install" "go build ./..." "cargo build" \
+  "vim tests/test_api.py" "ls pytest.ini" "echo make test" "git commit -m 'npm test passes'" "pnpm install"; do
+  expect "not a test command: $command" "$(is_test_command "$command" && echo yes)" ""
+done
+
 # Text is cut by characters, never inside one, even when the hook runs with the C locale (a background process).
 a119=$(printf '%119s' '' | tr ' ' a)
 PUPPET_PAYLOAD="{\"message\":\"${a119}éèê\",\"last_assistant_message\":\"$(printf '%89s' '' | tr ' ' b)€€ more\"}"

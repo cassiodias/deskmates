@@ -26,7 +26,7 @@ session_title() {
 # A subagent's own events come with its own session id, which is also its generation id; the main session's
 # turn events have a generation id of their own. Its transcript sits under the parent's subagents/ folder.
 case "$event" in sessionEnd) ;; *)
-  [ "$(field generation_id)" = "$session" ] && exit 0
+  [ "$turn" = "$session" ] && exit 0
   case "$(path_field transcript_path)" in */subagents/*) exit 0 ;; esac ;;
 esac
 
@@ -90,7 +90,7 @@ fi
 # (a session with no app at all counts as a background one, which leaves once it rests).
 [ -z "${TERM_PROGRAM:-}" ] && TERM_PROGRAM=Cursor
 flag=""
-[ "$tool" = Shell ] && is_test_command "$(field tool_input.command)" && flag="test"
+[ "$tool" = Shell ] && is_test_command "$(payload_value tool_input.command)" && flag="test"
 
 write_event cursor "$event" "$session" "$agent_id" "$tool" "$agent_type" "$text" \
   "$(path_field workspace_roots.0)" "$flag" "$title"

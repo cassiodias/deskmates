@@ -49,8 +49,8 @@ puppet_parse_payload() {
 # or an array.
 payload_value() {
   if [ -n "$PUPPET_PARSED" ]; then
-    printf '%s\n' "$PUPPET_FIELDS" | awk -v key="$1" 'index($0, key "\t") == 1 { print substr($0, length(key) + 2); exit }' |
-      tr '\036' '\n'
+    printf '%s\n' "$PUPPET_FIELDS" |
+      awk -v key="$1" 'index($0, key "\t") == 1 { print substr($0, length(key) + 2); exit }' | tr '\036' '\n'
     return 0
   fi
   # plutil prints its error on stdout.
@@ -107,13 +107,39 @@ leading_command() {
   printf '/%s' "$name"
 }
 
-# True when a shell command runs tests, so the puppet shows a progress bar and the result.
+# True when a shell command runs tests, so the puppet shows a progress bar and the result. It looks at the word
+# in each command's place (after variable settings and wrappers like npx, uv run or python -m), so a test runner's
+# name in an argument (cat jest.config.js) is not a test run.
 is_test_command() {
-  case " $1 " in
-    *pytest*|*"npm test"*|*"npm run test"*|*"yarn test"*|*"pnpm test"*|*"go test"*|*"cargo test"*|*jest*|*vitest*|\
-    *rspec*|*"mvn test"*|*"gradle test"*|*"make test"*|*" tox "*|*unittest*) return 0 ;;
-  esac
-  return 1
+  printf '%s\n' "$1" | awk '
+    function base(word) { sub(/.*\//, "", word); return word }
+    function isTest(word) { return word == "test" || word ~ /^test:/ }
+    {
+      gsub(/[;&|()]/, "\n")
+      n = split($0, commands, "\n")
+      for (c = 1; c <= n; c++) {
+        m = split(commands[c], w, /[ \t]+/)
+        i = 1
+        while (i <= m && w[i] == "") i++
+        while (i <= m) {
+          if (w[i] ~ /^[A-Za-z_][A-Za-z0-9_]*=/ || w[i] ~ /^(npx|bunx|pnpx|exec|time|env|sudo|nice|command)$/) i++
+          else if (w[i] ~ /^(uv|poetry|pipenv|pdm|hatch)$/ && w[i + 1] == "run") i += 2
+          else if (w[i] == "bundle" && w[i + 1] == "exec") i += 2
+          else if (base(w[i]) ~ /^python[0-9.]*$/ && w[i + 1] == "-m") i += 2
+          else break
+        }
+        if (i > m) continue
+        program = base(w[i]); first = w[i + 1]; second = w[i + 2]
+        if (program ~ /^(pytest|py\.test|unittest|jest|vitest|mocha|rspec|tox|phpunit)$/) found = 1
+        else if (program ~ /^(go|cargo|mvn|gradle|gradlew|make|dotnet|swift|mix|deno)$/ && isTest(first)) found = 1
+        else if (program ~ /^(npm|yarn|pnpm|bun)$/) {
+          if (isTest(first) || (first == "run" && isTest(second))) found = 1
+          else if (first ~ /^(exec|dlx|x)$/ && base(second) ~ /^(jest|vitest|mocha)$/) found = 1
+          else if (base(first) ~ /^(jest|vitest|mocha)$/) found = 1
+        }
+      }
+    }
+    END { exit !found }'
 }
 
 # The terminal of process $1 (/dev/ttys004), or nothing.

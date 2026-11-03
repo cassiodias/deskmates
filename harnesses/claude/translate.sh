@@ -36,7 +36,7 @@ esac
 [ "$tool" = "Skill" ] && text=$(field tool_input.skill)
 case "$tool" in Agent|Task) text=$(field tool_input.description) ;; esac
 flag=""
-[ "$tool" = "Bash" ] && is_test_command "$(field tool_input.command)" && flag="test"
+[ "$tool" = "Bash" ] && is_test_command "$(payload_value tool_input.command)" && flag="test"
 
 write_event claude "$event" "$(field session_id)" "$(field agent_id)" "$tool" "$(field agent_type)" "$text" \
   "$(path_field cwd)" "$flag" "$title"

@@ -9,9 +9,10 @@ puppet_read_payload
 # working in the session's folder.
 puppet_tty_fallback() { tty_from_program codex; }
 
-# A command's exit code, from the transcript's record of the call (the hook's result has only its output).
+# A command's exit code, from the transcript's record of the call (the hook's result has only its output). Nothing
+# without the call's id: every record would match an empty one.
 exit_code() {
-  [ -f "$1" ] || return 0
+  [ -f "$1" ] && [ -n "$2" ] || return 0
   tail -c 2000000 "$1" | grep -F "\"id\":\"$2\"" | grep -o '"exit_code":-\{0,1\}[0-9]*' | tail -n 1 | cut -d: -f2
 }
 
@@ -47,7 +48,7 @@ esac
 # The subagent's message is encrypted; its task name says what it is for.
 case "$tool" in collaborationspawn_agent|spawn_agent) text=$(field tool_input.task_name) ;; esac
 flag=""
-[ "$tool" = "Bash" ] && is_test_command "$(field tool_input.command)" && flag="test"
+[ "$tool" = "Bash" ] && is_test_command "$(payload_value tool_input.command)" && flag="test"
 
 write_event codex "$event" "$session" "$(field agent_id)" "$tool" "$(field agent_type)" "$text" \
   "$(path_field cwd)" "$flag" "$title"
