@@ -118,6 +118,21 @@ for id, h in pairs(harnesses.all) do
     end
   end
 end
+-- The two registries name the same agents: the hook side's folders (harnesses/<id>/ with a detect.sh, as
+-- bin/deskmates finds them) and the Spoon's (harnesses/init.lua). A folder with no module would have its lines
+-- drawn as Claude's; a module with no folder would never get a line.
+local hookSide = {}
+for _, path in ipairs(lines("ls -d '" .. root .. "/harnesses/'*/ 2>/dev/null")) do
+  local id = path:match("([^/]+)/$")
+  if id and os.execute("test -f '" .. root .. "/harnesses/" .. id .. "/detect.sh'") then
+    hookSide[id] = true
+    check("harnesses/" .. id .. "/ has a Spoon module in harnesses/init.lua", harnesses.all[id] ~= nil)
+  end
+end
+for id in pairs(harnesses.all) do
+  check("Spoon harness " .. id .. " has a hook side in harnesses/" .. id .. "/", hookSide[id])
+end
+
 check("codex wears the owl", harnesses.get("codex").id == "codex" and harnesses.get("codex").character.body == "owl")
 local codex = harnesses.get("codex")
 check("codex: spawn_agent starts a subagent, update_plan is a plan",
