@@ -164,28 +164,30 @@ function obj:loadChoice()
 end
 
 -- Dragging any puppet moves the whole row, and the place is remembered; a click without a drag is a focus.
--- Judged by where each mouse event happened, not where the mouse is when Hammerspoon gets to it: a busy
--- Hammerspoon handles a click late, when the mouse is already on its way elsewhere. `at` is where the press was.
-function obj:startDrag(key, at)
+-- Judged only by the drag events' own positions: the press's position (the canvas's, or the mouse's when a busy
+-- Hammerspoon gets to it) can be off, and turned clicks into jumps of the row.
+function obj:startDrag(key)
   -- A press whose release Hammerspoon missed leaves its tap running: only the last press is followed.
   if self.dragTap then self.dragTap:stop() end
-  local start = at or hs.mouse.absolutePosition()
   local origin = { x = self.stage.anchor.x, y = self.stage.anchor.y }
   local types = hs.eventtap.event.types
+  local first, isDrag
   local tap
   tap = hs.eventtap.new({ types.leftMouseDragged, types.leftMouseUp }, function(e)
     local now = e:location()
-    local isClick = math.abs(now.x - start.x) + math.abs(now.y - start.y) < config.CLICK_DISTANCE
-    -- A click leaves the row exactly where it was, so clicks do not make it creep.
-    self.stage.anchor = isClick and origin or { x = origin.x + now.x - start.x, y = origin.y + now.y - start.y }
-    self:layout()
-    if e:getType() == types.leftMouseUp then
-      tap:stop()
-      if self.dragTap == tap then self.dragTap = nil end
-      hs.settings.set(config.POSITION_KEY, self.stage.anchor)
-      -- Bringing a terminal forward can take a moment (iTerm's AppleScript); not inside the mouse's tap.
-      if isClick then hs.timer.doAfter(0, function() self:focus(key) end) end
+    if e:getType() == types.leftMouseDragged then
+      first = first or now
+      isDrag = isDrag or math.abs(now.x - first.x) + math.abs(now.y - first.y) >= config.CLICK_DISTANCE
+      -- A click leaves the row exactly where it was, so clicks do not make it creep.
+      self.stage.anchor = isDrag and { x = origin.x + now.x - first.x, y = origin.y + now.y - first.y } or origin
+      self:layout()
+      return false
     end
+    tap:stop()
+    if self.dragTap == tap then self.dragTap = nil end
+    hs.settings.set(config.POSITION_KEY, self.stage.anchor)
+    -- Bringing a terminal forward can take a moment (iTerm's AppleScript); not inside the mouse's tap.
+    if not isDrag then hs.timer.doAfter(0, function() self:focus(key) end) end
     return false
   end)
   self.dragTap = tap
@@ -211,11 +213,11 @@ function obj:isUnderMouse(key)
 end
 
 -- Option-click opens the menu bar menu at the puppet, for when the menu bar icon is hidden behind the notch.
-function obj:mouseDown(key, at)
+function obj:mouseDown(key)
   if hs.eventtap.checkKeyboardModifiers().alt then
-    self.menu:popupMenu(at or hs.mouse.absolutePosition())
+    self.menu:popupMenu(hs.mouse.absolutePosition())
   else
-    self:startDrag(key, at)
+    self:startDrag(key)
   end
 end
 
@@ -275,7 +277,7 @@ function obj:start()
   if not self:isOnAScreen(anchor) then anchor = self:defaultPosition() end
   self.stage = Stage.new({
     pixel = self.pixel, anchor = anchor,
-    onMouseDown = function(key, at) self:mouseDown(key, at) end,
+    onMouseDown = function(key) self:mouseDown(key) end,
     onBubbleClick = function(key) self:focus(key) end,
     onHover = function(key, isInside) self:hover(key, isInside) end,
   })

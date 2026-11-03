@@ -37,14 +37,8 @@ function Stage:add(key, palette)
   local px = self.pixel
   local height = (config.H + config.STATUS_H) * px
   local canvas = floating(hs.canvas.new({ x = self.anchor.x, y = self.anchor.y, w = config.W * px, h = height }), true)
-  canvas:mouseCallback(function(_, message, _, x, y)
-    -- Where the press happened on the screen (the mouse may have moved on by the time this runs).
-    local at
-    if x and y then
-      local f = canvas:frame()
-      at = { x = f.x + x, y = f.y + y }
-    end
-    if message == "mouseDown" then self.onMouseDown(key, at) end
+  canvas:mouseCallback(function(_, message)
+    if message == "mouseDown" then self.onMouseDown(key) end
     if message == "mouseEnter" or message == "mouseExit" then self.onHover(key, message == "mouseEnter") end
   end)
   local balloon = floating(hs.canvas.new({ x = self.anchor.x, y = self.anchor.y - 40, w = 200, h = bubble.HEIGHT }))
