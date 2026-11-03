@@ -9,9 +9,53 @@
 PUPPET_DIR="$HOME/.deskmates"
 PUPPET_EVENTS="$PUPPET_DIR/events"
 
-# Reads the payload from stdin once; field and first_sentence read from it.
+# jq, when this Mac has it: on the PATH, or where macOS and Homebrew put it (an app's hooks may run with a short
+# PATH). Without it (macOS 13 and 14 before `brew install jq`), plutil reads each field instead. Tests set
+# PUPPET_JQ (empty: no jq).
+puppet_find_jq() {
+  command -v jq 2>/dev/null && return 0
+  for jq in /usr/bin/jq /opt/homebrew/bin/jq /usr/local/bin/jq; do
+    [ -x "$jq" ] && { printf '%s\n' "$jq"; return 0; }
+  done
+  return 0
+}
+[ -n "${PUPPET_JQ+set}" ] || PUPPET_JQ=$(puppet_find_jq)
+
+# Every value in a JSON document, one per line: its key path (tool_input.command, workspace_roots.0), a tab,
+# then the value with its newlines as \036. Only what a translator may read: paths up to 4 keys deep, the first
+# 16 items of an array, and the first 4000 characters of a text; a big tool result is never copied whole.
+PUPPET_FLATTEN='paths(type != "object" and type != "array") as $p
+  | select(($p | length) <= 4 and all($p[]; type == "string" or . < 16))
+  | ($p | map(tostring) | join(".")) + "\t"
+    + (getpath($p) | if type == "string" then .[0:4000] elif . == null then "" else tostring end
+      | gsub("\n"; "\u001e"))'
+
+# Reads the payload from stdin once and parses it once; field, path_field and first_sentence read from that.
 puppet_read_payload() {
   PUPPET_PAYLOAD=$(cat)
+  puppet_parse_payload
+}
+
+# Parses PUPPET_PAYLOAD into PUPPET_FIELDS with one jq run, when there is jq; PUPPET_PARSED says it worked.
+puppet_parse_payload() {
+  PUPPET_PARSED=""
+  PUPPET_FIELDS=""
+  [ -n "$PUPPET_JQ" ] || return 0
+  PUPPET_FIELDS=$(printf '%s' "$PUPPET_PAYLOAD" | "$PUPPET_JQ" -r "$PUPPET_FLATTEN" 2>/dev/null) && PUPPET_PARSED=1
+  return 0
+}
+
+# The value at key path $1 in the payload, as it is (newlines kept); nothing when it is missing, null, an object
+# or an array.
+payload_value() {
+  if [ -n "$PUPPET_PARSED" ]; then
+    printf '%s\n' "$PUPPET_FIELDS" | awk -v key="$1" 'index($0, key "\t") == 1 { print substr($0, length(key) + 2); exit }' |
+      tr '\036' '\n'
+    return 0
+  fi
+  # plutil prints its error on stdout.
+  value=$(printf '%s' "$PUPPET_PAYLOAD" | plutil -extract "$1" raw -o - - 2>/dev/null) || return 0
+  printf '%s\n' "$value"
 }
 
 # The first $1 characters of stdin, never cutting one in two: hooks may run with the C locale (from a
@@ -20,28 +64,36 @@ cut_chars() {
   LC_ALL=en_US.UTF-8 cut -c "1-$1" 2>/dev/null
 }
 
-# One value from the JSON on stdin by key path, on one line, without "|".
+# Value $1 on one line, without "|", cut to 120 characters.
+one_line() {
+  printf '%s' "$1" | tr '\n|' '  ' | cut_chars 120
+}
+
+# One value from the JSON on stdin by key path, on one line, without "|"; for a file of the agent's.
 json_value() {
-  value=$(plutil -extract "$1" raw -o - - 2>/dev/null) || return 0
-  printf '%s' "$value" | tr '\n|' '  ' | cut_chars 120
+  if [ -n "$PUPPET_JQ" ]; then
+    value=$("$PUPPET_JQ" -r --arg key "$1" 'getpath($key | split(".") | map(tonumber? // .))?
+      | if type == "object" or type == "array" or . == null then empty else tostring end' 2>/dev/null) || return 0
+  else
+    value=$(plutil -extract "$1" raw -o - - 2>/dev/null) || return 0
+  fi
+  one_line "$value"
 }
 
-# One value from the payload by key path (like tool_input.command).
+# One value from the payload by key path (like tool_input.command), on one line, without "|", cut to 120
+# characters.
 field() {
-  printf '%s' "$PUPPET_PAYLOAD" | json_value "$1"
+  one_line "$(payload_value "$1")"
 }
 
-# A path from the payload (cwd, transcript_path), whole: field would cut a deep one short. Nothing when the
-# payload has none (plutil prints its error on stdout).
+# A path from the payload (cwd, transcript_path), whole: field would cut a deep one short.
 path_field() {
-  value=$(printf '%s' "$PUPPET_PAYLOAD" | plutil -extract "$1" raw -o - - 2>/dev/null) || return 0
-  printf '%s' "$value" | tr -d '\n|'
+  payload_value "$1" | tr -d '\n|'
 }
 
 # The first sentence of a text field, past any heading, without markdown marks.
 first_sentence() {
-  value=$(printf '%s' "$PUPPET_PAYLOAD" | plutil -extract "$1" raw -o - - 2>/dev/null) || return 0
-  printf '%s\n' "$value" | grep -v -e '^[[:space:]]*$' -e '^[[:space:]]*#' | head -n 1 | tr -d '#*`|' |
+  payload_value "$1" | grep -v -e '^[[:space:]]*$' -e '^[[:space:]]*#' | head -n 1 | tr -d '#*`|' |
     sed 's/^[[:space:]>-]*//' | sed 's/\([.!?]\)[[:space:]].*/\1/' | cut_chars 90
 }
 
