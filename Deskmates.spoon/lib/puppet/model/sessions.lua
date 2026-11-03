@@ -77,12 +77,21 @@ end
 -- rests: no tab to jump to, nothing to show; it comes back when it works again. With running (each terminal's
 -- programs, terminals/programs.lua), a session whose harness names its program has ended once its terminal no
 -- longer runs it.
+-- Whether a terminal's programs include the harness's program: one name, or any of a list.
+local function runs(programs, program)
+  if type(program) == "string" then return programs[program] == true end
+  for _, name in ipairs(program) do
+    if programs[name] then return true end
+  end
+  return false
+end
+
 function Sessions:closeMissing(tabs, running)
   for _, s in pairs(self.all) do
     local inTab = s.tty and tabs[s.tty]
     if inTab then s.wasInTab = true end
     if s.tty and s.wasInTab and not inTab then s.isClosed = true end
-    if running and s.program and s.tty and not (running[s.tty] or {})[s.program] then s.isClosed = true end
+    if running and s.program and s.tty and not runs(running[s.tty] or {}, s.program) then s.isClosed = true end
     s.isAway = not inTab and not s.wasInTab and wantsItermTab(s)
   end
 end

@@ -12,7 +12,11 @@ local TOOL_KINDS = {
 return {
   id = "claude",
   name = "Claude",
-  -- The events this agent sends; a missing one only means that mood never shows.
+  -- What this agent's hooks report, for people reading the code and the README's agents table; the contract test
+  -- checks each true one against a fixture (prompt: UserPromptSubmit, tools: PreToolUse, toolFailure:
+  -- PostToolUseFailure, subagents: SubagentStart, permission: PermissionRequest, question: a "question" tool,
+  -- reply: Stop with text, sessionEnd: SessionEnd, notification: Notification). A false one means that mood
+  -- never shows.
   capabilities = {
     prompt = true, tools = true, toolFailure = true, subagents = true,
     permission = true, question = true, reply = true, sessionEnd = true,
@@ -24,6 +28,9 @@ return {
   -- What a tool means to the puppet: "reading", "question", "plan", "skill" (calls a command), "agent" (starts a
   -- subagent; its text is the subagent's description), or nil.
   toolKind = function(tool) return TOOL_KINDS[tool] end,
-  -- A command-line agent: a click brings its terminal tab forward.
+  -- Optional: program = "name" or { "name", … }, the program its sessions run in their terminal (`ps -o comm`'s
+  -- last part). A session then ends once its terminal no longer runs it; for agents that report the end late.
+  -- A click on the puppet. A command-line agent brings its terminal tab forward; an agent that runs in its own
+  -- app would call terminals.app(bundleId, session.folder) instead (terminals/focus.lua).
   focus = function(session, terminals) return terminals.focus(session) end,
 }

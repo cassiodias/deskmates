@@ -180,5 +180,14 @@ plain:apply(event("UserPromptSubmit", { session = "p1", text = "/build", tty = "
   { mapping = mapping, harness = fake, frame = 1, now = 100 })
 plain:closeMissing(tabs, Programs.parse(""))
 check("a harness with no program is judged by its tab only", onStageOf(plain, "p1"))
+-- A program given as a list (an agent that shows up under more than one name): any of them keeps it.
+local hare = { id = "hare", name = "Hare", program = { "hare", "hare-agent" }, toolKind = function() return nil end }
+local listed = Sessions.new(100)
+listed:apply(event("UserPromptSubmit", { session = "h1", text = "/build", tty = "/dev/ttys004", app = "iTerm.app" }),
+  { mapping = mapping, harness = hare, frame = 1, now = 100 })
+listed:closeMissing(tabs, Programs.parse("ttys004  /opt/bin/hare-agent\n"))
+check("a program list: any name in it keeps the session", onStageOf(listed, "h1"))
+listed:closeMissing(tabs, Programs.parse("ttys004  -zsh\n"))
+check("a program list: none of them running ends it", not onStageOf(listed, "h1"))
 
 check.done("sessions")
