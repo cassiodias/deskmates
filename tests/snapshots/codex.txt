@@ -1,0 +1,54 @@
+== a codex session plays ping pong
+  puppet 1: s1 at 1208,752 colour #2BB3A3 bubble: -
+  |                                                |
+  |                                                |
+  |                                                |
+  |                                                |
+  |                                                |
+  |                                                |
+  |                                                |
+  |                                                |
+  |                                                |
+  |                             w                  |
+  | l     l                                l     l |
+  | lllllll                                lllllll |
+  |lwwwlwwwl                              lwwwlwwwl|
+  |lwkwlwkwlw                            wlwkwlwkwl|
+  |lwwwywwwlw              w             wlwwwywwwl|
+  | lllylll w              w             w lllylll |
+  | llwlwll                w               llwlwll |
+  |  y   y   tttttttttttttttttttttttttttt   y   y  |
+  |          tttttttttttttttttttttttttttt          |
+  |            g                      g            |
+  |            g                      g            |
+  |            g                      g            |
+  |            g                      g            |
+  |            g                      g            |
+  texts: 0 list_folder / 0 default / qa check / app · <1m
+== the codex session is done
+  puppet 1: s1 at 1208,752 colour #2BB3A3 bubble: Fixed the parser. ✓
+  |                                                |
+  |                 gggggggggggggggggggggggggggggg |
+  |                 g::::::::::::::::::::::::::::g |
+  |                 g::::::::::::::::::::::::::::g |
+  |                 g::::::::::::::::::::::::::::g |
+  |                 g::::::::::::::::::::::::::::g |
+  |                 g::::::::::::::::::::::::::::g |
+  |                 g::::::::::::::::::::::::::::g |
+  |                 g::::::::::::::::::::::::::::g |
+  |                 g::::::::::::::::::::::::::::g |
+  |  l     l        g::::::::::::::::::::::::::::g |
+  |  lllllll     g  g::::::::::::::::::::::::::::g |
+  |  lwwlwwl     g  g::::::::::::::::::::::::::::g |
+  |  lwklwkl     g  g::::::::::::::::::::::::::::g |
+  |  lllylll     g  g::::::::::::::::::::::::::::g |
+  |  lllllll     g  g::::::::::::::::::::::::::::g |
+  |  llwlwll     g  g::::::::::::::::::::::::::::g |
+  |   lllll gggggg  g::::::::::::::::::::::::::::g |
+  |   y   y         gggggggggggggggggggggggggggggg |
+  |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
+  |bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|
+  |  bb                                        bb  |
+  |  bb                                        bb  |
+  |  bb                                        bb  |
+  texts: qa check / app · idle <1m

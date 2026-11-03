@@ -3,6 +3,7 @@
 
 local harnesses = {
   claude = require("puppet.harnesses.claude"),
+  codex = require("puppet.harnesses.codex"),
 }
 
 return {

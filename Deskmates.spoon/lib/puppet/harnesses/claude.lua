@@ -1,4 +1,4 @@
--- Claude Code: the first harness, and the reference for the others (see docs/architecture.md, "Harnesses").
+-- Claude Code: the first harness, and the reference for the others (a harness is one module like this, one line in init.lua, and a hook side).
 -- Its hook side is harnesses/claude/ at the repo root.
 
 local TOOL_KINDS = {
@@ -16,6 +16,7 @@ return {
   capabilities = {
     prompt = true, tools = true, toolFailure = true, subagents = true,
     permission = true, question = true, reply = true, sessionEnd = true,
+    notification = true,
   },
   -- Looks: the body it wears (render/sprites.lua's BODIES), and each session's puppet takes the first colour of
   -- this palette no other puppet wears.
