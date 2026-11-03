@@ -126,8 +126,18 @@ spoon_link() {
   say "Spoon linked: ~/.hammerspoon/Spoons/Deskmates.spoon"
 }
 
+# Renames ClaudePuppet to Deskmates throughout init.lua, so the user's own settings on the Spoon carry over.
+init_rename() {
+  [ -f "$init" ] && grep -q 'ClaudePuppet' "$init" || return 0
+  init_backup
+  renamed=$(mktemp) || exit 1
+  sed 's/ClaudePuppet/Deskmates/g' "$init" > "$renamed"
+  cat "$renamed" > "$init" && rm -f "$renamed"
+  say "~/.hammerspoon/init.lua: ClaudePuppet lines renamed to Deskmates (backup in ~/.hammerspoon/init.lua.bak)"
+}
+
 init_lines() {
-  init_drop 'ClaudePuppet'
+  init_rename
   if [ -f "$init" ] && grep -qF 'hs.loadSpoon("Deskmates")' "$init"; then
     say "~/.hammerspoon/init.lua already starts Deskmates"
     return 0
@@ -143,14 +153,18 @@ init_lines() {
 # Installs the Spoon, then each harness in $1 ("all" = each one detected). $2 = "reload" when the caller reloads.
 # After a migration every harness with hooks on is installed again too, so none keeps the old paths.
 install_with() {
+  need_jq || exit 1
   migrate
   spoon_link
   init_lines
+  here=$(cd -P "$data/src" 2> /dev/null && pwd)
+  [ "$here" = "$root" ] || todo "the hooks run ~/.deskmates/src, and this copy is elsewhere ($root): clone into ~/.deskmates/src, or link it there"
   installed='' skipped='' failed=0 again=''
   if [ "$1" = all ]; then
     ids=$(harnesses | tr '\n' ' ')
   else
-    ids=$1
+    ids=''
+    for id in $1; do listed "$id" "$ids" || ids="$ids $id"; done
   fi
   if [ -n "$migrated" ]; then
     for id in $(harnesses); do
@@ -197,6 +211,7 @@ uninstall() {
   say "Spoon links removed"
   init_drop 'ClaudePuppet|loadSpoon\("Deskmates"\)|spoon\.Deskmates'
   say "Deskmates lines removed from ~/.hammerspoon/init.lua"
+  [ -n "$init_backed" ] && todo "a setting of yours that spread over several lines may have lost a line: the original is ~/.hammerspoon/init.lua.bak"
   if [ "${DESKMATES_NO_DEFAULTS:-}" != 1 ]; then
     for key in Deskmates.choice Deskmates.position Deskmates.hidden ClaudePuppet.choice ClaudePuppet.position \
       ClaudePuppet.hidden ClaudePuppet.commands ClaudePuppet.scenes ClaudePuppet.seenCommands; do

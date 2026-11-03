@@ -113,7 +113,7 @@ Update the copy you have and install from it, instead of steps 2 and 3:
 cd ~/.claude-puppet/src && git pull && bin/deskmates install
 ```
 
-It moves the old folder to `~/.deskmates` (keeping your puppets' recent events) and switches the Spoon link, the Hammerspoon lines and the hooks to the new paths. Then reload Hammerspoon and start new agent sessions.
+It moves the old folder to `~/.deskmates` (keeping your puppets' recent events) and switches the Spoon link, the Hammerspoon lines and the hooks to the new paths; your own `spoon.ClaudePuppet` settings in `init.lua` carry over, renamed (a copy is in `init.lua.bak`). Then reload Hammerspoon and start new agent sessions.
 
 ## If something does not work
 

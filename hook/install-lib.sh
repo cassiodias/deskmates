@@ -17,7 +17,7 @@ need_jq() {
 }
 
 backup() {
-  [ -f "$1" ] && cp "$1" "$1.bak"
+  [ -f "$1" ] && cp -p "$1" "$1.bak"
   return 0
 }
 

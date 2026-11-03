@@ -151,15 +151,19 @@ check "migrate: events moved" '[ "$(cat "$HOME/.deskmates/events")" = "1|Stop|s1
 check "migrate: old folder gone" '[ ! -e "$HOME/.claude-puppet" ]'
 check "migrate: old link gone" '[ ! -e "$HOME/.hammerspoon/Spoons/ClaudePuppet.spoon" ] && [ ! -L "$HOME/.hammerspoon/Spoons/ClaudePuppet.spoon" ]'
 check "migrate: Spoon linked" '[ "$(readlink "$(spoon_link)")" = "$src/Deskmates.spoon" ]'
-check "migrate: init.lua swapped" '[ "$(cat "$(init)")" = "$mine_init
-$ours_init" ]'
+check "migrate: init.lua renamed" '[ "$(cat "$(init)")" = "-- mine
+hs.loadSpoon(\"Deskmates\")
+spoon.Deskmates:start()
+-- mine too" ]'
 check "migrate: hooks on" '[ "$(count "$(settings)" "$OURS")" = 10 ]'
 check "migrate: init.lua backed up" '[ "$(cat "$(init).bak")" = "$(printf -- "-- mine\nhs.loadSpoon(\"ClaudePuppet\")\nspoon.ClaudePuppet:start()\n-- mine too")" ]'
 
 # Installing twice adds the init.lua lines once.
 "$deskmates" install claude > /dev/null
-check "install twice: init.lua lines once" '[ "$(cat "$(init)")" = "$mine_init
-$ours_init" ]'
+check "install twice: init.lua unchanged" '[ "$(cat "$(init)")" = "-- mine
+hs.loadSpoon(\"Deskmates\")
+spoon.Deskmates:start()
+-- mine too" ]'
 
 # status: the moved line has no harness field, so it was Claude's.
 check "migrate: status counts the old line" '"$deskmates" status | grep -Eq "^claude +detected +hooks on +last event [0-9]+m ago$"'
@@ -169,8 +173,10 @@ check "migrate: status counts the old line" '"$deskmates" status | grep -Eq "^cl
 check "uninstall all: no ~/.deskmates" '[ ! -e "$HOME/.deskmates" ]'
 check "uninstall all: no Spoon link" '[ ! -L "$(spoon_link)" ] && [ ! -e "$(spoon_link)" ]'
 check "uninstall all: init.lua mine only" '[ "$(cat "$(init)")" = "$mine_init" ]'
-check "uninstall all: init.lua backed up" '[ "$(cat "$(init).bak")" = "$mine_init
-$ours_init" ]'
+check "uninstall all: init.lua backed up" '[ "$(cat "$(init).bak")" = "-- mine
+hs.loadSpoon(\"Deskmates\")
+spoon.Deskmates:start()
+-- mine too" ]'
 check "uninstall all: no ours" '[ "$(count "$(settings)" "$OURS")" = 0 ]'
 check "uninstall all: working copy kept" '[ -x "$deskmates" ] && [ -d "$src/Deskmates.spoon" ]'
 check "uninstall all: status hooks off" '"$deskmates" status | grep -Eq "^claude +detected +hooks off +last event never$"'
@@ -290,6 +296,77 @@ check "update: Spoon linked to the clone" '[ "$(readlink "$(spoon_link)")" = "$(
 echo '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"~/.deskmates/src/harnesses/claude/translate.sh"}]}]}}' > "$(settings)"
 "$HOME/clone/bin/deskmates" update > /dev/null
 check "update: hooks on reinstalled" '[ "$(count "$(settings)" "$OURS")" = 10 ]'
+
+# A user's own ClaudePuppet settings in init.lua carry over: renamed, not dropped, no defaults added on top.
+fresh_home
+mkdir -p "$HOME/.claude" "$HOME/.hammerspoon"
+cat > "$(init)" <<'LUA'
+hs.loadSpoon("ClaudePuppet")
+spoon.ClaudePuppet.pixel = 5
+spoon.ClaudePuppet.coder = {
+  "a",
+}
+spoon.ClaudePuppet:bindHotkeys({ toggle = { {"cmd"}, "j" } })
+spoon.ClaudePuppet:start()
+LUA
+cp "$(init)" "$HOME/init.orig"
+out=$("$deskmates" install claude)
+check "init rename: no ClaudePuppet left" '! grep -q ClaudePuppet "$(init)"'
+check "init rename: settings kept" 'grep -qx "spoon.Deskmates.pixel = 5" "$(init)" && grep -qx "spoon.Deskmates.coder = {" "$(init)" && grep -qx "  \"a\"," "$(init)"'
+check "init rename: own hotkey kept, no default" '[ "$(grep -c bindHotkeys "$(init)")" = 1 ] && grep -q "\"cmd\"" "$(init)"'
+check "init rename: one loadSpoon" '[ "$(grep -c "loadSpoon(\"Deskmates\")" "$(init)")" = 1 ]'
+check "init rename: backup is the original" 'cmp -s "$(init).bak" "$HOME/init.orig"'
+check "init rename: said so" 'echo "$out" | grep -q "init.lua: ClaudePuppet lines renamed to Deskmates"'
+if command -v luac > /dev/null 2>&1; then
+  check "init rename: parses" 'luac -p "$(init)"'
+fi
+# Uninstall points at the backup.
+out=$("$deskmates" uninstall)
+check "init uninstall: names the backup" 'echo "$out" | grep -q "init.lua.bak"'
+
+# An init.lua linked into dotfiles stays a link and keeps its mode through the rename.
+fresh_home
+mkdir -p "$HOME/.claude" "$HOME/.hammerspoon" "$HOME/dotfiles"
+printf 'hs.loadSpoon("ClaudePuppet")\n' > "$HOME/dotfiles/init.lua"
+chmod 600 "$HOME/dotfiles/init.lua"
+ln -s ../dotfiles/init.lua "$(init)"
+"$deskmates" install claude > /dev/null
+check "init link: still a link" '[ -L "$(init)" ]'
+check "init link: renamed in target" 'grep -q "loadSpoon(\"Deskmates\")" "$HOME/dotfiles/init.lua"'
+check "init link: mode kept" '[ "$(stat -f %Lp "$HOME/dotfiles/init.lua")" = 600 ]'
+
+# Run from a clone outside ~/.deskmates/src: the hooks run ~/.deskmates/src, so say so.
+fresh_home
+mkdir "$HOME/.claude"
+out=$("$deskmates" install claude)
+check "elsewhere: warned" 'echo "$out" | grep -q "hooks run ~/.deskmates/src"'
+mkdir -p "$HOME/.deskmates"
+ln -s "$src" "$HOME/.deskmates/src"
+out=$("$deskmates" install claude)
+check "elsewhere: no warning when ~/.deskmates/src is this copy" '! echo "$out" | grep -q "hooks run ~/.deskmates/src"'
+
+# No jq: nothing is migrated or changed.
+if [ ! -x /usr/bin/jq ] && [ ! -x /bin/jq ]; then
+  fresh_home
+  mkdir -p "$HOME/.claude" "$HOME/.claude-puppet/src"
+  out=$(PATH=/usr/bin:/bin "$deskmates" install claude 2>&1)
+  rc=$?
+  check "no jq: exit 1" '[ "$rc" = 1 ]'
+  check "no jq: says so" 'echo "$out" | grep -q "jq is needed"'
+  check "no jq: nothing migrated" '[ -d "$HOME/.claude-puppet/src" ] && [ ! -e "$HOME/.deskmates" ]'
+fi
+
+# An id given twice installs once.
+fresh_home
+mkdir "$HOME/.claude"
+out=$("$deskmates" install claude claude)
+check "dedupe: installed once" '[ "$(echo "$out" | grep -c "hooks installed for: claude$")" = 1 ]'
+
+# A backup keeps the mode of the file it copies.
+fresh_home
+echo '{}' > "$HOME/s.json"
+chmod 600 "$HOME/s.json"
+check "backup: mode kept" '(. hook/install-lib.sh; backup "$HOME/s.json") && [ "$(stat -f %Lp "$HOME/s.json.bak")" = 600 ]'
 
 rm -rf "$HOME_DIR"
 [ "$failed" = 0 ] && echo "install: ok"
