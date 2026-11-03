@@ -1,5 +1,6 @@
 #!/bin/sh
 # The helpers in hook/puppet-lib.sh on their own: what a translator keeps from a payload, and what it drops.
+# shellcheck disable=SC2034 # PUPPET_PAYLOAD is read by the library this sources
 cd "$(dirname "$0")/.." || exit 1
 failed=0
 HOME=$(mktemp -d) || exit 1
