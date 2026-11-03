@@ -224,6 +224,10 @@ check("apps: a session in its running app waits at its desk, not away", onStageO
 app:applyLiveness({ terminals = terminal, apps = { ["com.example.burrow"] = false } })
 check("apps: a session whose app quit leaves", not onStageOf(app, "r1", 200))
 check("apps: the agent's terminal sessions stay", onStageOf(app, "r2", 200))
+app:apply(event("UserPromptSubmit", { session = "r3", text = "/build", tty = "/dev/ttys004", app = "Burrow" }),
+  { mapping = mapping, harness = rabbit, frame = 1, now = 200 })
+app:applyLiveness({ terminals = terminal, apps = { ["com.example.burrow"] = false } })
+check("apps: a session with a terminal is judged by it, even when its line names the app", onStageOf(app, "r3", 200))
 app:apply(event("UserPromptSubmit", { session = "r1", text = "/build", app = "Burrow" }),
   { mapping = mapping, harness = rabbit, frame = 1, now = 300 })
 check("apps: a new prompt from the app brings it back", onStageOf(app, "r1", 300))

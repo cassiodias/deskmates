@@ -54,6 +54,16 @@ if [ "$app" != "Cursor" ]; then
 fi
 rm -rf "$work"
 
+# Cursor's CLI in a terminal that sets no TERM_PROGRAM (Alacritty): it has a terminal, so it is not the app.
+work=$(mktemp -d)
+app=$(env -u TERM_PROGRAM HOME="$work" PUPPET_NOW=0 PUPPET_TTY=/dev/ttys009 harnesses/cursor/translate.sh \
+  < "$f/prompt.json" > /dev/null; cut -d'|' -f9 "$work/.deskmates/events")
+if [ -n "$app" ]; then
+  echo "cursor turns: a prompt from a terminal with no TERM_PROGRAM names app '$app', expected none"
+  failed=1
+fi
+rm -rf "$work"
+
 work=$(mktemp -d)
 for name in prompt reply-first stop-first stop-aborted session-end; do
   HOME="$work" PUPPET_NOW=0 PUPPET_TTY=/dev/ttys009 harnesses/cursor/translate.sh < "$f/$name.json" > /dev/null

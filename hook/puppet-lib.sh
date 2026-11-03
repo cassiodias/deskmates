@@ -273,6 +273,12 @@ respond() {
   trap 'printf "%s\n" "$PUPPET_RESPONSE"' EXIT
 }
 
+# Names the app the agent's sessions run inside when they have no terminal (Cursor's chat): write_event puts it
+# on a line with neither a terminal nor a TERM_PROGRAM.
+puppet_app() {
+  PUPPET_APP=$1
+}
+
 # write_event harness event session agent_id tool agent_type text cwd flag title
 # Appends the line; the only place that writes the events file. event is one of the common names (see
 # CONTRIBUTING.md, "What each event must carry"); agent_id is empty on the main thread; flag is "test" or empty.
@@ -280,9 +286,11 @@ write_event() {
   mkdir -p "$PUPPET_DIR"
   puppet_expire
   tty=$(puppet_tty "$3")
+  app=${TERM_PROGRAM:-}
+  [ -z "$app" ] && [ -z "$tty" ] && app=${PUPPET_APP:-}
   [ "$2" = "SessionEnd" ] && rm -f "$PUPPET_DIR/tty-$3"
   printf '%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s\n' "${PUPPET_NOW:-$(date +%s)}" "$2" "$3" "$4" "$5" "$6" "$7" \
-    "$(printf '%s' "${8##*/}" | cut_chars 120)" "${TERM_PROGRAM:-}" "$9" "$tty" "$1" "${10}" >> "$PUPPET_EVENTS"
+    "$(printf '%s' "${8##*/}" | cut_chars 120)" "$app" "$9" "$tty" "$1" "${10}" >> "$PUPPET_EVENTS"
   # Keeps the file small; the puppets start reading again from the top.
   [ "$(wc -c < "$PUPPET_EVENTS")" -gt 1000000 ] && : > "$PUPPET_EVENTS"
   return 0

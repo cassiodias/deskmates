@@ -83,8 +83,8 @@ end
 -- Applies one look at what runs (terminals/liveness.lua): live.terminals ({ [tty] = { [program] = true } }, nil
 -- when unknown) and live.apps ({ [bundle id] = running? }). The same for every terminal app:
 --   closed: its terminal is gone (nothing runs in its tty: the tab or window closed), its terminal no longer
---     runs the harness's program, or the app it runs inside (harness.apps) quit. It leaves at once, and comes
---     back with its next prompt.
+--     runs the harness's program, or, having no terminal, the app it runs inside (harness.apps) quit. It leaves
+--     at once, and comes back with its next prompt.
 --   away: it has no terminal and no app to watch (run in the background). It leaves once it rests, after saying
 --     what it did, and comes back when it works again.
 function Sessions:applyLiveness(live)
@@ -93,7 +93,7 @@ function Sessions:applyLiveness(live)
     local bundle = s.apps and s.app and s.apps[s.app]
     if s.tty and live.terminals and not programs then s.isClosed = true end
     if programs and s.program and not runs(programs, s.program) then s.isClosed = true end
-    if bundle and live.apps and live.apps[bundle] == false then s.isClosed = true end
+    if bundle and not s.tty and live.apps and live.apps[bundle] == false then s.isClosed = true end
     s.isAway = not s.tty and not bundle
   end
 end

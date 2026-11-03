@@ -289,15 +289,16 @@ Make every script executable (`chmod +x`).
   (Cursor's terminal says `vscode`, like VS Code's, so `cursor.lua` brings Cursor forward). An agent with an app
   of its own may fire the same hooks from the app's chat, with no terminal at all. A session with no terminal
   (no tty on its lines) is read as a background session, which leaves once it rests; to keep its puppet at the
-  desk, have the translator name the app when `TERM_PROGRAM` is empty (Cursor's writes `Cursor`), bring the
-  app forward for it in `focus`, and name it in `apps` so the puppet leaves when the app quits. The contract test
-  can check it with a stand-in `terminals` table.
+  desk, have the translator name the app with `puppet_app` (Cursor's: `puppet_app Cursor`; `write_event` puts it
+  on a line with neither a terminal nor a `TERM_PROGRAM`), bring the app forward for it in `focus`, and name it
+  in `apps` so the puppet leaves when the app quits. The contract test can check it with a stand-in `terminals`
+  table.
 - `program` (optional): the program name, or a list of names, its sessions run in their terminal (the last
   part of `ps -o comm`). The session ends once its terminal no longer runs it; for agents that report the end
   of a session late, or never.
 - `apps` (optional): `{ [app on its lines] = bundle id }`, the apps its sessions run inside with no terminal
-  (Cursor: `{ Cursor = "com.todesktop.230313mzl4w4u92" }`). Such a session ends once its app no longer runs;
-  for an app that says nothing when it quits.
+  (Cursor: `{ Cursor = "com.todesktop.230313mzl4w4u92" }`). Such a session, with no terminal, ends once its
+  app no longer runs; for an app that says nothing when it quits.
 
 Then add the line in `Deskmates.spoon/lib/puppet/harnesses/init.lua`.
 
