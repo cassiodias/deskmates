@@ -1,7 +1,7 @@
 #!/bin/sh
 # Codex runs its hooks with no terminal: the hook finds the codex process working in the session's folder.
 # Two sessions in one folder: each takes a terminal no other session has claimed. pgrep, ps and lsof are fakes.
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 failed=0
 work=$(mktemp -d)
 folder=$(cd "$work" && pwd -P)

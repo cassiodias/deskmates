@@ -1,7 +1,7 @@
 #!/bin/sh
 # Runs every harness translator on its fixtures and compares each written line (without its time) with the
 # expected one. No agent and no Hammerspoon needed.
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 failed=0
 for payload in harnesses/*/fixtures/*.json; do
   harness=$(echo "$payload" | cut -d/ -f2)
@@ -10,7 +10,8 @@ for payload in harnesses/*/fixtures/*.json; do
   work=$(mktemp -d)
   # <name>.home holds files the case needs in its home (like Codex's session index).
   [ -d "${payload%.json}.home" ] && cp -R "${payload%.json}.home/." "$work/"
-  stdout=$(HOME="$work" PUPPET_NOW=0 PUPPET_TTY=/dev/ttys009 TERM_PROGRAM=iTerm.app "harnesses/$harness/translate.sh" < "$payload")
+  # LC_ALL=C: hooks may run from a background process, with no locale.
+  stdout=$(LC_ALL=C HOME="$work" PUPPET_NOW=0 PUPPET_TTY=/dev/ttys009 TERM_PROGRAM=iTerm.app "harnesses/$harness/translate.sh" < "$payload")
   got=$(cut -d'|' -f2- "$work/.deskmates/events" 2>/dev/null)
   if [ ! -e "$expected" ]; then
     echo "harness $harness: $(basename "$payload") has no .line file"

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Cursor sends a turn's reply (afterAgentResponse) before or after its stop, and two stops on Ctrl-C. Replays
 # its fixtures in the orders seen live, in one home, and checks the lines the translator writes.
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 f=harnesses/cursor/fixtures
 failed=0
 

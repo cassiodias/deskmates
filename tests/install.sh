@@ -1,7 +1,7 @@
 #!/bin/sh
 # Runs each harness's install, uninstall and detect against a fake home and checks what they leave in the
 # agent's settings. Needs jq.
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 src=$(pwd)
 failed=0
 HOME_DIR=

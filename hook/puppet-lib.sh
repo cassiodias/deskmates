@@ -14,10 +14,16 @@ puppet_read_payload() {
   PUPPET_PAYLOAD=$(cat)
 }
 
+# The first $1 characters of stdin, never cutting one in two: hooks may run with the C locale (from a
+# background process), where cut counts bytes.
+cut_chars() {
+  LC_ALL=en_US.UTF-8 cut -c "1-$1" 2>/dev/null
+}
+
 # One value from the JSON on stdin by key path, on one line, without "|".
 json_value() {
   value=$(plutil -extract "$1" raw -o - - 2>/dev/null) || return 0
-  printf '%s' "$value" | tr '\n|' '  ' | cut -c1-120
+  printf '%s' "$value" | tr '\n|' '  ' | cut_chars 120
 }
 
 # One value from the payload by key path (like tool_input.command).
@@ -36,7 +42,7 @@ path_field() {
 first_sentence() {
   value=$(printf '%s' "$PUPPET_PAYLOAD" | plutil -extract "$1" raw -o - - 2>/dev/null) || return 0
   printf '%s\n' "$value" | grep -v -e '^[[:space:]]*$' -e '^[[:space:]]*#' | head -n 1 | tr -d '#*`|' |
-    sed 's/^[[:space:]>-]*//' | sed 's/\([.!?]\)[[:space:]].*/\1/' | cut -c1-90
+    sed 's/^[[:space:]>-]*//' | sed 's/\([.!?]\)[[:space:]].*/\1/' | cut_chars 90
 }
 
 # A prompt's leading /command, or nothing: a slash and a name of letters, digits and ":_-". A prompt that starts
@@ -118,7 +124,7 @@ write_event() {
   tty=$(puppet_tty "$3")
   [ "$2" = "SessionEnd" ] && rm -f "$PUPPET_DIR/tty-$3"
   printf '%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s\n' "${PUPPET_NOW:-$(date +%s)}" "$2" "$3" "$4" "$5" "$6" "$7" \
-    "$(printf '%s' "${8##*/}" | cut -c1-120)" "${TERM_PROGRAM:-}" "$9" "$tty" "$1" "${10}" >> "$PUPPET_EVENTS"
+    "$(printf '%s' "${8##*/}" | cut_chars 120)" "${TERM_PROGRAM:-}" "$9" "$tty" "$1" "${10}" >> "$PUPPET_EVENTS"
   # Keeps the file small; the puppets start reading again from the top.
   [ "$(wc -c < "$PUPPET_EVENTS")" -gt 1000000 ] && : > "$PUPPET_EVENTS"
   return 0

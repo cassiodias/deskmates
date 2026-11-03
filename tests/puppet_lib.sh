@@ -25,6 +25,16 @@ expect "a path is not a command" "$(leading_command "/Users/me/my-app/notes.pdf 
 expect "a path with a dot is not a command" "$(leading_command "/notes.pdf summarise")" ""
 expect "a lone slash" "$(leading_command "/ hello")" ""
 
+# Text is cut by characters, never inside one, even when the hook runs with the C locale (a background process).
+a119=$(printf '%119s' '' | tr ' ' a)
+PUPPET_PAYLOAD="{\"message\":\"${a119}éèê\",\"last_assistant_message\":\"$(printf '%89s' '' | tr ' ' b)€€ more\"}"
+expect "field cuts at 120 characters" "$(export LC_ALL=C; field message)" "${a119}é"
+expect "first_sentence cuts at 90 characters" "$(export LC_ALL=C; first_sentence last_assistant_message)" \
+  "$(printf '%89s' '' | tr ' ' b)€"
+mkdir -p "$HOME/.deskmates"
+(export LC_ALL=C PUPPET_NOW=0 PUPPET_TTY=; write_event claude Stop s1 "" "" "" "" "/Users/me/${a119}ü✓" "" "")
+expect "the folder is cut at 120 characters" "$(LC_ALL=C cut -d'|' -f8 "$HOME/.deskmates/events")" "${a119}ü"
+
 rm -rf "$HOME"
 [ "$failed" = 0 ] && echo "puppet-lib: ok"
 exit "$failed"
