@@ -324,6 +324,37 @@ fi
 out=$("$deskmates" uninstall)
 check "init uninstall: names the backup" 'echo "$out" | grep -q "init.lua.bak"'
 
+# Only this Spoon's names change: another Spoon whose name holds the word, and comments, stay as they are.
+fresh_home
+mkdir -p "$HOME/.claude" "$HOME/.hammerspoon"
+cat > "$(init)" <<'LUA'
+-- I used ClaudePuppet before
+hs.loadSpoon("MyClaudePuppetTheme")
+hs.loadSpoon("ClaudePuppet")
+spoon.ClaudePuppet:start()
+LUA
+"$deskmates" install claude > /dev/null
+check "init narrow: comment kept" 'grep -qx -- "-- I used ClaudePuppet before" "$(init)"'
+check "init narrow: other Spoon kept" 'grep -qx "hs.loadSpoon(\"MyClaudePuppetTheme\")" "$(init)"'
+check "init narrow: ours renamed" 'grep -qx "hs.loadSpoon(\"Deskmates\")" "$(init)" && grep -qx "spoon.Deskmates:start()" "$(init)"'
+"$deskmates" uninstall > /dev/null
+check "init narrow: uninstall keeps the other Spoon" 'grep -q "MyClaudePuppetTheme" "$(init)" && ! grep -q "Deskmates" "$(init)" && grep -q "I used ClaudePuppet" "$(init)"'
+
+# Both names already there: the old Spoon's load and calls go, so Deskmates starts once; settings carry over.
+fresh_home
+mkdir -p "$HOME/.claude" "$HOME/.hammerspoon"
+cat > "$(init)" <<'LUA'
+hs.loadSpoon("ClaudePuppet")
+spoon.ClaudePuppet.pixel = 5
+spoon.ClaudePuppet:start()
+hs.loadSpoon("Deskmates")
+spoon.Deskmates:start()
+LUA
+"$deskmates" install claude > /dev/null
+check "init both: one loadSpoon" '[ "$(grep -c "loadSpoon" "$(init)")" = 1 ]'
+check "init both: one start" '[ "$(grep -c ":start()" "$(init)")" = 1 ]'
+check "init both: setting kept" 'grep -qx "spoon.Deskmates.pixel = 5" "$(init)"'
+
 # An init.lua linked into dotfiles stays a link and keeps its mode through the rename.
 fresh_home
 mkdir -p "$HOME/.claude" "$HOME/.hammerspoon" "$HOME/dotfiles"

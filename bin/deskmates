@@ -127,15 +127,24 @@ spoon_link() {
 }
 
 # Renames ClaudePuppet to Deskmates throughout init.lua, so the user's own settings on the Spoon carry over.
+# The old Spoon's own lines (its load and spoon.ClaudePuppet…) take the new name; other text keeps the word. When
+# init.lua already loads Deskmates, the old load and calls go instead, so it starts once; settings still carry over.
+OLD_LOAD='loadSpoon\("ClaudePuppet"\)'
+OLD_NAME='spoon\.ClaudePuppet([^A-Za-z0-9_]|$)'
 init_rename() {
-  [ -f "$init" ] && grep -q 'ClaudePuppet' "$init" || return 0
+  [ -f "$init" ] && grep -Eq "$OLD_LOAD|$OLD_NAME" "$init" || return 0
   init_backup
   renamed=$(mktemp) || exit 1
-  sed 's/ClaudePuppet/Deskmates/g' "$init" > "$renamed"
-  cat "$renamed" > "$init" && rm -f "$renamed"
+  if grep -qF 'hs.loadSpoon("Deskmates")' "$init"; then
+    grep -Ev "$OLD_LOAD|spoon\.ClaudePuppet:" "$init" > "$renamed.in"
+  else
+    cp "$init" "$renamed.in"
+  fi
+  sed -E 's/loadSpoon\("ClaudePuppet"\)/loadSpoon("Deskmates")/g; s/spoon\.ClaudePuppet([^A-Za-z0-9_]|$)/spoon.Deskmates\1/g' \
+    "$renamed.in" > "$renamed"
+  cat "$renamed" > "$init" && rm -f "$renamed" "$renamed.in"
   say "~/.hammerspoon/init.lua: ClaudePuppet lines renamed to Deskmates (backup in ~/.hammerspoon/init.lua.bak)"
 }
-
 init_lines() {
   init_rename
   if [ -f "$init" ] && grep -qF 'hs.loadSpoon("Deskmates")' "$init"; then
@@ -209,7 +218,7 @@ uninstall() {
   spoon_unlink Deskmates.spoon
   spoon_unlink ClaudePuppet.spoon
   say "Spoon links removed"
-  init_drop 'ClaudePuppet|loadSpoon\("Deskmates"\)|spoon\.Deskmates'
+  init_drop "$OLD_LOAD|$OLD_NAME|loadSpoon\\(\"Deskmates\"\\)|spoon\\.Deskmates([^A-Za-z0-9_]|\$)"
   say "Deskmates lines removed from ~/.hammerspoon/init.lua"
   [ -n "$init_backed" ] && todo "a setting of yours that spread over several lines may have lost a line: the original is ~/.hammerspoon/init.lua.bak"
   if [ "${DESKMATES_NO_DEFAULTS:-}" != 1 ]; then
