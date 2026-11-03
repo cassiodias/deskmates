@@ -1,4 +1,5 @@
-# Shared by every harness's install.sh and uninstall.sh (harnesses/<id>/ sources it), and by bin/deskmates.
+# Shared by every harness's install.sh and uninstall.sh (harnesses/<id>/ sources it; install_hooks and
+# uninstall_hooks below do their work), and by bin/deskmates.
 # The jq filters here handle a JSON hooks file with an event map under "hooks", in either shape:
 #   nested (Claude Code, Codex):  {"hooks": {event: [{matcher?, hooks: [{type, command}]}]}}
 #   flat:                         {"version": 1, "hooks": {event: [{command}]}}
@@ -87,4 +88,49 @@ hooks_merge() {
 hooks_present() {
   [ -f "$1" ] || return 1
   jq -e --arg ours "$OURS" "[$COMMANDS | select(test(\$ours))] | length > 0" "$1" > /dev/null 2>&1
+}
+
+# Path $1 as the user knows it: ~/… under their home.
+# shellcheck disable=SC2088 # a ~ to read, not to expand
+tilde() {
+  case "$1" in
+    "$HOME"/*) printf '~/%s' "${1#"$HOME"/}" ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
+# install_hooks name file snippet [filter]: what a harness's install.sh does. Adds our hooks from snippet (its
+# hooks.json) to the agent's hooks file, replacing any of ours already there, after a backup; a jq filter, when
+# given, rewrites the snippet first, with $home set to the user's home. Fails, leaving the file as it was, when
+# it is not a JSON object.
+install_hooks() {
+  need_jq || return 1
+  if [ -f "$2" ]; then
+    valid_json "$2" && backup "$2" || return 1
+  fi
+  if [ -n "$4" ]; then
+    rewritten=$(mktemp) || return 1
+    jq --arg home "$HOME" "$4" "$3" > "$rewritten" && hooks_merge "$2" "$rewritten"
+    merged=$?
+    rm -f "$rewritten"
+    [ "$merged" = 0 ] || return 1
+  else
+    hooks_merge "$2" "$3" || return 1
+  fi
+  say "$1 hooks in $(tilde "$2") (backups in $(tilde "$2").bak and .last.bak)"
+}
+
+# uninstall_hooks name file: what a harness's uninstall.sh does. Removes our hooks from the agent's hooks file,
+# after a backup, and nothing else.
+uninstall_hooks() {
+  need_jq || return 1
+  if [ -f "$2" ]; then
+    valid_json "$2" || return 1
+  fi
+  if ! hooks_present "$2"; then
+    say "no Deskmates hooks in $(tilde "$2")"
+    return 0
+  fi
+  backup "$2" && hooks_remove "$2" || return 1
+  say "$1 hooks removed from $(tilde "$2") (backups in $(tilde "$2").bak and .last.bak)"
 }

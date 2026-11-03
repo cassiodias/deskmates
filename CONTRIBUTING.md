@@ -233,13 +233,15 @@ When the agent's events do not line up with the table (`harnesses/cursor/transla
   command name other tools may have (Cursor's CLI is also called `agent`; its `detect.sh` looks for
   `cursor-agent`).
 - `config.sh`: prints the path of the file the agent keeps its hooks in.
-- `install.sh`, `uninstall.sh`: copy Codex's and change the names and the `todo` line (what the user still has
-  to do by hand). They use `hooks_merge`, `hooks_remove` and `hooks_present` from `hook/install-lib.sh`, which
-  understand a JSON file with an event map under `"hooks"`, either nested
-  (`{"hooks": {event: [{"hooks": [{"command": …}]}]}}`, Claude Code and Codex) or flat
-  (`{"version": 1, "hooks": {event: [{"command": …}]}}`). They back the file up first and touch only our
-  commands. Other top-level keys in `hooks.json` (like `"version": 1`) are added to the user's file when it
-  has none, and stay there on uninstall.
+- `install.sh`, `uninstall.sh`: copy Codex's and change the agent's name and the `todo` line (what the user
+  still has to do by hand). They hand the file `config.sh` prints to `install_hooks` and `uninstall_hooks` in
+  `hook/install-lib.sh`, which back it up (`.bak` keeps the file from before Deskmates, `.last.bak` the one
+  from before the latest change), touch only our commands and say where the hooks went. A jq filter given to
+  `install_hooks` rewrites `hooks.json` first (Cursor's spells out the home). The library understands a JSON
+  file with an event map under `"hooks"`, either nested (`{"hooks": {event: [{"hooks": [{"command": …}]}]}}`,
+  Claude Code and Codex) or flat (`{"version": 1, "hooks": {event: [{"command": …}]}}`). Other top-level keys
+  in `hooks.json` (like `"version": 1`) are added to the user's file when it has none, and stay there on
+  uninstall.
 - An agent whose hooks are not in such a file writes its own `install.sh` and `uninstall.sh`, plus an
   executable `present.sh` that exits 0 when our hooks are on (`deskmates status` and `update` use it).
 

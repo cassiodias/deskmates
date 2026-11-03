@@ -314,6 +314,53 @@ for args in "install nope" "nope" ""; do
   check "usage ($args): on stderr" 'echo "$err" | grep -q "^usage: deskmates"'
 done
 
+# An agent whose hooks are not in a JSON file has its own install.sh and uninstall.sh, and a present.sh that
+# deskmates status and update ask whether its hooks are on (CONTRIBUTING.md, "Add an agent", step 4).
+fresh_home
+git clone -q "$src" "$HOME/clone"
+cp -R bin harnesses hook "$HOME/clone/"
+plain="$HOME/clone/harnesses/plain"
+mkdir -p "$plain"
+printf '#!/bin/sh\nexit 0\n' > "$plain/detect.sh"
+printf '#!/bin/sh\necho "$HOME/.plain/hooks.conf"\n' > "$plain/config.sh"
+printf '#!/bin/sh\nmkdir -p "$HOME/.plain" && echo on > "$HOME/.plain/hooks.conf"\n' > "$plain/install.sh"
+printf '#!/bin/sh\nrm -f "$HOME/.plain/hooks.conf"\n' > "$plain/uninstall.sh"
+printf '#!/bin/sh\n[ "$(cat "$HOME/.plain/hooks.conf" 2>/dev/null)" = on ]\n' > "$plain/present.sh"
+chmod +x "$plain/"*.sh
+check "present.sh: hooks off" '"$HOME/clone/bin/deskmates" status | grep -Eq "^plain +detected +hooks off"'
+"$HOME/clone/bin/deskmates" install plain > /dev/null
+check "present.sh: hooks on after install" '"$HOME/clone/bin/deskmates" status | grep -Eq "^plain +detected +hooks on"'
+echo off > "$HOME/.plain/hooks.conf"
+check "present.sh: its answer, not the file's existence" '"$HOME/clone/bin/deskmates" status | grep -Eq "^plain +detected +hooks off"'
+echo on > "$HOME/.plain/hooks.conf"
+printf '#!/bin/sh\nmkdir -p "$HOME/.plain" && echo on > "$HOME/.plain/hooks.conf" && touch "$HOME/.plain/ran"\n' > "$plain/install.sh"
+(cd "$HOME/clone" && git add -A > /dev/null && git -c user.name=t -c user.email=t@t commit -qm plain)
+"$HOME/clone/bin/deskmates" update > /dev/null
+check "present.sh: update installs an agent whose present.sh says on" '[ -f "$HOME/.plain/ran" ]'
+"$HOME/clone/bin/deskmates" uninstall plain > /dev/null
+check "present.sh: hooks off after uninstall" '"$HOME/clone/bin/deskmates" status | grep -Eq "^plain +detected +hooks off"'
+
+# The install helpers say where the hooks went as the user knows the path, and back the file up.
+fresh_home
+mkdir -p "$HOME/.agent"
+out=$(. hook/install-lib.sh; install_hooks "My agent" "$HOME/.agent/hooks.json" "$claude/hooks.json")
+check "install_hooks: says where, with ~" 'echo "$out" | grep -qF "✓ My agent hooks in ~/.agent/hooks.json"'
+check "install_hooks: our hooks in" '[ "$(count "$HOME/.agent/hooks.json" "$OURS")" = 10 ]'
+out=$(. hook/install-lib.sh; install_hooks "My agent" "$HOME/.agent/hooks.json" "$claude/hooks.json" \
+  '.hooks[][].hooks[].command |= sub("^~"; $home)')
+check "install_hooks: a filter rewrites the snippet, with \$home" \
+  '[ "$(count "$HOME/.agent/hooks.json" "^$HOME/\\.deskmates/")" = 10 ] && [ "$(count "$HOME/.agent/hooks.json" "^~")" = 0 ]'
+check "install_hooks: backed up" '[ -f "$HOME/.agent/hooks.json.bak" ] && [ -f "$HOME/.agent/hooks.json.last.bak" ]'
+out=$(. hook/install-lib.sh; uninstall_hooks "My agent" "$HOME/.agent/hooks.json")
+check "uninstall_hooks: says so, with ~" 'echo "$out" | grep -qF "✓ My agent hooks removed from ~/.agent/hooks.json"'
+check "uninstall_hooks: none of ours left" '[ "$(count "$HOME/.agent/hooks.json" "$OURS")" = 0 ]'
+out=$(. hook/install-lib.sh; uninstall_hooks "My agent" "$HOME/.agent/hooks.json")
+check "uninstall_hooks: none there, says so" 'echo "$out" | grep -qF "✓ no Deskmates hooks in ~/.agent/hooks.json"'
+echo 'not json' > "$HOME/.agent/bad.json"
+(. hook/install-lib.sh; install_hooks "My agent" "$HOME/.agent/bad.json" "$claude/hooks.json") > /dev/null 2>&1
+rc=$?
+check "install_hooks: not JSON, fails and leaves it" '[ "$rc" = 1 ] && [ "$(cat "$HOME/.agent/bad.json")" = "not json" ]'
+
 # update from a clone: pulls, then installs only harnesses whose hooks are on.
 fresh_home
 mkdir "$HOME/.claude"
