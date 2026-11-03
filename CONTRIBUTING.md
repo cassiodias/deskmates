@@ -205,12 +205,19 @@ session, when it has one. Never pass prompts, commands or code: only what the ta
 
 Helpers in `hook/puppet-lib.sh`:
 
-- `field key.path` (one line, `|` removed, cut to 120 characters), `path_field key` (a whole path),
-  `payload_value key` (the value as it is, newlines kept, up to 4000 characters), `first_sentence key`,
+- `field key.path` (one line, `|` removed, cut to 120 characters), `path_field key` (newlines and `|` removed,
+  not cut), `payload_value key` (the value with its newlines), `first_sentence key` (cut to 90 characters),
   `leading_command text`, `is_test_command command` (pass it the whole command: `payload_value`),
-  `json_value key` (JSON on stdin, for a file of the agent's). `puppet_read_payload` reads the payload once and,
-  when jq is there, parses it once; without jq (macOS 13 and 14) plutil reads each field. A missing key is
-  empty. Text is cut by characters, never inside one, whatever the locale.
+  `json_value key` (like `field`, for JSON on stdin: a file of the agent's). A key path is keys and array
+  indexes joined by dots (`tool_input.command`, `workspace_roots.0`). A missing key or `null` reads as empty;
+  so do an object and an array with jq (plutil gives an object's keys and an array's length). Text is cut by
+  characters, never inside one, whatever the locale; a byte that is not UTF-8 is dropped.
+- `puppet_read_payload` reads the payload once. With jq (on the `PATH`, or in `/usr/bin`, `/opt/homebrew/bin`
+  or `/usr/local/bin`) it also parses it once, into a table of its values that the helpers read. The table
+  holds key paths up to 4 keys deep, the first 16 items of an array, and the first 4000 characters of a text:
+  a value deeper or further along reads as empty, and a longer one comes back cut there (`path_field` too,
+  though no path is that long). Without jq (macOS 13 and 14 before `brew install jq`), plutil reads each value
+  whole from the payload, which is slower on a large one.
 - `respond json`: prints `json` when the translator exits, however it exits, for agents that wait for an
   answer (Codex wants `{}` after `Stop`). Call it before anything that may exit, including the `exit 0` that
   drops an event, when the agent waits on that event. Print nothing otherwise: the tests expect no output

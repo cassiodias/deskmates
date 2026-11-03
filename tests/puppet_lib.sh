@@ -87,6 +87,7 @@ expect "and its line is written" "$(tail -n 1 "$HOME/.deskmates/events")" \
   "0|PostToolUse|big||Read|||my-app|${TERM_PROGRAM:-}||/dev/ttys009|claude|"
 
 # Without jq (macOS 13 and 14), plutil reads each field: the same helpers, the same answers.
+found_jq=$PUPPET_JQ
 PUPPET_PAYLOAD='{"a":{"b":"one|two\nthree"},"n":3,"t":true,"z":null,"list":["x","y"],"cwd":"/Users/me/my-app"}'
 for jq in "$PUPPET_JQ" ""; do
   PUPPET_JQ=$jq
@@ -104,6 +105,18 @@ for jq in "$PUPPET_JQ" ""; do
   expect "$mode: json_value" "$(printf '{"x":{"y":"deep"}}' | json_value x.y)" deep
   expect "$mode: json_value of a missing key" "$(printf '{"x":1}' | json_value y)" ""
 done
+
+# With jq, what the table holds (CONTRIBUTING.md, "Helpers"): 4 keys deep, 16 items of an array, 4000 characters
+# of a text.
+PUPPET_JQ=$found_jq
+PUPPET_PAYLOAD=$(jq -n '{a: {b: {c: {d: "four", e: {f: "five"}}}}, list: [range(20) | tostring],
+  text: ([range(4100)] | map("x") | join(""))}')
+puppet_parse_payload
+expect "jq: 4 keys deep" "$(field a.b.c.d)" four
+expect "jq: not 5" "$(field a.b.c.e.f)" ""
+expect "jq: the 16th item" "$(field list.15)" 15
+expect "jq: not the 17th" "$(field list.16)" ""
+expect "jq: a text up to 4000 characters" "$(payload_value text | wc -c | tr -d ' ')" 4001
 
 rm -rf "$HOME"
 [ "$failed" = 0 ] && echo "puppet-lib: ok"
