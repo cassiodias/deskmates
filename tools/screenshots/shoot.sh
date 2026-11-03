@@ -11,20 +11,19 @@ EV=$(mktemp -t puppet-events)
 hsq() { perl -e 'alarm 20; exec @ARGV' hs -c "$1"; }
 D="local D=dofile('$S/stage.lua')"
 wait() { perl -e "select(undef,undef,undef,$1)"; }
-# ev <seconds ago> <event> <session> <agent> <tool> <agent type> <text> <tty> [title]
+# ev <seconds ago> <event> <session> <agent> <tool> <agent type> <text> <tty> [title] [harness, default claude]
 ev() {
-  echo "$(( $(date +%s) - $1 ))|$2|$3|$4|$5|$6|$7|shop-api|iTerm.app||/dev/ttys$8|claude|$9" >> "$EV"
+  echo "$(( $(date +%s) - $1 ))|$2|$3|$4|$5|$6|$7|shop-api|iTerm.app||/dev/ttys$8|${10:-claude}|$9" >> "$EV"
 }
 fresh() { : > "$EV"; hsq "$D; return D.begin('$EV')"; wait 1; }
 snap() { wait "${2:-0.4}"; hsq "$D; return D.snap('$OUT/$1.png')"; }
-smile() {
-  # Waits for the moment the puppets turn to smile (frames 68-79 of every 80).
+# Saves the next moment the puppets turn to smile. Hammerspoon waits for it itself: asking it many times a
+# second breaks its command line.
+smile_snap() {
+  rm -f "$OUT/$1.png"
+  hsq "$D; return D.snapSmiling('$OUT/$1.png')"
   i=0
-  while [ $i -lt 100 ]; do
-    f=$(hsq 'return spoon.Deskmates.frame % 80')
-    [ "$f" -ge 70 ] && [ "$f" -le 75 ] && break
-    wait 0.1; i=$((i + 1))
-  done
+  while [ ! -s "$OUT/$1.png" ] && [ $i -lt 100 ]; do wait 0.1; i=$((i + 1)); done
 }
 
 # Coding: one puppet at its laptop, an invader hit.
@@ -55,7 +54,7 @@ fresh
 ev 1200 UserPromptSubmit s1 "" "" "" "/my-coding-skill" 101
 ev 1200 PreToolUse s1 "" Edit "" "" 101
 ev 0 UserPromptSubmit s2 "" "" "" "/my-coding-skill" 102
-wait 0.5; smile; snap coding-smiling-thinking 0
+wait 0.5; smile_snap coding-smiling-thinking
 
 # Happy: two puppets smiling.
 fresh
@@ -63,7 +62,7 @@ ev 1200 UserPromptSubmit s1 "" "" "" "/my-coding-skill" 101
 ev 1200 PreToolUse s1 "" Edit "" "" 101
 ev 600 UserPromptSubmit s2 "" "" "" "/my-planner" 102
 ev 600 PreToolUse s2 "" Edit "" "" 102
-wait 0.5; smile; snap dev-planner-happy 0
+wait 0.5; smile_snap dev-planner-happy
 
 # Coder and Matrix side by side, the Matrix one just given a prompt.
 fresh
@@ -134,6 +133,20 @@ ev 1900 SubagentStart s1 a1 "" general-purpose "" 101
 ev 1900 SubagentStart s1 a2 "" general-purpose "" 101
 for i in 1 2 3 4 5 6; do ev 30 PreToolUse s1 a1 Read "" "" 101; ev 30 PreToolUse s1 a2 Bash "" "" 101; done
 wait 0.6; hsq "$D; return D.hover('s1')"; snap hover-card 0.6
+
+# Claude Code and Codex side by side: a Claude puppet's subagents play ping pong, the Codex owl codes.
+fresh
+ev 900 UserPromptSubmit s1 "" "" "" "/my-reviewer" 101
+ev 900 PreToolUse s1 "" Agent "" "Check the contract" 101
+ev 900 PreToolUse s1 "" Agent "" "Try to break it" 101
+ev 900 SubagentStart s1 a1 "" general-purpose "" 101
+ev 900 SubagentStart s1 a2 "" general-purpose "" 101
+ev 600 UserPromptSubmit s2 "" "" "" "/my-coding-skill" 102 "" codex
+for i in 1 2 3 4 5 6; do
+  ev 0 PreToolUse s1 a1 Read "" "" 101; ev 0 PreToolUse s1 a2 Bash "" "" 101
+  ev 0 PreToolUse s2 "" Bash "" "" 102 "" codex
+done
+snap agents 0.8
 
 # Nothing running: the home puppet.
 fresh

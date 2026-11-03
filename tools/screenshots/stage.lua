@@ -18,6 +18,9 @@ function D.begin(eventsFile)
     self.windows = 1
     return true
   end
+  -- Staged sessions run no real program in their fake tabs: judge them by the tabs only.
+  P.unstagedRefreshTabs = P.unstagedRefreshTabs or P.refreshTabs
+  P.refreshTabs = function(self) if self.iterm:refresh() then self.sessions:closeMissing(self.iterm.tabs) end end
   P:refreshTabs()
   return "staged"
 end
@@ -48,6 +51,18 @@ function D.snap(path)
   return "saved " .. path
 end
 
+-- Snaps the next moment the puppets smile at you (frames 70-75 of every 80).
+function D.snapSmiling(path)
+  P.smileTimer = hs.timer.doEvery(0.05, function()
+    local f = P.frame % 80
+    if f >= 70 and f <= 75 then
+      P.smileTimer:stop()
+      D.snap(path)
+    end
+  end)
+  return "waiting for a smile"
+end
+
 -- Rests the mouse on a session's puppet, so its card shows.
 function D.hover(key)
   local f = P.stage.puppets[key].canvas:frame()
@@ -58,6 +73,7 @@ end
 
 function D.finish()
   if D.mouse then hs.mouse.absolutePosition(D.mouse) end
+  if P.unstagedRefreshTabs then P.refreshTabs, P.unstagedRefreshTabs = P.unstagedRefreshTabs, nil end
   P:stop()
   P.eventsFile = os.getenv("HOME") .. "/.deskmates/events"
   P:start()
