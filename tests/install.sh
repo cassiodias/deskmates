@@ -89,6 +89,38 @@ check "detect: empty home" '! PATH=/usr/bin:/bin "$claude/detect.sh"'
 mkdir "$HOME/.claude"
 check "detect: ~/.claude" 'PATH=/usr/bin:/bin "$claude/detect.sh"'
 
+# Codex: hooks in ~/.codex/hooks.json.
+codex="$src/harnesses/codex"
+codex_cmd='~/.deskmates/src/harnesses/codex/translate.sh'
+chooks() { echo "$HOME/.codex/hooks.json"; }
+fresh_home
+mkdir "$HOME/.codex"
+"$codex/install.sh" > /dev/null
+h=$(chooks)
+check "codex fresh: config path" '[ "$("$codex/config.sh")" = "$HOME/.codex/hooks.json" ]'
+check "codex fresh: 9 events" '[ "$(jq ".hooks | length" "$h")" = 9 ]'
+check "codex fresh: one ours per event" \
+  '[ "$(jq --arg c "$codex_cmd" "[.hooks[] | (map(.hooks[].command) == [\$c])] | all" "$h")" = true ]'
+check "codex fresh: no matcher" '[ "$(jq "[.hooks[][] | has(\"matcher\")] | any" "$h")" = false ]'
+check "codex fresh: no Notification" '[ "$(jq ".hooks | has(\"Notification\")" "$h")" = false ]'
+
+fresh_home
+mkdir "$HOME/.codex"
+echo '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"~/bin/my-stop.sh"}]}]}}' > "$(chooks)"
+"$codex/install.sh" > /dev/null
+h=$(chooks)
+check "codex user: hook kept" '[ "$(count "$h" "^~/bin/my-stop.sh$")" = 1 ]'
+check "codex user: 9 ours" '[ "$(count "$h" "$OURS")" = 9 ]'
+cp "$h" "$HOME/once.json"
+"$codex/install.sh" > /dev/null
+check "codex twice: same file" 'cmp -s "$h" "$HOME/once.json"'
+"$codex/uninstall.sh" > /dev/null
+check "codex uninstall: none of ours" '[ "$(count "$h" "$OURS")" = 0 ]'
+check "codex uninstall: user hook kept" '[ "$(count "$h" "^~/bin/my-stop.sh$")" = 1 ]'
+check "codex detect: ~/.codex" 'PATH=/usr/bin:/bin "$codex/detect.sh"'
+fresh_home
+check "codex detect: empty home" '! PATH=/usr/bin:/bin "$codex/detect.sh"'
+
 # The library on its own: a missing file and its folder are created; hooks_present sees ours.
 fresh_home
 lib="$HOME/nested/hooks.json"
@@ -182,6 +214,16 @@ check "spoon folders: named" 'echo "$out" | grep -q "ClaudePuppet.spoon is a fol
 out=$("$deskmates" uninstall)
 check "spoon folders: uninstall keeps them" '[ -f "$HOME/.hammerspoon/Spoons/ClaudePuppet.spoon/init.lua" ] && [ -f "$(spoon_link)/init.lua" ]'
 check "spoon folders: uninstall names them" 'echo "$out" | grep -q "Deskmates.spoon is a folder"'
+
+# An old install moves over and Codex is installed too: Claude's hooks come back pointing at ~/.deskmates.
+fresh_home
+mkdir -p "$HOME/.claude" "$HOME/.codex" "$HOME/.claude-puppet/src"
+echo '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"~/.claude-puppet/src/hook/puppet-hook.sh"}]}]}}' > "$(settings)"
+"$deskmates" install codex > /dev/null
+check "migrate codex: claude hooks on" '[ "$(count "$(settings)" "$OURS")" = 10 ] && [ "$(count "$(settings)" "claude-puppet")" = 0 ]'
+check "migrate codex: claude hooks at ~/.deskmates" '[ "$(count "$(settings)" "^~/\\.deskmates/src/harnesses/claude/")" = 10 ]'
+check "migrate codex: codex hooks on" '[ "$(count "$(chooks)" "^~/\\.deskmates/src/harnesses/codex/")" = 9 ]'
+rm -rf "$HOME/.deskmates"
 
 # Both folders: the old one is left alone and named.
 fresh_home

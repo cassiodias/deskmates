@@ -1,0 +1,9 @@
+{
+  "session_id": "s1",
+  "turn_id": "t1",
+  "transcript_path": "/tmp/rollout.jsonl",
+  "cwd": "/Users/me/projects/units",
+  "model": "m",
+  "permission_mode": "default",
+  "hook_event_name": "Interrupt"
+}

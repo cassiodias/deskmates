@@ -1,0 +1,13 @@
+{
+  "session_id": "s1",
+  "turn_id": "t1",
+  "transcript_path": "/tmp/rollout.jsonl",
+  "cwd": "/Users/me/projects/units",
+  "model": "m",
+  "permission_mode": "default",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "apply_patch",
+  "tool_input": { "command": "*** Begin Patch" },
+  "tool_use_id": "u1",
+  "tool_response": "Exit code: 0\nWall time: 0.1 seconds\nOutput:\nok"
+}

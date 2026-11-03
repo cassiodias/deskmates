@@ -1,0 +1,11 @@
+{
+  "session_id": "s2",
+  "turn_id": "t1",
+  "transcript_path": "/tmp/rollout.jsonl",
+  "cwd": "/Users/me/projects/units",
+  "model": "m",
+  "permission_mode": "default",
+  "hook_event_name": "Stop",
+  "last_assistant_message": "Fixed the typo. More.",
+  "stop_hook_active": false
+}
