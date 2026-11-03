@@ -44,7 +44,8 @@ for name, body in pairs(sprites.BODIES) do
     local rows = body[pose]
     check(name .. ": has " .. pose, type(rows) == "table")
     rows = rows or {}
-    local tall = pose:match("^FRONT") and #rows >= 1 and #rows <= 8 or #rows == 9
+    local tall
+    if pose:match("^FRONT") then tall = #rows >= 1 and #rows <= 8 else tall = #rows == 9 end
     check(name .. ": " .. pose .. " is the right height", tall)
     for i, row in ipairs(rows) do
       check(name .. ": " .. pose .. " row " .. i .. " is 9 wide", #row == 9)
@@ -62,8 +63,9 @@ for id, h in pairs(harnesses.all) do
     check(id .. ": says whether it has " .. capability, type(h.capabilities[capability]) == "boolean")
   end
   check(id .. ": wears a body sprites.lua has", sprites.BODIES[h.character.body] ~= nil)
-  check(id .. ": program is nil, a name or a list of names", h.program == nil or type(h.program) == "string"
-    or (type(h.program) == "table" and #h.program > 0))
+  local names = type(h.program) == "table" and #h.program > 0
+  for _, name in ipairs(type(h.program) == "table" and h.program or {}) do names = names and type(name) == "string" end
+  check(id .. ": program is nil, a name or a list of names", h.program == nil or type(h.program) == "string" or names)
   check(id .. ": has a palette", type(h.character.palette) == "table" and #h.character.palette > 0)
   check(id .. ": toolKind is a function", type(h.toolKind) == "function")
   local kind = h.toolKind("no-such-tool")
@@ -103,8 +105,7 @@ for id, h in pairs(harnesses.all) do
       end
     end
   end
-  -- Without these the puppet never starts a turn, or never finishes one.
-  check(id .. ": a fixture sends UserPromptSubmit", events.UserPromptSubmit)
+  -- Without Stop the puppet never finishes a turn.
   check(id .. ": a fixture sends Stop", events.Stop)
   for capability, test in pairs(SHOWN_BY) do
     if h.capabilities[capability] then

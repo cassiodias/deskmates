@@ -25,7 +25,10 @@ for payload in harnesses/*/fixtures/*.json; do
     echo "  $(cat "$expected")"
     failed=1
   fi
-  if [ -e "${payload%.json}.stdout" ] && [ "$stdout" != "$(cat "${payload%.json}.stdout")" ]; then
+  # Without a .stdout file the translator must print nothing: agents may read what it prints.
+  expected_stdout=""
+  [ -e "${payload%.json}.stdout" ] && expected_stdout=$(cat "${payload%.json}.stdout")
+  if [ "$stdout" != "$expected_stdout" ]; then
     echo "harness $harness: $(basename "$payload") printed '$stdout'"
     failed=1
   fi

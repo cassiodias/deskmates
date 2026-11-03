@@ -420,8 +420,12 @@ for dir in harnesses/*/; do
   [ -f "$dir/detect.sh" ] || continue
   fresh_home
   f=$("$dir/config.sh")
-  check "$id: hooks.json points at its translator" \
-    '[ "$(jq -r "[$(. hook/install-lib.sh; echo "$COMMANDS")] | unique | join(\" \")" "$dir/hooks.json")" = "~/.deskmates/src/harnesses/$id/translate.sh" ]'
+  if [ -x "$dir/present.sh" ]; then
+    check "$id: hooks.json points at its translator" 'grep -q "harnesses/$id/translate.sh" "$dir/hooks.json"'
+  else
+    check "$id: hooks.json points at its translator" \
+      '[ "$(jq -r "[$(. hook/install-lib.sh; echo "$COMMANDS")] | unique | join(\" \")" "$dir/hooks.json")" = "~/.deskmates/src/harnesses/$id/translate.sh" ]'
+  fi
   mkdir -p "$(dirname "$f")"
   if [ ! -x "$dir/present.sh" ]; then
     jq 'walk(if type == "object" and has("command") then .command = "~/bin/my-hook" else . end)' "$dir/hooks.json" > "$f"

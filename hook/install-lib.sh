@@ -31,10 +31,10 @@ backup() {
   return 0
 }
 
-# Fails, leaving file $1 as it was, unless it holds JSON.
+# Fails, leaving file $1 as it was, unless it holds a JSON object.
 valid_json() {
-  jq empty "$1" > /dev/null 2>&1 && return 0
-  echo "$1 is not valid JSON; left as it was" >&2
+  jq -e 'type == "object"' "$1" > /dev/null 2>&1 && return 0
+  echo "$1 is not a JSON object; left as it was" >&2
   return 1
 }
 
@@ -69,14 +69,14 @@ hooks_remove() {
 }
 
 # Our hooks from snippet $2 added to settings file $1, replacing any of ours already there. The snippet's other
-# top-level keys (like "version") are added when the file has none of its own.
+# top-level keys (like "version") are added when the file has none of its own, and stay after hooks_remove.
 hooks_merge() {
   if [ ! -f "$1" ]; then
     mkdir -p "$(dirname "$1")" && echo '{}' > "$1" || return 1
   fi
   valid_json "$1" || return 1
   out=$(jq -s --arg ours "$OURS" "(.[0] | $OURS_REMOVE) as \$mine | .[1].hooks as \$add
-    | (.[1] | del(.hooks)) + \$mine | .hooks = (reduce (\$add | keys_unsorted[]) as \$e ((\$mine.hooks // {}); .[\$e] = ((.[\$e] // []) + \$add[\$e])))" \
+    | (.[1] | del(.hooks)) + \$mine | .hooks = (reduce (\$add | keys_unsorted[]) as \$e (((\$mine.hooks | objects) // {}); .[\$e] = ((.[\$e] // []) + \$add[\$e])))" \
     "$1" "$2") || return 1
   write_json "$1" "$out"
 }

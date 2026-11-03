@@ -69,7 +69,7 @@ tests/run.sh
   for Hammerspoon and compare every frame with `tests/snapshots/`. If you changed a drawing on purpose, record
   it again with `UPDATE=1 lua5.4 tests/scenario_test.lua` and check the diff.
 - `sessions_test.lua` runs the session model with a fake agent; `status_test.lua` checks the status line and
-  the card's text.
+  the card's text; `settings_test.lua` checks the saved settings carry over from the old name.
 - `harness_contract_test.lua` checks every harness and every creature (see "What the tests check for you").
 - `harnesses.sh` runs every translator on its fixtures; `codex_tty.sh` checks how Codex finds its terminal.
 - `install.sh` runs the installer against a fake `HOME`, for every harness; it never touches your real files.
@@ -114,12 +114,12 @@ Add `NAME.stdout` when the translator must print something for the agent, and a 
 the case needs in its home (it is copied into a fresh fake `HOME`). The translator runs with
 `PUPPET_TTY=/dev/ttys009 TERM_PROGRAM=iTerm.app`.
 
-Have at least a prompt and a Stop: without them the puppet never starts or never finishes a turn, and the
-contract test fails.
+Have at least a Stop: without it the puppet never finishes a turn, and the contract test fails.
 
 ### 3. translate.sh
 
-Source the library, read the payload, map the event, call `write_event`, exit 0:
+The agent runs it with the payload on stdin. Source the library, read the payload, map the event, call
+`write_event`, exit 0:
 
 ```sh
 #!/bin/sh
@@ -140,7 +140,7 @@ order (it adds the time, the terminal app and the tty itself). What each event m
 
 | Event | Send it when | Fields the Spoon reads | Without it |
 | --- | --- | --- | --- |
-| `UserPromptSubmit` | you send a prompt | `text`: the prompt's leading `/command` only (`leading_command`); `title` | **required**: the turn never starts, and command animations never play |
+| `UserPromptSubmit` | you send a prompt | `text`: the prompt's leading `/command` only (`leading_command`); `title` | each turn carries on the last one (score, subagents, reply), command animations never play, and a session judged closed never comes back |
 | `PreToolUse` | a tool is about to run | `tool`; `text`: the skill's name for a skill tool, the subagent's short description for a subagent tool; `flag=test` for a test command | the puppet never types or shoots |
 | `PostToolUse` | a tool succeeded | `tool`, `flag` (same as its `PreToolUse`) | a test never shows its ✓, and a permission sign stays up until the next tool call |
 | `PostToolUseFailure` | a tool failed | `tool`, `flag` | a failed test shows as passed |
@@ -160,7 +160,9 @@ Helpers in `hook/puppet-lib.sh`:
 - `field key.path` (one line, `|` removed, cut to 120 characters), `path_field key` (a whole path),
   `first_sentence key`, `leading_command text`, `is_test_command command`, `json_value key` (JSON on stdin).
 - `respond json`: prints `json` when the translator exits, however it exits, for agents that wait for an
-  answer (Codex wants `{}` after `Stop`). Call it first in that case.
+  answer (Codex wants `{}` after `Stop`). Call it before anything that may exit, including the `exit 0` that
+  drops an event, when the agent waits on that event. Print nothing otherwise: the tests expect no output
+  without a `.stdout` file.
 - `puppet_tty_fallback`: define it when the agent runs hooks in a background process with no terminal; it
   prints the session's terminal. `puppet_tty_fallback() { tty_from_program codex; }` finds the agent's
   process working in the session's folder.
@@ -179,7 +181,8 @@ translator's to spot and turn into `PostToolUseFailure`.
   understand a JSON file with an event map under `"hooks"`, either nested
   (`{"hooks": {event: [{"hooks": [{"command": …}]}]}}`, Claude Code and Codex) or flat
   (`{"version": 1, "hooks": {event: [{"command": …}]}}`). They back the file up first and touch only our
-  commands.
+  commands. Other top-level keys in `hooks.json` (like `"version": 1`) are added to the user's file when it
+  has none, and stay there on uninstall.
 - An agent whose hooks are not in such a file writes its own `install.sh` and `uninstall.sh`, plus an
   executable `present.sh` that exits 0 when our hooks are on (`deskmates status` and `update` use it).
 
@@ -192,7 +195,8 @@ Make every script executable (`chmod +x`).
 - `id` (the name `write_event` writes) and `name` (shown in bubbles, like "Codex needs you").
 - `capabilities`: which of `prompt`, `tools`, `toolFailure`, `subagents`, `permission`, `question`, `reply`,
   `sessionEnd`, `notification` the agent reports. Each `true` must have a fixture that shows it.
-- `character = { body = "…", palette = { five colours } }`: the creature and its colours, one per session.
+- `character = { body = "…", palette = { colours } }`: the creature, and its colours: each session's puppet takes the first one no
+  other puppet wears (five is plenty).
 - `toolKind(tool)`: `"reading"`, `"question"`, `"plan"`, `"skill"`, `"agent"` (starts a subagent) or `nil`.
 - `focus(session, terminals)`: what a click does. `terminals.focus(session)` brings the terminal tab forward;
   `terminals.app(bundleId, session.folder)` brings an app's window forward, for an agent that runs in its own
@@ -220,7 +224,8 @@ For every harness and creature, with nothing to add:
   `config.COLORS` has; the harness's body exists;
 - the harness has its fields, and its scripts are executable;
 - every fixture line names this harness and one of the events above, and the Spoon takes them all without an
-  error; there is a prompt and a Stop among them; every `true` capability has a fixture that shows it;
+  error; there is a Stop among them; every `true` capability has a fixture that shows it; a translator prints
+  nothing unless the case has a `.stdout` file;
 - `hooks.json` points at its own translator; install, install again (same file), `deskmates status` (hooks
   on), uninstall (your hooks back as they were).
 
@@ -235,11 +240,21 @@ brand's mascot.
 
 ## Add an animation
 
-1. A scene is one file in `render/scenes/` with `draw(buf, texts, session, ctx)`; a new monitor screen is one
-   file like `matrix.lua`, registered in `monitor.lua`.
-2. To let people map commands to it, add it to `Mapping.SCENES` in `model/mapping.lua` (and to
+Animations come in two kinds, and each is chosen per command in the menu (`model/mapping.lua`).
+
+- **A new monitor screen**, shown on the desk like Matrix: one file like `render/scenes/matrix.lua` with
+  `draw(buf, session, ctx)`, registered in `SCREENS` in `render/scenes/monitor.lua`. The Spoon picks the
+  screen in `Deskmates.spoon/init.lua` (the `monitor =` line, which today chooses between `matrix` and
+  `invaders`); add yours there.
+- **A new whole scene**, like ping pong: one file in `render/scenes/` with `draw(buf, texts, session, ctx)`,
+  a line in `SCENES` in `render/scenes/init.lua`, and a branch in `Sessions.sceneFor` in `model/sessions.lua`
+  saying when a session plays it.
+
+Then:
+
+1. To let people map commands to it, add it to `Mapping.SCENES` in `model/mapping.lua` (and to
    `CONVERSATION_CHOICES` if the main conversation may use it).
-3. Add moments to `tests/scenario_test.lua`, record the snapshots, and check them by eye.
+2. Add moments to `tests/scenario_test.lua`, record the snapshots, and check them by eye.
 
 ## Refresh the screenshots
 
