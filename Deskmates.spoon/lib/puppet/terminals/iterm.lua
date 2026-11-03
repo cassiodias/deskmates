@@ -46,27 +46,30 @@ function Iterm:label(tty)
   return "tab " .. place.tab
 end
 
--- Selects the window, tab and pane running a terminal device; false when iTerm has none. iTerm comes forward
--- first: activating it after the selection brought back its last front window, so a second click was needed.
+-- Selects the tab and pane running a terminal device and brings their window forward, in one go; false when iTerm
+-- has none. AppleScript only selects inside iTerm and answers the window's id (macOS's window number too):
+-- Hammerspoon raises that window itself, as activating iTerm from AppleScript raised its last front window
+-- instead, a step per click.
 function Iterm:select(tty)
-  local ok, found = hs.osascript.applescript(string.format([[
+  local ok, id = hs.osascript.applescript(string.format([[
     tell application id "com.googlecode.iterm2"
       repeat with w in windows
         repeat with t in tabs of w
           repeat with s in sessions of t
             if tty of s is "%s" then
-              activate
-              select w
               select t
               select s
-              return true
+              return id of w
             end if
           end repeat
         end repeat
       end repeat
     end tell
-    return false]], tty))
-  return ok and found == true
+    return 0]], tty))
+  if not ok or type(id) ~= "number" or id == 0 then return false end
+  local window = hs.window.get(id)
+  if window then window:focus() end
+  return true
 end
 
 return Iterm

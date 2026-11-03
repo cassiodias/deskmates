@@ -16,7 +16,7 @@ end
 local P = dofile(stub.spoonPath .. "init.lua")
 P.eventsFile = eventsFile
 P:start()
-stub.tabs = "/dev/ttys001=1/1;"
+stub.tabs = "/dev/ttys009=1/1;/dev/ttys001=2/1;"
 write("UserPromptSubmit|tab1||||/dev-skill|app|iTerm.app||/dev/ttys001|claude|")
 stub.advance(0.2)
 
@@ -34,6 +34,7 @@ stub.mouse = { x = f.x + 300, y = f.y - 200 }
 stub.fire("leftMouseUp", f.x + 300, f.y - 200)
 stub.advance(0.2)
 check("a click handled late still selects its tab", stub.selected == "/dev/ttys001")
+check("one click raises the tab's own window, in a second iTerm window too", stub.raised == 102)
 check("a click handled late leaves the puppets where they were", anchor() == before)
 
 -- A click with a small wobble of the hand selects, and leaves the row exactly where it was.

@@ -99,11 +99,15 @@ hs = {
   osascript = {
     applescript = function(script)
       if script:find("set out to", 1, true) then return true, stub.tabs end
+      -- Selecting a tab: iTerm answers the id of the window holding it (its window number + 100), or 0.
       local tty = script:match('tty of s is "([^"]+)"')
       stub.selected = tty
-      return true, stub.tabs:find(tty .. "=", 1, true) ~= nil
+      local window = stub.tabs:match(tty:gsub("%p", "%%%0") .. "=(%d+)/")
+      return true, window and 100 + tonumber(window) or 0
     end,
   },
+  -- A window by id; focusing it records the id in stub.raised.
+  window = { get = function(id) return { focus = function() stub.raised = id end } end },
   styledtext = { new = function(text, style)
     stub.styled = { text = text, style = style }
     return text
