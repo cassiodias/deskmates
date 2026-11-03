@@ -87,7 +87,7 @@ if [ "$tool" = Task ]; then
   esac
 fi
 # Cursor's own chat runs the hooks with no terminal: the line names the app, so its rabbit waits at its desk
-# (a session with no app at all counts as a background one, which leaves once it rests).
+# (a session with no terminal and no app to watch counts as a background one, which leaves once it rests).
 [ -z "${TERM_PROGRAM:-}" ] && TERM_PROGRAM=Cursor
 flag=""
 [ "$tool" = Shell ] && is_test_command "$(payload_value tool_input.command)" && flag="test"
