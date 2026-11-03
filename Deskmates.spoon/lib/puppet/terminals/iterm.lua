@@ -46,7 +46,8 @@ function Iterm:label(tty)
   return "tab " .. place.tab
 end
 
--- Selects the window, tab and pane running a terminal device; false when iTerm has none.
+-- Selects the window, tab and pane running a terminal device; false when iTerm has none. iTerm comes forward
+-- first: activating it after the selection brought back its last front window, so a second click was needed.
 function Iterm:select(tty)
   local ok, found = hs.osascript.applescript(string.format([[
     tell application id "com.googlecode.iterm2"
@@ -54,10 +55,10 @@ function Iterm:select(tty)
         repeat with t in tabs of w
           repeat with s in sessions of t
             if tty of s is "%s" then
+              activate
               select w
               select t
               select s
-              activate
               return true
             end if
           end repeat
