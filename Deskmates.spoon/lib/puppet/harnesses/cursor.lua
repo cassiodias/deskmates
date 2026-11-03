@@ -22,10 +22,11 @@ return {
   -- The CLI runs as agent or cursor-agent, by the name it was started with. Ends a session whose tab quit it.
   program = { "agent", "cursor-agent" },
   -- A click brings its terminal forward. Cursor comes forward instead for a session in Cursor's own terminal
-  -- (TERM_PROGRAM "vscode", like VS Code's: a Cursor session there is in Cursor) or in Cursor's chat (no
-  -- terminal at all).
+  -- (TERM_PROGRAM "vscode", like VS Code's: a Cursor session there is in Cursor) or in Cursor's chat (app
+  -- "Cursor", written by the translator when there is no terminal).
   focus = function(session, terminals)
-    if session.app == "vscode" or (session.app or "") == "" then return terminals.app(CURSOR_APP, session.folder) end
+    local app = session.app or ""
+    if app == "vscode" or app == "Cursor" or app == "" then return terminals.app(CURSOR_APP, session.folder) end
     return terminals.focus(session)
   end,
 }

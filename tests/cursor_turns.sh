@@ -44,6 +44,16 @@ expect "a subagent's own events stay out of the main session" \
 expect "after the session ends, nothing is left behind" \
   "prompt reply-first stop-aborted session-end" "UserPromptSubmit| Stop| SessionEnd| "
 
+# Cursor's own chat runs the hooks with no terminal and no TERM_PROGRAM: its lines name the app Cursor.
+work=$(mktemp -d)
+app=$(env -u TERM_PROGRAM HOME="$work" PUPPET_NOW=0 PUPPET_TTY= harnesses/cursor/translate.sh < "$f/prompt.json" > /dev/null;
+  cut -d'|' -f9 "$work/.deskmates/events")
+if [ "$app" != "Cursor" ]; then
+  echo "cursor turns: a prompt from Cursor's chat names app '$app', expected 'Cursor'"
+  failed=1
+fi
+rm -rf "$work"
+
 work=$(mktemp -d)
 for name in prompt reply-first stop-first stop-aborted session-end; do
   HOME="$work" PUPPET_NOW=0 PUPPET_TTY=/dev/ttys009 harnesses/cursor/translate.sh < "$f/$name.json" > /dev/null

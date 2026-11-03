@@ -259,8 +259,10 @@ Make every script executable (`chmod +x`).
   `terminals.app(bundleId, session.folder)` brings an app's window forward, for an agent that runs in its own
   app. `session.app` is the `TERM_PROGRAM` the hook saw; when that is ambiguous for your agent, decide here
   (Cursor's terminal says `vscode`, like VS Code's, so `cursor.lua` brings Cursor forward). An agent with an app
-  of its own may fire the same hooks from the app's chat, with no terminal at all (`app` empty): bring the app
-  forward for those. Such a session shows while it works and leaves once it rests, like any session with no tab. The contract test
+  of its own may fire the same hooks from the app's chat, with no terminal at all. A line with no terminal app
+  is read as a background session, which leaves once it rests; to keep its puppet at the desk, have the
+  translator name the app when `TERM_PROGRAM` is empty (Cursor's writes `Cursor`), and bring the app forward
+  for it in `focus`. The contract test
   can check it with a stand-in `terminals` table.
 - `program` (optional): the program name, or a list of names, its sessions run in their terminal (the last
   part of `ps -o comm`). The session ends once its terminal no longer runs it; for agents that report the end

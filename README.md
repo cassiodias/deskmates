@@ -20,7 +20,7 @@ Pixel puppets that float over your Mac desktop, like the old Office paperclip, a
 | --- | --- | --- |
 | Claude Code | the puppet | every mood above |
 | Codex | an owl, in teal | every mood above except three: no notifications, no question (plans only), and no permission sign (Codex's default sandbox does not ask). The owl leaves a few seconds after you quit Codex |
-| Cursor CLI (`agent`) | a rabbit, in lavender | every mood above except three: no notifications, no question, and no permission sign (Cursor's hooks are not told when it asks you). A chat in the Cursor app gets a rabbit too, while it works; a click on it brings Cursor forward |
+| Cursor CLI (`agent`) | a rabbit, in lavender | every mood above except three: no notifications, no question, and no permission sign (Cursor's hooks are not told when it asks you). A chat in the Cursor app gets a rabbit too, which waits at its desk like the others; a click on it brings Cursor forward |
 
 Codex and Cursor show the title each gives the session; Codex's subagents show their short task name, Cursor's their description. Want to add an agent, a creature or an animation? [CONTRIBUTING.md](CONTRIBUTING.md) has the steps.
 

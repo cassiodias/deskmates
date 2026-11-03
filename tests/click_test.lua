@@ -66,9 +66,13 @@ for _, tap in ipairs(stub.taps) do if tap.running then running = running + 1 end
 check("only the last press is followed: no tap left running", running == 0)
 check("only the last press is followed: the row stays", anchor() == moved)
 
--- A rabbit from Cursor's own chat has no terminal: a click brings Cursor forward.
-write("UserPromptSubmit|chat1|||||my-app||||cursor|")
+-- A rabbit from Cursor's own chat (app "Cursor", no terminal) waits at its desk like any other, and a click
+-- brings Cursor forward.
+write("UserPromptSubmit|chat1|||||my-app|Cursor|||cursor|")
 stub.advance(0.2)
+write("Stop|chat1||||Done.|my-app|Cursor|||cursor|")
+stub.advance(60)
+check("Cursor's chat rabbit stays at its desk after the turn", P.stage.puppets.chat1 ~= nil and P.stage.puppets.chat1.canvas:isShowing())
 stub.focused = nil
 P:focus("chat1")
 check("a click on Cursor's chat rabbit brings Cursor forward", stub.focused == "com.todesktop.230313mzl4w4u92")
