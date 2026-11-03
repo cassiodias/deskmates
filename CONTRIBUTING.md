@@ -132,6 +132,9 @@ the way up means the hooks run in a background process, and you need `puppet_tty
 - how a subagent shows: its own events, or only a tool call, and whether the subagent's own tool calls arrive
   under the main session or as a session of their own;
 - where the session's title is, if anywhere (the transcript, or a file of the agent's).
+- whether the agent also runs other agents' hooks. Cursor runs Claude Code's (`~/.claude/settings.json`) as
+  well as its own, so with Deskmates installed for Claude Code, Cursor's events also reach Claude's translator.
+  Look in `~/.deskmates/events` for lines from another harness with your session's id.
 
 ### 2. Fixtures
 
@@ -210,9 +213,13 @@ When the agent's events do not line up with the table (`harnesses/cursor/transla
   `SubagentStop`, with the tool call's id as `agent_id` and its description as `text`.
 - **A subagent's own events arrive as a session of their own.** Drop them, or they draw a second puppet; find
   what tells them apart in the capture (Cursor: the generation id equals the session id).
-- **The reply comes on its own event, before or after the end of the turn.** Keep what came first in a file
-  `$PUPPET_DIR/<agent>-<session>.<what>` and write the one `Stop` when the second arrives; remove the files on
-  `SessionEnd`. Two `Stop`s for one turn show two bubbles.
+- **The reply comes on its own event, before or after the end of the turn, sometimes after the next prompt.**
+  Pair them by the agent's own id for the turn (Cursor: `generation_id`), not by arrival order, and keep what
+  came first in a file `$PUPPET_DIR/<agent>-<session>.<turn>.<what>`; remove the files on `SessionEnd`. Write
+  `Stop` when the turn ends, so the puppet stops working then; a reply that comes later for the same turn may
+  send a second `Stop` with its text (the bubble just changes), but drop one whose turn is over.
+- **Another agent's payloads reach your translator** (step 1): drop them by a field only that agent sends
+  (Claude's translator drops payloads with `cursor_version`).
 - **Two end-of-turn events for one turn** (Cursor on Ctrl-C: `aborted`, then `error`): write one `Stop`.
 
 ### 4. hooks.json, detect.sh, config.sh, install.sh, uninstall.sh

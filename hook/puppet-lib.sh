@@ -25,9 +25,11 @@ field() {
   printf '%s' "$PUPPET_PAYLOAD" | json_value "$1"
 }
 
-# A path from the payload (cwd, transcript_path), whole: field would cut a deep one short.
+# A path from the payload (cwd, transcript_path), whole: field would cut a deep one short. Nothing when the
+# payload has none (plutil prints its error on stdout).
 path_field() {
-  printf '%s' "$PUPPET_PAYLOAD" | plutil -extract "$1" raw -o - - 2>/dev/null | tr -d '\n|'
+  value=$(printf '%s' "$PUPPET_PAYLOAD" | plutil -extract "$1" raw -o - - 2>/dev/null) || return 0
+  printf '%s' "$value" | tr -d '\n|'
 }
 
 # The first sentence of a text field, past any heading, without markdown marks.

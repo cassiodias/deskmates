@@ -28,12 +28,14 @@ expect() {
 
 expect "reply, then stop: one Stop with the reply" \
   "prompt reply-first stop-first" "UserPromptSubmit| Stop|Fixed the typo. "
-expect "stop, then reply: one Stop with the reply" \
-  "prompt stop-first reply-first" "UserPromptSubmit| Stop|Fixed the typo. "
+expect "stop, then reply: the stop ends the turn, the reply then fills its bubble" \
+  "prompt stop-first reply-first" "UserPromptSubmit| Stop| Stop|Fixed the typo. "
 expect "Ctrl-C: aborted, then error: one Stop" \
   "prompt stop-aborted stop-error" "UserPromptSubmit| Stop| "
-expect "a stop with no reply, then a new turn: the next turn's reply waits for its own stop" \
-  "prompt stop-first prompt reply-first stop-first" "UserPromptSubmit| UserPromptSubmit| Stop|Fixed the typo. "
+expect "a reply arriving once the next turn has started is dropped" \
+  "prompt stop-first prompt-next reply-first" "UserPromptSubmit| Stop| UserPromptSubmit| "
+expect "a prompt queued while a turn runs: that turn's reply still goes with its stop" \
+  "prompt prompt-next reply-first stop-first" "UserPromptSubmit| UserPromptSubmit| Stop|Fixed the typo. "
 expect "an error alone ends the turn" \
   "prompt stop-error" "UserPromptSubmit| Stop| "
 expect "a subagent's own events stay out of the main session" \

@@ -9,7 +9,11 @@ puppet_read_payload
 event=$(field hook_event_name)
 session=$(field session_id)
 tool=$(field tool_name)
+# A turn's prompt, tools, reply and stop share a generation id. What one of its events leaves for another is
+# kept in ~/.deskmates/cursor-<session>.<generation>.<what>; cursor-<session>.turn holds the latest turn's id.
+turn=$(field generation_id)
 state="$PUPPET_DIR/cursor-$session"
+mkdir -p "$PUPPET_DIR"
 
 # The session's title, as Cursor named it in the chat's meta.json (~/.cursor/chats/<md5 of folder>/<id>/).
 session_title() {
@@ -32,40 +36,43 @@ agent_id=""
 agent_type=""
 case "$event" in
   beforeSubmitPrompt)
-    # A new turn: a stop still waiting for its reply belongs to the turn before.
-    rm -f "$state.stopped" "$state.aborted"
+    printf '%s' "$turn" > "$state.turn"
     event=UserPromptSubmit; text=$(leading_command "$(field prompt)"); title=$(session_title) ;;
   preToolUse) event=PreToolUse ;;
   postToolUse) event=PostToolUse ;;
   postToolUseFailure) event=PostToolUseFailure ;;
   afterAgentResponse)
-    reply=$(first_sentence text)
-    if [ -f "$state.stopped" ]; then
-      rm -f "$state.stopped"
-      event=Stop; text=$reply; title=$(session_title)
-    else
-      mkdir -p "$PUPPET_DIR" && printf '%s' "$reply" > "$state.reply"
+    # Cursor joins the reply's parts without a space ("Listed them.Quick look next", "Which one?the app"): cut
+    # there too, at a "?" or "!" right before a letter, or a "." right before a capital.
+    reply=$(first_sentence text | sed -e 's/\([[:alnum:]][!?]\)[[:alpha:]].*/\1/' -e 's/\([[:alnum:]]\.\)[A-Z].*/\1/')
+    if [ ! -f "$state.$turn.stopped" ]; then
+      # Before its stop: the stop says it.
+      printf '%s' "$reply" > "$state.$turn.reply"
       exit 0
-    fi ;;
+    fi
+    rm -f "$state.$turn.stopped"
+    # After its stop, which already ended the turn: the reply fills that turn's bubble, unless the next turn
+    # has started.
+    [ -f "$state.turn" ] && [ "$(cat "$state.turn")" != "$turn" ] && exit 0
+    event=Stop; text=$reply; title=$(session_title) ;;
   stop)
     case "$(field status)" in
       completed)
-        # The reply may come after the stop: the stop then waits for it.
-        if [ ! -f "$state.reply" ]; then
-          mkdir -p "$PUPPET_DIR" && : > "$state.stopped"
-          exit 0
-        fi
-        text=$(cat "$state.reply") ;;
+        if [ -f "$state.$turn.reply" ]; then
+          text=$(cat "$state.$turn.reply")
+          rm -f "$state.$turn.reply"
+        else
+          : > "$state.$turn.stopped"
+        fi ;;
       aborted)
         # Ctrl-C: an "error" stop follows this one.
-        mkdir -p "$PUPPET_DIR" && : > "$state.aborted" ;;
+        : > "$state.$turn.aborted" ;;
       *)
-        if [ -f "$state.aborted" ]; then
-          rm -f "$state.aborted"
+        if [ -f "$state.$turn.aborted" ]; then
+          rm -f "$state.$turn.aborted"
           exit 0
         fi ;;
     esac
-    rm -f "$state.reply" "$state.stopped"
     event=Stop; title=$(session_title) ;;
   sessionEnd) event=SessionEnd; rm -f "$state".* ;;
   *) exit 0 ;;

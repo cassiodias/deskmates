@@ -5,6 +5,9 @@
 . "$(dirname "$0")/../../hook/puppet-lib.sh"
 puppet_read_payload
 
+# Cursor runs Claude Code's hooks too, with its own payloads: its own harness writes those.
+[ -n "$(field cursor_version)" ] && exit 0
+
 # The session's title, as Claude Code last wrote it in the transcript at path $1; its lines repeat, so the
 # end of the file is enough.
 session_title() {
