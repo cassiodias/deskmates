@@ -1,0 +1,14 @@
+{
+  "session_id": "s1",
+  "turn_id": "t1",
+  "transcript_path": "/tmp/rollout.jsonl",
+  "cwd": "/Users/dev/workspace/a-very-long-folder-name-that-goes-on-and-on/another-long-level-of-nesting-here/and-one-more/my-deep-app/units",
+  "model": "m",
+  "permission_mode": "default",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "ls"
+  },
+  "tool_use_id": "u1"
+}

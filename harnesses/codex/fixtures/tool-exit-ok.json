@@ -1,0 +1,15 @@
+{
+  "session_id": "s1",
+  "turn_id": "t1",
+  "transcript_path": "harnesses/codex/fixtures/rollout-exit.jsonl",
+  "cwd": "/Users/me/projects/units",
+  "model": "m",
+  "permission_mode": "default",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "make build"
+  },
+  "tool_use_id": "exec-u3",
+  "tool_response": ""
+}

@@ -1,0 +1,2 @@
+{"type":"event_msg","payload":{"type":"item_completed","item":{"type":"CommandExecution","id":"exec-u2","status":"failed","aggregated_output":"","exit_code":2}}}
+{"type":"event_msg","payload":{"type":"item_completed","item":{"type":"CommandExecution","id":"exec-u3","status":"completed","aggregated_output":"ok","exit_code":0}}}

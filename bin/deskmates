@@ -148,7 +148,7 @@ install_with() {
   init_lines
   installed='' skipped='' failed=0 again=''
   if [ "$1" = all ]; then
-    ids=$(harnesses)
+    ids=$(harnesses | tr '\n' ' ')
   else
     ids=$1
   fi

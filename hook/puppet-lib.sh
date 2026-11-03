@@ -25,6 +25,11 @@ field() {
   printf '%s' "$PUPPET_PAYLOAD" | json_value "$1"
 }
 
+# A path from the payload (cwd, transcript_path), whole: field would cut a deep one short.
+path_field() {
+  printf '%s' "$PUPPET_PAYLOAD" | plutil -extract "$1" raw -o - - 2>/dev/null | tr -d '\n|'
+}
+
 # The session's title, as Claude Code last wrote it in the transcript at path $1; its lines repeat, so the
 # end of the file is enough.
 session_title() {
@@ -61,7 +66,9 @@ is_test_command() {
   return 1
 }
 
-# The terminal the session runs in: the first ancestor process that has one, remembered per session.
+# The terminal the session runs in: the first ancestor process that has one, remembered per session. An agent
+# that runs its hooks away from its terminal defines puppet_tty_fallback to find it another way. Not finding one
+# is not remembered, so a later event can still find it.
 puppet_tty() {
   if [ -n "${PUPPET_TTY+set}" ]; then printf '%s' "$PUPPET_TTY"; return; fi
   cache="$PUPPET_DIR/tty-$1"
@@ -75,7 +82,8 @@ puppet_tty() {
       *) tty="/dev/$name"; break ;;
     esac
   done
-  [ -n "$1" ] && printf '%s' "$tty" > "$cache"
+  [ -z "$tty" ] && command -v puppet_tty_fallback > /dev/null && tty=$(puppet_tty_fallback)
+  [ -n "$1" ] && [ -n "$tty" ] && printf '%s' "$tty" > "$cache"
   printf '%s' "$tty"
 }
 
@@ -86,7 +94,7 @@ write_event() {
   tty=$(puppet_tty "$3")
   [ "$2" = "SessionEnd" ] && rm -f "$PUPPET_DIR/tty-$3"
   printf '%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s\n' "${PUPPET_NOW:-$(date +%s)}" "$2" "$3" "$4" "$5" "$6" "$7" \
-    "${8##*/}" "${TERM_PROGRAM:-}" "$9" "$tty" "$1" "${10}" >> "$PUPPET_EVENTS"
+    "$(printf '%s' "${8##*/}" | cut -c1-120)" "${TERM_PROGRAM:-}" "$9" "$tty" "$1" "${10}" >> "$PUPPET_EVENTS"
   # Keeps the file small; the puppets start reading again from the top.
   [ "$(wc -c < "$PUPPET_EVENTS")" -gt 1000000 ] && : > "$PUPPET_EVENTS"
   return 0

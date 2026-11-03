@@ -225,6 +225,15 @@ check "migrate codex: claude hooks at ~/.deskmates" '[ "$(count "$(settings)" "^
 check "migrate codex: codex hooks on" '[ "$(count "$(chooks)" "^~/\\.deskmates/src/harnesses/codex/")" = 9 ]'
 rm -rf "$HOME/.deskmates"
 
+# A migration with a plain install installs each harness once, and the first backup keeps the old hooks.
+fresh_home
+mkdir -p "$HOME/.claude" "$HOME/.codex" "$HOME/.claude-puppet/src"
+echo '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"~/.claude-puppet/src/hook/puppet-hook.sh"}]}]}}' > "$(settings)"
+out=$(PATH=/usr/bin:/bin:$(dirname "$(command -v jq)") "$deskmates" install)
+check "migrate all: each harness once" 'echo "$out" | grep -qx "✓ hooks installed for: claude codex"'
+check "migrate all: backup has the old hooks" 'grep -q claude-puppet "$(settings).bak"'
+rm -rf "$HOME/.deskmates"
+
 # A plain install finds both agents by their folders and installs both.
 fresh_home
 mkdir -p "$HOME/.claude" "$HOME/.codex"

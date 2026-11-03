@@ -5,6 +5,23 @@
 . "$(dirname "$0")/../../hook/puppet-lib.sh"
 puppet_read_payload
 
+# Codex runs hooks from a background process with no terminal: the terminal is the one of the codex process
+# working in the session's folder.
+puppet_tty_fallback() {
+  folder=$(cd "$(path_field cwd)" 2>/dev/null && pwd -P) || return 0
+  for pid in $(pgrep -x codex); do
+    name=$(ps -o tty= -p "$pid" | tr -d ' ')
+    case "$name" in ""|"??") continue ;; esac
+    [ "$(lsof -a -d cwd -p "$pid" -Fn 2>/dev/null | sed -n 's/^n//p')" = "$folder" ] && { printf '/dev/%s' "$name"; return 0; }
+  done
+}
+
+# A command's exit code, from the transcript's record of the call (the hook's result has only its output).
+exit_code() {
+  [ -f "$1" ] || return 0
+  tail -c 2000000 "$1" | grep -F "\"id\":\"$2\"" | grep -o '"exit_code":-\{0,1\}[0-9]*' | tail -n 1 | cut -d: -f2
+}
+
 # The session's title, as Codex last named it in its session index (one JSON line per rename).
 session_title() {
   [ -f "$HOME/.codex/session_index.jsonl" ] || return 0
@@ -26,7 +43,9 @@ case "$event" in
     case "$(field tool_response)" in
       "Exit code: 0"*) ;;
       "Exit code: "[0-9]*|"Exit code: -"[0-9]*) event=PostToolUseFailure ;;
-    esac ;;
+    esac
+    code=$(exit_code "$(path_field transcript_path)" "$(field tool_use_id)")
+    [ -n "$code" ] && [ "$code" != 0 ] && event=PostToolUseFailure ;;
   PreToolUse|PermissionRequest|SubagentStart|SessionEnd) ;;
   *) exit 0 ;;
 esac
@@ -36,5 +55,5 @@ flag=""
 [ "$tool" = "Bash" ] && is_test_command "$(field tool_input.command)" && flag="test"
 
 write_event codex "$event" "$session" "$(field agent_id)" "$tool" "$(field agent_type)" "$text" \
-  "$(field cwd)" "$flag" "$title"
+  "$(path_field cwd)" "$flag" "$title"
 exit 0
