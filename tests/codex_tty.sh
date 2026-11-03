@@ -58,6 +58,10 @@ for name in tty-gone cursor-gone.turn cursor-gone.g1.reply myagent-gone.state ev
   echo /dev/ttys011 > "$work/home/.deskmates/$name"
   touch -t "$old" "$work/home/.deskmates/$name"
 done
+# The source copy in ~/.deskmates/src is never touched, however old its files.
+mkdir -p "$work/home/.deskmates/src/bin"
+echo old > "$work/home/.deskmates/src/bin/deskmates"
+touch -t "$old" "$work/home/.deskmates/src/bin/deskmates" "$work/home/.deskmates/src/README.md" "$work/home/.deskmates/src"
 echo /dev/ttys005 > "$work/home/.deskmates/tty-recent"
 check "an old claim does not hold a terminal" "$(run s4)" /dev/ttys011
 for name in tty-gone cursor-gone.turn cursor-gone.g1.reply myagent-gone.state; do
@@ -65,6 +69,16 @@ for name in tty-gone cursor-gone.turn cursor-gone.g1.reply myagent-gone.state; d
 done
 check "a recent cache stays" "$(cat "$work/home/.deskmates/tty-recent")" /dev/ttys005
 check "the events file stays, however old" "$(head -n 1 "$work/home/.deskmates/events")" /dev/ttys011
+check "a file inside src stays" "$(cat "$work/home/.deskmates/src/bin/deskmates")" old
+check "a file at the top of src stays" "$(ls "$work/home/.deskmates/src/README.md")" "$work/home/.deskmates/src/README.md"
+
+# ~/.deskmates/src may be a link to a clone elsewhere: the link stays too.
+mkdir -p "$work/clone" "$work/linked/.deskmates"
+ln -s "$work/clone" "$work/linked/.deskmates/src"
+touch -h -t "$old" "$work/linked/.deskmates/src"
+printf '{"session_id":"s9","cwd":"%s","hook_event_name":"UserPromptSubmit","prompt":"hello"}' "$folder" |
+  HOME="$work/linked" PATH="$work/bin:/usr/bin:/bin" PUPPET_NOW=0 harnesses/codex/translate.sh
+check "a linked src stays" "$([ -L "$work/linked/.deskmates/src" ] && echo link)" link
 rm -rf "$work"
 [ "$failed" = 0 ] && echo "codex tty: ok"
 exit "$failed"
