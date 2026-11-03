@@ -7,7 +7,7 @@ return function(out)
   local px, now = 4, os.time()
   local cellW, cellH = config.W * px + 16, (config.H + 4) * px + 16
   local bodies = {
-    { "owl", "#3FA7A0" }, { "cat", "#A06CD5" },
+    { "owl", "#3FA7A0" }, { "rabbit", "#A99BD6" }, { "cat", "#A06CD5" },
   }
   local function session(fields)
     local s = { agents = {}, order = {}, queued = {}, score = 3, tools = 0, isWorking = true, readingUntil = 0,

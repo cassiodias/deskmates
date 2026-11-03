@@ -71,7 +71,8 @@ tests/run.sh
 - `sessions_test.lua` runs the session model with a fake agent; `status_test.lua` checks the status line and
   the card's text; `settings_test.lua` checks the saved settings carry over from the old name.
 - `harness_contract_test.lua` checks every harness and every creature (see "What the tests check for you").
-- `harnesses.sh` runs every translator on its fixtures; `codex_tty.sh` checks how Codex finds its terminal.
+- `harnesses.sh` runs every translator on its fixtures; `codex_tty.sh` checks how Codex finds its terminal;
+  `cursor_turns.sh` replays Cursor's end-of-turn events in the orders it sends them.
 - `install.sh` runs the installer against a fake `HOME`, for every harness; it never touches your real files.
 
 To try your copy for real, link it instead of the installed one and click Reload Config in Hammerspoon:
@@ -84,27 +85,53 @@ The hooks run `~/.deskmates/src`, so to try a translator, link that to your copy
 
 ## Add an agent
 
-Use `harnesses/codex/` and `Deskmates.spoon/lib/puppet/harnesses/codex.lua` as the example: Codex is the agent
-that differs most from Claude Code. Work in this order.
+Use the agent closest to yours as the example, under `harnesses/<id>/` and
+`Deskmates.spoon/lib/puppet/harnesses/<id>.lua`: Codex for hooks that run away from the terminal and a failure
+hidden in a tool's result; Cursor for its own event names, a flat hooks file, subagents seen only as a tool,
+and a reply that comes on its own event. Work in this order.
 
 ### 1. Capture real payloads
 
-Point one of the agent's hooks at a throwaway script that saves what it receives, use the agent for a few
-minutes (a prompt, a tool call, a failed command, a subagent, a permission, the end of a turn, quitting), then
-look at the file:
+Point **every** event the agent documents at a throwaway script that saves what it receives: agents often fire
+only some of their documented events, and the capture is how you find out which. Use absolute paths in the
+agent's hooks file (some agents read a relative path from their own folder, and not every one expands `~`).
+Before the run, check what the agent does when a hook prints nothing: if silence blocks it, print what it
+expects. Then make the script executable (`chmod +x ~/capture.sh`).
 
 ```sh
 #!/bin/sh
-# ~/capture.sh: appends each payload, one per line; print what the agent expects back, if anything.
-{ cat; echo; } >> ~/agent-payloads.jsonl
+# ~/capture.sh: appends each payload, then a "#" line with the time, the hook's terminal and its parents.
+p=$(cat)
+chain=""; pid=$$
+while [ -n "$pid" ] && [ "$pid" -gt 1 ]; do
+  chain="$chain > $(ps -o tty=,comm= -p "$pid" | awk '{n=split($2,a,"/"); print $1":"a[n]}')"
+  pid=$(ps -o ppid= -p "$pid" | tr -d ' ')
+done
+{ printf '%s\n' "$p"
+  printf '# time=%s tty=%s TERM_PROGRAM=%s chain=%s\n' "$(date +%s)" "$(ps -o tty= -p $$ | tr -d ' ')" \
+    "$TERM_PROGRAM" "$chain"
+} >> ~/agent-payloads.jsonl
 ```
+
+Use the agent for a few minutes, one thing at a time, noting the time of each: a prompt, a `/command`, reading
+a file, an edit, a command that works and one that fails, a test run, a subagent, a question, a permission
+(approve one, refuse one), interrupting a turn (Ctrl-C) and sending one more prompt, quitting, and closing a
+tab with the agent still open. Then turn the hooks off and read the file (`jq` helps: `grep -v '^#' file | jq
+-r .hook_event_name | uniq -c` shows what fired, in order).
 
 Payloads hold your prompts, commands and code. Keep the file to yourself; the fixtures you make from it keep
 only the fields the translator reads, with neutral text (`my-app`, `Fixed the typo.`).
 
 Note for each event: its name, where the session id, folder, tool name and reply text are, how a failed tool
-looks, whether the agent waits for an answer on stdout, and whether the hook runs inside the session's
-terminal (`ps -o tty= -p $$` from the hook prints a terminal, not `??`).
+looks, whether the agent waits for an answer on stdout, and where the hook runs. The `#` line's chain shows
+it: a terminal (`ttys…`) on the hook or one of its parents means `write_event` finds it on its own; `??` all
+the way up means the hooks run in a background process, and you need `puppet_tty_fallback` (step 3). Also note:
+
+- the events that never fired, and what you did that fired nothing (a refused permission may leave no trace);
+- the order of events at the end of a turn, and whether it changes from turn to turn;
+- how a subagent shows: its own events, or only a tool call, and whether the subagent's own tool calls arrive
+  under the main session or as a session of their own;
+- where the session's title is, if anywhere (the transcript, or a file of the agent's).
 
 ### 2. Fixtures
 
@@ -115,6 +142,11 @@ the case needs in its home (it is copied into a fresh fake `HOME`). The translat
 `PUPPET_TTY=/dev/ttys009 TERM_PROGRAM=iTerm.app`.
 
 Have at least a Stop: without it the puppet never finishes a turn, and the contract test fails.
+
+A translator that keeps something between events (step 3) gets one fixture per step, with the state it starts
+from in `NAME.home/.deskmates/`. To check the steps chained in the orders you saw, add a script like
+`tests/cursor_turns.sh` that feeds fixtures in turn into one home, and a line for it in `tests/run.sh` (which
+runs each script by name).
 
 ### 3. translate.sh
 
@@ -127,8 +159,8 @@ The agent runs it with the payload on stdin. Source the library, read the payloa
 puppet_read_payload
 event=$(field hook_event_name)
 case "$event" in
-  beforeSubmitPrompt) event=UserPromptSubmit; text=$(leading_command "$(field prompt)") ;;
-  stop) respond '{}'; event=Stop; text=$(first_sentence last_message) ;;
+  prompt_sent) event=UserPromptSubmit; text=$(leading_command "$(field prompt)") ;;
+  turn_done) event=Stop; text=$(first_sentence reply) ;;
   *) exit 0 ;;     # events with no counterpart are dropped
 esac
 write_event myagent "$event" "$(field session_id)" "" "$(field tool_name)" "" "$text" "$(path_field cwd)" "" ""
@@ -170,11 +202,28 @@ Helpers in `hook/puppet-lib.sh`:
 A failure that the agent reports as a normal tool result (Codex: `Exit code: 1` in the output) is your
 translator's to spot and turn into `PostToolUseFailure`.
 
+When the agent's events do not line up with the table (`harnesses/cursor/translate.sh` handles each of these):
+
+- **The folder is not in `cwd`.** Pass whatever holds it; `path_field` reads array items too
+  (`path_field workspace_roots.0`).
+- **No subagent events, only a subagent tool.** Turn the tool's start into `SubagentStart` and its result into
+  `SubagentStop`, with the tool call's id as `agent_id` and its description as `text`.
+- **A subagent's own events arrive as a session of their own.** Drop them, or they draw a second puppet; find
+  what tells them apart in the capture (Cursor: the generation id equals the session id).
+- **The reply comes on its own event, before or after the end of the turn.** Keep what came first in a file
+  `$PUPPET_DIR/<agent>-<session>.<what>` and write the one `Stop` when the second arrives; remove the files on
+  `SessionEnd`. Two `Stop`s for one turn show two bubbles.
+- **Two end-of-turn events for one turn** (Cursor on Ctrl-C: `aborted`, then `error`): write one `Stop`.
+
 ### 4. hooks.json, detect.sh, config.sh, install.sh, uninstall.sh
 
 - `hooks.json`: the agent's own hook registration, in its own format, with every command
   `~/.deskmates/src/harnesses/<agent>/translate.sh`.
-- `detect.sh`: exits 0 when the agent is on this Mac (`[ -d "$HOME/.agent" ] || command -v agent`).
+  The tests want the `~` spelling here. If the agent runs a hook's command as a path rather than through a shell
+  (Cursor), `~` may not be expanded: your `install.sh` then writes the home out in full (see Cursor's).
+- `detect.sh`: exits 0 when the agent is on this Mac (`[ -d "$HOME/.myagent" ] || command -v myagent`). Skip a
+  command name other tools may have (Cursor's CLI is also called `agent`; its `detect.sh` looks for
+  `cursor-agent`).
 - `config.sh`: prints the path of the file the agent keeps its hooks in.
 - `install.sh`, `uninstall.sh`: copy Codex's and change the names and the `todo` line (what the user still has
   to do by hand). They use `hooks_merge`, `hooks_remove` and `hooks_present` from `hook/install-lib.sh`, which
@@ -200,7 +249,9 @@ Make every script executable (`chmod +x`).
 - `toolKind(tool)`: `"reading"`, `"question"`, `"plan"`, `"skill"`, `"agent"` (starts a subagent) or `nil`.
 - `focus(session, terminals)`: what a click does. `terminals.focus(session)` brings the terminal tab forward;
   `terminals.app(bundleId, session.folder)` brings an app's window forward, for an agent that runs in its own
-  app.
+  app. `session.app` is the `TERM_PROGRAM` the hook saw; when that is ambiguous for your agent, decide here
+  (Cursor's terminal says `vscode`, like VS Code's, so `cursor.lua` brings Cursor forward). The contract test
+  can check it with a stand-in `terminals` table.
 - `program` (optional): the program name, or a list of names, its sessions run in their terminal (the last
   part of `ps -o comm`). The session ends once its terminal no longer runs it; for agents that report the end
   of a session late, or never.

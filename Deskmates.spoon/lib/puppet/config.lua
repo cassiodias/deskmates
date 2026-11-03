@@ -30,6 +30,7 @@ local config = {
     n = { hex = "#3FB950" }, -- Matrix rain, the trail
     o = { hex = "#1B5E20" }, -- Matrix rain, the fading end
     r = { hex = "#E5534B" }, -- tests failed
+    i = { hex = "#F29CB4" }, -- the rabbit's nose and inner ears
   },
 }
 

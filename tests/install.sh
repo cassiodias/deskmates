@@ -121,6 +121,21 @@ check "codex detect: ~/.codex" 'PATH=/usr/bin:/bin "$codex/detect.sh"'
 fresh_home
 check "codex detect: empty home" '! PATH=/usr/bin:/bin "$codex/detect.sh"'
 
+# Cursor: a flat hooks file, ~/.cursor/hooks.json. Cursor reads a command as a path (relative ones from
+# ~/.cursor/), so ours are written with the home spelled out.
+cursor="$src/harnesses/cursor"
+fresh_home
+check "cursor detect: empty home" '! PATH=/usr/bin:/bin "$cursor/detect.sh"'
+mkdir "$HOME/.cursor"
+check "cursor detect: ~/.cursor" 'PATH=/usr/bin:/bin "$cursor/detect.sh"'
+"$cursor/install.sh" > /dev/null
+h="$HOME/.cursor/hooks.json"
+check "cursor fresh: config path" '[ "$("$cursor/config.sh")" = "$h" ]'
+check "cursor fresh: version 1" '[ "$(jq .version "$h")" = 1 ]'
+check "cursor fresh: 8 events" '[ "$(jq ".hooks | length" "$h")" = 8 ]'
+check "cursor fresh: every command is ours, home spelled out" \
+  '[ "$(jq -r "[.hooks[][].command] | unique | join(\" \")" "$h")" = "$HOME/.deskmates/src/harnesses/cursor/translate.sh" ]'
+
 # The library on its own: a missing file and its folder are created; hooks_present sees ours.
 fresh_home
 lib="$HOME/nested/hooks.json"

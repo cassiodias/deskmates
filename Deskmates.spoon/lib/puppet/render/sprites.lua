@@ -90,6 +90,50 @@ local BODIES = {
       "..y...y..",
     },
   },
+  -- A rabbit: long ears, an eye on the monitor, a pink nose, a white tail and belly, big feet.
+  rabbit = {
+    SIDE = {
+      "....c.c..",
+      "....c.c..",
+      "....ccc..",
+      "...ccccc.",
+      "...cccck.",
+      "..cccccci",
+      "wcccccc..",
+      ".cccccc..",
+      "..cc..cc.",
+    },
+    SMILE = {
+      "....c.c..",
+      "....c.c..",
+      "....ccc..",
+      "...ccccc.",
+      "...ccckc.",
+      "..cccccci",
+      "wccccckk.",
+      ".cccccc..",
+      "..cc..cc.",
+    },
+    FRONT = {
+      "..c...c..",
+      "..ci.ic..",
+      "..cc.cc..",
+      ".ccccccc.",
+      ".ckcccck.",
+      ".ccciccc.",
+      ".ccwwwcc.",
+      "..cc.cc..",
+    },
+    FRONT_ASLEEP = {
+      "..c...c..",
+      "..cc.cc..",
+      ".ccccccc.",
+      ".kkccckk.",
+      ".ccciccc.",
+      ".ccwwwcc.",
+      "..cc.cc..",
+    },
+  },
   -- A cat: pointed ears, eyes on the monitor, whiskers, a tail curling up behind, paws.
   cat = {
     SIDE = {

@@ -5,6 +5,7 @@
 local harnesses = {
   claude = require("puppet.harnesses.claude"),
   codex = require("puppet.harnesses.codex"),
+  cursor = require("puppet.harnesses.cursor"),
 }
 
 return {

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [{ "command": "~/.deskmates/src/harnesses/cursor/translate.sh" }],
+    "beforeSubmitPrompt": [{ "command": "~/.deskmates/src/harnesses/cursor/translate.sh" }],
+    "preToolUse": [{ "command": "~/.deskmates/src/harnesses/cursor/translate.sh" }],
+    "postToolUse": [{ "command": "~/.deskmates/src/harnesses/cursor/translate.sh" }],
+    "postToolUseFailure": [{ "command": "~/.deskmates/src/harnesses/cursor/translate.sh" }],
+    "afterAgentResponse": [{ "command": "~/.deskmates/src/harnesses/cursor/translate.sh" }],
+    "stop": [{ "command": "~/.deskmates/src/harnesses/cursor/translate.sh" }],
+    "sessionEnd": [{ "command": "~/.deskmates/src/harnesses/cursor/translate.sh" }]
+  }
+}

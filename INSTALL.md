@@ -1,6 +1,6 @@
 # Install
 
-**You need:** macOS 13 or later, [Homebrew](https://brew.sh), `git` (run `xcode-select --install` if `git --version` asks for it), `jq` (comes with macOS 15 and later; on macOS 13 or 14, run `brew install jq`) and Claude Code and/or Codex. iTerm2 is optional; with it, a click on a puppet selects its exact tab.
+**You need:** macOS 13 or later, [Homebrew](https://brew.sh), `git` (run `xcode-select --install` if `git --version` asks for it), `jq` (comes with macOS 15 and later; on macOS 13 or 14, run `brew install jq`) and Claude Code, Codex and/or Cursor's command-line agent (`agent`). iTerm2 is optional; with it, a click on a puppet selects its exact tab.
 
 Steps 1 to 3 are copy and paste into a terminal. Step 4 is a few clicks in macOS that no script can do for you. It takes about 5 minutes.
 
@@ -28,9 +28,9 @@ This one command:
 
 - links `~/.hammerspoon/Spoons/Deskmates.spoon` to the source, so an update is a `git pull`;
 - adds three lines to `~/.hammerspoon/init.lua` (Hammerspoon's config, created if you have none), unless they are there already; anything else in that file stays;
-- adds Deskmates' hooks for each agent it finds on your Mac: Claude Code in `~/.claude/settings.json`, Codex in `~/.codex/hooks.json`. Each file is saved to a `.bak` first, everything else in it (your other hooks included) is kept, and Deskmates' own hooks are replaced, so it is safe to run again.
+- adds Deskmates' hooks for each agent it finds on your Mac: Claude Code in `~/.claude/settings.json`, Codex in `~/.codex/hooks.json`, Cursor in `~/.cursor/hooks.json`. Each file is saved to a `.bak` first, everything else in it (your other hooks included) is kept, and Deskmates' own hooks are replaced, so it is safe to run again.
 
-To install for one agent only, name it: `~/.deskmates/src/bin/deskmates install codex` (or `claude`).
+To install for one agent only, name it: `~/.deskmates/src/bin/deskmates install codex` (or `claude`, `cursor`).
 
 ## 4. Things only you can do
 
@@ -39,7 +39,7 @@ To install for one agent only, name it: `~/.deskmates/src/bin/deskmates install 
 3. **Allow iTerm2 control** (iTerm2 only): the first time an agent session runs in iTerm2, macOS asks *"Hammerspoon wants to control iTerm2"*. Click **OK**: it is how each puppet shows its tab number and how a click selects that tab. If you clicked Don't Allow: System Settings → Privacy & Security → **Automation** → Hammerspoon → turn on iTerm2.
 4. **Launch at login:** click the Hammerspoon icon in the menu bar → **Preferences** → tick **Launch Hammerspoon at login**. Otherwise the puppets are gone after you restart your Mac.
 5. **Codex: trust the hooks.** Run `codex`, type `/hooks` and trust the Deskmates hooks. Codex asks again whenever the hooks change, for example after an update.
-6. **Start a new session** (`claude` or `codex` in a new terminal tab), so it surely reads the new hooks.
+6. **Start a new session** (`claude`, `codex` or `agent` in a new terminal tab), so it surely reads the new hooks.
 
 ## 5. Try it
 
@@ -101,7 +101,7 @@ This pulls the latest source, installs again for the agents that have Deskmates'
 ~/.deskmates/src/bin/deskmates uninstall
 ```
 
-This removes Deskmates' hooks from Claude Code's and Codex's settings (keeping a backup of each), the Spoon link, the three lines in `~/.hammerspoon/init.lua`, the menu choices, position and hidden state Hammerspoon kept, and `~/.deskmates`. To remove one agent's hooks only, name it: `deskmates uninstall codex`. Then click **Reload Config** in the Hammerspoon menu.
+This removes Deskmates' hooks from Claude Code's, Codex's and Cursor's settings (keeping a backup of each), the Spoon link, the three lines in `~/.hammerspoon/init.lua`, the menu choices, position and hidden state Hammerspoon kept, and `~/.deskmates`. To remove one agent's hooks only, name it: `deskmates uninstall codex`. Then click **Reload Config** in the Hammerspoon menu.
 
 Hammerspoon itself stays: `brew uninstall --cask hammerspoon` removes it, and you can turn its Accessibility and Automation switches off in System Settings.
 
@@ -119,7 +119,7 @@ It moves the old folder to `~/.deskmates` (keeping your puppets' recent events) 
 
 - **See where things stand:** run `~/.deskmates/src/bin/deskmates status`. For each agent it says whether it was found, whether its hooks are on, and when its last event came.
 - **No puppet at all:** click the Hammerspoon icon → **Console**. A red line names the problem; a common one is a typo in `~/.hammerspoon/init.lua`.
-- **The puppet does not move while the agent works:** run `tail -f ~/.deskmates/events`. A line per event means the hooks run and the problem is on the Hammerspoon side (see Console). No lines: start a new session, and check that `/hooks` in Claude Code or Codex lists `~/.deskmates/src/harnesses/<agent>/translate.sh` (for Codex, trusted).
+- **The puppet does not move while the agent works:** run `tail -f ~/.deskmates/events`. A line per event means the hooks run and the problem is on the Hammerspoon side (see Console). No lines: start a new session, and check that `/hooks` in Claude Code or Codex lists `~/.deskmates/src/harnesses/<agent>/translate.sh` (for Codex, trusted); for Cursor, that `~/.cursor/hooks.json` names `…/.deskmates/src/harnesses/cursor/translate.sh`.
 - **Cannot drag or click it:** Accessibility, step 4.2, including the remove-and-add-again fix.
 - **No tab number, or a click does not reach the right tab:** in iTerm2, check the Automation switch (step 4.3). Inside tmux or Zellij the puppet cannot see iTerm's tab, so it falls back to the next rule.
 - **A click does not reach the right window:** outside iTerm2 the puppet knows Terminal, Ghostty, WezTerm, Warp, VS Code, Hyper, Tabby and Zed. It brings the app forward and picks the window whose title has the project folder's name; in other terminals a click does nothing.

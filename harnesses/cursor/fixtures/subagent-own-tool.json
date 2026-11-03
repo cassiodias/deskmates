@@ -1,0 +1,1 @@
+{"hook_event_name":"preToolUse","session_id":"99999999-8888-4777-8666-555555555555","generation_id":"99999999-8888-4777-8666-555555555555","workspace_roots":["/Users/me/my-app"],"tool_name":"Shell","tool_input":{"command":"ls"},"tool_use_id":"t9"}

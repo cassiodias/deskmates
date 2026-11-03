@@ -1,6 +1,6 @@
 # Deskmates
 
-Pixel puppets that float over your Mac desktop, like the old Office paperclip, and act out what your coding agents are doing: one puppet per busy session. Works with Claude Code and Codex.
+Pixel puppets that float over your Mac desktop, like the old Office paperclip, and act out what your coding agents are doing: one puppet per busy session. Works with Claude Code, Codex and Cursor's command-line agent.
 
 | When the agent is... | The puppet... |
 | --- | --- |
@@ -20,8 +20,9 @@ Pixel puppets that float over your Mac desktop, like the old Office paperclip, a
 | --- | --- | --- |
 | Claude Code | the puppet | every mood above |
 | Codex | an owl, in teal | every mood above except three: no notifications, no question (plans only), and no permission sign (Codex's default sandbox does not ask). The owl leaves a few seconds after you quit Codex |
+| Cursor CLI (`agent`) | a rabbit, in lavender | every mood above except three: no notifications, no question, and no permission sign (Cursor's hooks are not told when it asks you) |
 
-Codex shows the title Codex gives the session; its subagents show their short task name. Want to add an agent, a creature or an animation? [CONTRIBUTING.md](CONTRIBUTING.md) has the steps.
+Codex and Cursor show the title each gives the session; Codex's subagents show their short task name, Cursor's their description. Want to add an agent, a creature or an animation? [CONTRIBUTING.md](CONTRIBUTING.md) has the steps.
 
 ## What it looks like
 
@@ -44,7 +45,7 @@ Codex shows the title Codex gives the session; its subagents show their short ta
 | ![Three puppets dozing at their desks, monitors off](docs/images/3-desks-sleeping.png) | **Between turns.** Each puppet rests at its desk, monitor off, and dozes off. |
 | ![A single puppet waiting on an empty table](docs/images/big-desk.png) | **Nothing running.** One puppet waits at home. |
 
-Each agent has its own creature and colours in the same scenes: the puppet for Claude Code, the owl for Codex. A cat is drawn and waits for its agent.
+Each agent has its own creature and colours in the same scenes: the puppet for Claude Code, the owl for Codex, the rabbit for Cursor. A cat is drawn and waits for its agent.
 
 ![An owl and a cat coding, asking a question, playing ping pong and waiting at home](docs/images/bodies.png)
 
@@ -64,7 +65,7 @@ It is two small pieces: hooks that write one line per agent event to `~/.deskmat
 - installs Hammerspoon, a free macOS automation app (Homebrew);
 - adds `~/.deskmates/` (the source and the events file) and links `~/.hammerspoon/Spoons/Deskmates.spoon` to it;
 - adds three lines to `~/.hammerspoon/init.lua`;
-- adds Deskmates' hooks to the settings of each agent it finds (`~/.claude/settings.json` for Claude Code, `~/.codex/hooks.json` for Codex), after saving a backup, keeping your other settings and hooks;
+- adds Deskmates' hooks to the settings of each agent it finds (`~/.claude/settings.json` for Claude Code, `~/.codex/hooks.json` for Codex, `~/.cursor/hooks.json` for Cursor), after saving a backup, keeping your other settings and hooks;
 - asks you to allow Hammerspoon in **Accessibility** (to drag and click the puppets) and, with iTerm2, **Automation** (to show and select each session's tab), and to start it at login.
 
 INSTALL.md also covers [choosing what plays](INSTALL.md#choose-what-plays), [updating](INSTALL.md#update) and [uninstalling](INSTALL.md#uninstall).

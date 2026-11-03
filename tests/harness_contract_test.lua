@@ -118,6 +118,21 @@ local codex = harnesses.get("codex")
 check("codex: spawn_agent starts a subagent, update_plan is a plan",
   codex.toolKind("spawn_agent") == "agent" and codex.toolKind("collaborationspawn_agent") == "agent" and codex.toolKind("update_plan") == "plan")
 check("codex: other tools mean nothing, so the wait is not a subagent", codex.toolKind("collaborationwait_agent") == nil and codex.toolKind("Bash") == nil)
+local cursor = harnesses.get("cursor")
+check("cursor wears the rabbit", cursor.id == "cursor" and cursor.character.body == "rabbit")
+check("cursor: Task starts a subagent, Read reads", cursor.toolKind("Task") == "agent" and cursor.toolKind("Read") == "reading")
+check("cursor: its sessions run agent or cursor-agent",
+  type(cursor.program) == "table" and cursor.program[1] == "agent" and cursor.program[2] == "cursor-agent")
+-- A click: the session's terminal; in Cursor's own terminal (TERM_PROGRAM=vscode), Cursor's window.
+local asked = {}
+local fake = {
+  focus = function(s) asked[#asked + 1] = "focus " .. s.app end,
+  app = function(bundle, folder) asked[#asked + 1] = bundle .. " " .. folder end,
+}
+cursor.focus({ app = "iTerm.app", folder = "my-app" }, fake)
+cursor.focus({ app = "vscode", folder = "my-app" }, fake)
+check("cursor: a click brings its terminal forward, or Cursor itself",
+  asked[1] == "focus iTerm.app" and asked[2] == "com.todesktop.230313mzl4w4u92 my-app")
 check("unknown ids fall back to claude", harnesses.get("nope").id == "claude")
 
 check.done("harness contract")
