@@ -74,12 +74,15 @@ end
 
 -- Given the terminal tabs iTerm holds now: a session whose tab was there and is gone was closed without saying
 -- so. One never seen in a tab (closed before Hammerspoon started, or a background session) is away while it
--- rests: no tab to jump to, nothing to show; it comes back when it works again.
-function Sessions:closeMissing(tabs)
+-- rests: no tab to jump to, nothing to show; it comes back when it works again. With running (each terminal's
+-- programs, terminals/programs.lua), a session whose harness names its program has ended once its terminal no
+-- longer runs it.
+function Sessions:closeMissing(tabs, running)
   for _, s in pairs(self.all) do
     local inTab = s.tty and tabs[s.tty]
     if inTab then s.wasInTab = true end
     if s.tty and s.wasInTab and not inTab then s.isClosed = true end
+    if running and s.program and s.tty and not (running[s.tty] or {})[s.program] then s.isClosed = true end
     s.isAway = not inTab and not s.wasInTab and wantsItermTab(s)
   end
 end
@@ -117,6 +120,7 @@ function Sessions:apply(e, ctx)
   self.lastEventAt = at
   s.seenAt = at
   s.harness = harness.id
+  s.program = harness.program
   if e.folder ~= "" then s.folder = e.folder end
   if e.app ~= "" then s.app = e.app end
   if e.tty:match("^/dev/ttys%d+$") then s.tty = e.tty end

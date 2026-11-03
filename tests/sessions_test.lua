@@ -126,6 +126,10 @@ local function tab(sid, name, fields)
   fields.session = sid
   return tabbed:apply(event(name, fields), { mapping = mapping, harness = fake, frame = 1, now = 100 })
 end
+local function onStageOf(model, sid, now)
+  for _, key in ipairs(model:stageKeys(now or 160)) do if key == sid then return true end end
+  return false
+end
 local function onStage(sid, now)
   for _, key in ipairs(tabbed:stageKeys(now or 160)) do if key == sid then return true end end
   return false
@@ -149,5 +153,27 @@ tabbed:closeMissing({})
 check("a session whose tab closed leaves", not onStage("here"))
 tabbed:closeMissing({ ["/dev/ttys002"] = { window = 1, tab = 1 } })
 check("and stays gone when another tab takes its terminal", not onStage("here"))
+
+-- An agent that names its program (and says late that it ended): its session ends when its terminal stops
+-- running that program, even though the tab stays open.
+local Programs = require("puppet.terminals.programs")
+local running = Programs.parse("ttys004  codex\nttys004  -zsh\n??       /Users/me/.codex/bin/codex\nttys005  /opt/bin/codex\n")
+check("programs: by terminal, by name", running["/dev/ttys004"].codex and running["/dev/ttys005"].codex)
+check("programs: none without a terminal", running["??"] == nil and running["/dev/??"] == nil)
+local owl = { id = "owl", name = "Owl", program = "codex", toolKind = function() return nil end }
+local quit = Sessions.new(100)
+local tabs = { ["/dev/ttys004"] = { window = 1, tab = 1 } }
+quit:apply(event("UserPromptSubmit", { session = "o1", text = "/build", tty = "/dev/ttys004", app = "iTerm.app" }),
+  { mapping = mapping, harness = owl, frame = 1, now = 100 })
+quit:apply(event("Stop", { session = "o1", text = "Done." }), { mapping = mapping, harness = owl, frame = 1, now = 100 })
+quit:closeMissing(tabs, running)
+check("a session whose program still runs stays", onStageOf(quit, "o1"))
+quit:closeMissing(tabs, Programs.parse("ttys004  -zsh\n"))
+check("a session whose program left its terminal leaves", not onStageOf(quit, "o1"))
+local plain = Sessions.new(100)
+plain:apply(event("UserPromptSubmit", { session = "p1", text = "/build", tty = "/dev/ttys004", app = "iTerm.app" }),
+  { mapping = mapping, harness = fake, frame = 1, now = 100 })
+plain:closeMissing(tabs, Programs.parse(""))
+check("a harness with no program is judged by its tab only", onStageOf(plain, "p1"))
 
 check.done("sessions")

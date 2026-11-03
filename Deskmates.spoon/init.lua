@@ -23,6 +23,7 @@ local harnesses = require("puppet.harnesses")
 local scenes = require("puppet.render.scenes")
 local Stage = require("puppet.stage.stage")
 local Iterm = require("puppet.terminals.iterm")
+local Programs = require("puppet.terminals.programs")
 local newTerminals = require("puppet.terminals.focus")
 local menuItems = require("puppet.ui.menu")
 
@@ -116,7 +117,9 @@ function obj:render()
 end
 
 function obj:refreshTabs()
-  if self.iterm:refresh() then self.sessions:closeMissing(self.iterm.tabs) end
+  if not self.iterm:refresh() then return end
+  local ps = hs.execute("/bin/ps -axo tty=,comm=")
+  self.sessions:closeMissing(self.iterm.tabs, ps and Programs.parse(ps) or nil)
 end
 
 --- Deskmates:focus(key)

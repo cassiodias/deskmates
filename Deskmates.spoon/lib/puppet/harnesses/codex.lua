@@ -16,6 +16,9 @@ return {
   },
   character = { body = "owl", palette = { "#2BB3A3", "#1F8A80", "#5FD4C4", "#147A8C", "#7FE0D0" } },
   toolKind = function(tool) return TOOL_KINDS[tool] end,
+  -- The program its sessions run in their terminal. Codex says a session ended only later, so the session ends
+  -- when its terminal stops running codex.
+  program = "codex",
   -- A command-line agent: a click brings its terminal tab forward.
   focus = function(session, terminals) return terminals.focus(session) end,
 }
