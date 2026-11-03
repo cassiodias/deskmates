@@ -27,8 +27,8 @@ git clone https://github.com/cassiodias/deskmates.git ~/.deskmates/src
 This one command:
 
 - links `~/.hammerspoon/Spoons/Deskmates.spoon` to the source, so an update is a `git pull`;
-- adds three lines to `~/.hammerspoon/init.lua` (Hammerspoon's config, created if you have none), unless they are there already; anything else in that file stays;
-- adds Deskmates' hooks for each agent it finds on your Mac: Claude Code in `~/.claude/settings.json`, Codex in `~/.codex/hooks.json`, Cursor in `~/.cursor/hooks.json`. Before changing a file it saves a copy beside it: `.bak` is the file as it was before Deskmates first changed it, and is never overwritten; `.last.bak` is the file as it was before the latest change. Everything else in the file (your other hooks included) is kept, and Deskmates' own hooks are replaced, so it is safe to run again.
+- adds three lines to `~/.hammerspoon/init.lua` (Hammerspoon's config, created if you have none), unless they are there already, after saving a copy the same way as below (`init.lua.bak`, `init.lua.last.bak`); anything else in that file stays;
+- adds Deskmates' hooks for each agent it finds on your Mac: Claude Code in `~/.claude/settings.json`, Codex in `~/.codex/hooks.json`, Cursor in `~/.cursor/hooks.json`. Before changing a file it saves a copy beside it: `.bak` is the file as it was before Deskmates first changed it, and is never overwritten (empty when there was no file before Deskmates); `.last.bak` is the file as it was just before the latest change, install, update or uninstall. A `.bak` that is already there is kept as it is, whatever it holds: older versions of Deskmates rewrote it on every run, so if you installed more than once with one of those, yours may hold Deskmates' hooks rather than your file from before. Everything else in the file (your other hooks included) is kept, and Deskmates' own hooks are replaced, so it is safe to run again.
 
 To install for one agent only, name it: `~/.deskmates/src/bin/deskmates install codex` (or `claude`, `cursor`).
 

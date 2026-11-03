@@ -29,8 +29,12 @@ need_jq() {
 
 # Copies file $1 to $1.last.bak, keeping its mode. The first copy also goes to $1.bak, which is never
 # overwritten: the file as it was before Deskmates first changed it (or a .bak of the user's own, left alone).
+# With no file yet, $1.bak is left empty, to say there was none: it never holds Deskmates' own changes.
 backup() {
-  [ -f "$1" ] || return 0
+  if [ ! -f "$1" ]; then
+    [ -e "$1.bak" ] || { mkdir -p "$(dirname "$1")" && : > "$1.bak"; }
+    return
+  fi
   [ -e "$1.bak" ] || cp -p "$1" "$1.bak" || return 1
   cp -p "$1" "$1.last.bak"
 }
@@ -105,9 +109,12 @@ tilde() {
 # it is not a JSON object.
 install_hooks() {
   need_jq || return 1
+  was=new
   if [ -f "$2" ]; then
-    valid_json "$2" && backup "$2" || return 1
+    valid_json "$2" || return 1
+    was=""
   fi
+  backup "$2" || return 1
   if [ -n "$4" ]; then
     rewritten=$(mktemp) || return 1
     jq --arg home "$HOME" "$4" "$3" > "$rewritten" && hooks_merge "$2" "$rewritten"
@@ -117,7 +124,11 @@ install_hooks() {
   else
     hooks_merge "$2" "$3" || return 1
   fi
-  say "$1 hooks in $(tilde "$2") (backups in $(tilde "$2").bak and .last.bak)"
+  if [ -n "$was" ]; then
+    say "$1 hooks in $(tilde "$2") (a new file; the empty $(tilde "$2").bak says there was none)"
+  else
+    say "$1 hooks in $(tilde "$2") (backups in $(tilde "$2").bak and .last.bak)"
+  fi
 }
 
 # uninstall_hooks name file: what a harness's uninstall.sh does. Removes our hooks from the agent's hooks file,

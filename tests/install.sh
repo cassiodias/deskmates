@@ -30,11 +30,17 @@ settings() { echo "$HOME/.claude/settings.json"; }
 # Fresh home with ~/.claude/ only.
 fresh_home
 mkdir "$HOME/.claude"
-"$claude/install.sh" > /dev/null
+out=$("$claude/install.sh")
 s=$(settings)
+check "fresh: says the file is new" 'echo "$out" | grep -qF "(a new file; the empty ~/.claude/settings.json.bak says there was none)"'
 check "fresh: 10 events" '[ "$(jq ".hooks | length" "$s")" = 10 ]'
 check "fresh: one ours per event" \
   '[ "$(jq --arg c "$ours_cmd" "[.hooks[] | (map(.hooks[].command) == [\$c])] | all" "$s")" = true ]'
+# No file before Deskmates: .bak is left empty to say so, and stays that way; it never holds our own hooks.
+check "fresh: an empty .bak marks there was no file" '[ -f "$s.bak" ] && [ ! -s "$s.bak" ]'
+"$claude/install.sh" > /dev/null
+check "fresh, twice: .bak still empty" '[ -f "$s.bak" ] && [ ! -s "$s.bak" ]'
+check "fresh, twice: .last.bak has the file before this run" 'cmp -s "$s" "$s.last.bak"'
 
 # A user's own hooks and an old puppet entry.
 fresh_home
@@ -447,6 +453,7 @@ fresh_home
 mkdir "$HOME/.claude"
 out=$("$deskmates" install claude)
 check "elsewhere: warned" 'echo "$out" | grep -q "hooks run ~/.deskmates/src"'
+check "no init.lua before: an empty init.lua.bak marks it" '[ -f "$(init).bak" ] && [ ! -s "$(init).bak" ]'
 mkdir -p "$HOME/.deskmates"
 ln -s "$src" "$HOME/.deskmates/src"
 out=$("$deskmates" install claude)
