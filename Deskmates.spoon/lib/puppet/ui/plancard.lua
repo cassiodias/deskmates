@@ -195,9 +195,22 @@ local PlanCard = {}
 PlanCard.__index = PlanCard
 plancard.PlanCard = PlanCard
 
+local MIN_WIDTH, MIN_HEIGHT = 320, 280
+
+-- The card's size from what was saved: a table with numbers w and h, raised to the smallest card; anything
+-- else is the default size.
+function plancard.fitSize(saved)
+  if type(saved) ~= "table" or type(saved.w) ~= "number" or type(saved.h) ~= "number" then
+    return { w = WIDTH, h = HEIGHT }
+  end
+  return { w = math.max(MIN_WIDTH, math.floor(saved.w)), h = math.max(MIN_HEIGHT, math.floor(saved.h)) }
+end
+
 -- opts.onFocus(key): the card's "Go to terminal". opts.frameFor(key, w, h): where the card goes, beside its puppet.
+-- opts.loadSize() and opts.saveSize({ w, h }) (optional): the size the card was last left at.
 function plancard.new(opts)
-  return setmetatable({ onFocus = opts.onFocus, frameFor = opts.frameFor }, PlanCard)
+  return setmetatable({ onFocus = opts.onFocus, frameFor = opts.frameFor, loadSize = opts.loadSize,
+    saveSize = opts.saveSize }, PlanCard)
 end
 
 -- Shows session `key`'s plan; meta as for plancard.html. Replaces a card already open.
@@ -214,8 +227,9 @@ function PlanCard:show(key, plan, meta)
       self:hide()
     end
   end)
-  local view = hs.webview.new(self.frameFor(key, WIDTH, HEIGHT), { developerExtrasEnabled = false }, content)
-  view:windowStyle({ "titled", "closable", "utility" })
+  local size = plancard.fitSize(self.loadSize and self.loadSize())
+  local view = hs.webview.new(self.frameFor(key, size.w, size.h), { developerExtrasEnabled = false }, content)
+  view:windowStyle({ "titled", "closable", "utility", "resizable" })
   view:windowTitle(meta.title or "Plan")
   view:allowTextEntry(true)
   view:deleteOnClose(true)
@@ -230,6 +244,8 @@ function PlanCard:show(key, plan, meta)
       self.view = nil
     elseif action == "focusChange" and state == false then
       self:hide()
+    elseif action == "frameChange" and type(state) == "table" and self.saveSize then
+      self.saveSize(plancard.fitSize({ w = state.w, h = state.h }))
     end
   end)
   view:html(plancard.html(plan, meta))

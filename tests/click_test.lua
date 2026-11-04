@@ -134,6 +134,38 @@ check("Close closes the card", not second.shown and not second.deleted and not P
 stub.advance(0.2)
 check("and deletes it after", second.deleted)
 
+-- The card can be resized, and the next one opens at the size it was left.
+local function openCard()
+  press()
+  release()
+  stub.advance(0.2)
+  return stub.webviews[#stub.webviews]
+end
+local function closeCard(view)
+  view.content.callback({ body = "close" })
+  stub.advance(0.2)
+end
+local resized = openCard()
+local resizable = false
+for _, style in ipairs(resized.style_ or {}) do if style == "resizable" then resizable = true end end
+check("the card can be resized", resizable)
+resized.windowCallback_("frameChange", resized, { x = 0, y = 0, w = 650, h = 500 })
+local saved = stub.settings["Deskmates.cardSize"]
+check("a new size is remembered", type(saved) == "table" and saved.w == 650 and saved.h == 500)
+closeCard(resized)
+local again = openCard()
+check("the next card opens at it", again.frame_.w == 650 and again.frame_.h == 500)
+closeCard(again)
+stub.settings["Deskmates.cardSize"] = { w = 5000, h = 5000 }
+local huge = openCard()
+check("a size bigger than the screen fits on it", huge.frame_.w == 1440 and huge.frame_.h == 900
+  and huge.frame_.x == 0 and huge.frame_.y == 0)
+closeCard(huge)
+stub.settings["Deskmates.cardSize"] = "big"
+local junk = openCard()
+check("a junk size gives the default", junk.frame_.w == 600 and junk.frame_.h == 560)
+closeCard(junk)
+
 -- An empty plan has nothing to read: the click goes to the terminal as before.
 planFile = io.open(plansDir .. "/tab1.json", "w")
 planFile:write('{"steps": []}')

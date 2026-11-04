@@ -45,14 +45,16 @@ local function timer(seconds, fn, repeats)
   return t
 end
 
--- Web views the Spoon opens are kept in stub.webviews; a page's message is view.content.callback({ body = … }).
+-- Web views the Spoon opens are kept in stub.webviews; a page's message is view.content.callback({ body = … }),
+-- its window's style is view.style_ and its window callback view.windowCallback_.
 stub.webviews = {}
 local function webview(frame, _, content)
   local v = { frame_ = frame, content = content, shown = false, deleted = false }
-  for _, name in ipairs({ "windowStyle", "windowTitle", "allowTextEntry", "deleteOnClose", "level",
-    "policyCallback", "windowCallback", "bringToFront" }) do
+  for _, name in ipairs({ "windowTitle", "allowTextEntry", "deleteOnClose", "level", "policyCallback", "bringToFront" }) do
     v[name] = function(self) return self end
   end
+  function v:windowStyle(style) self.style_ = style return self end
+  function v:windowCallback(fn) self.windowCallback_ = fn return self end
   function v:html(html) self.html_ = html return self end
   function v:show() self.shown = true return self end
   function v:hide() self.shown = false return self end

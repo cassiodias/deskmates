@@ -15,6 +15,7 @@ local config = {
   POSITION_KEY = "Deskmates.position",
   CHOICE_KEY = "Deskmates.choice",
   HIDDEN_KEY = "Deskmates.hidden",
+  CARD_SIZE_KEY = "Deskmates.cardSize",
   COLORS = {
     c = { hex = "#D97757" }, -- the puppet; replaced by each puppet's own colour
     d = { hex = "#8C8C8C" }, -- a puppet whose subagent is done

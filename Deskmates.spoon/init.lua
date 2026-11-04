@@ -184,7 +184,8 @@ function obj:click(key)
   end
 end
 
--- Where a plan card of w by h goes: beside its puppet, as its bubble would, and whole on the puppet's screen.
+-- Where a plan card of w by h goes: beside its puppet, as its bubble would, and whole on the puppet's screen
+-- (smaller, when it is bigger than the screen).
 function obj:cardFrame(key, w, h)
   local puppet = self.stage.puppets[key]
   local screen = hs.screen.mainScreen():frame()
@@ -194,6 +195,8 @@ function obj:cardFrame(key, w, h)
     local s = each:frame()
     if f.x + w / 2 >= s.x and f.x + w / 2 < s.x + s.w then screen = s end
   end
+  w, h = math.min(w, screen.w), math.min(h, screen.h)
+  f.w, f.h = w, h
   f.y = math.max(screen.y, math.min(f.y, screen.y + screen.h - h))
   f.x = math.max(screen.x, math.min(f.x, screen.x + screen.w - w))
   return f
@@ -369,6 +372,8 @@ function obj:start()
   self.planCard = plancard.new({
     onFocus = function(key) self:focus(key) end,
     frameFor = function(key, w, h) return self:cardFrame(key, w, h) end,
+    loadSize = function() return hs.settings.get(config.CARD_SIZE_KEY) end,
+    saveSize = function(size) hs.settings.set(config.CARD_SIZE_KEY, size) end,
   })
   self.screenWatcher = hs.screen.watcher.new(function()
     if not self:isOnAScreen(self.stage.anchor) then self:moveToCorner() end

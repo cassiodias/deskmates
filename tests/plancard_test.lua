@@ -118,4 +118,12 @@ check("page: one ## heading, no contents", not has(plancard.html({ steps = {}, m
 local hostile = plancard.html({ steps = {}, markdown = "## a <script>x</script>\n\n## b" }, { title = "x" })
 check("page: a heading in the contents is escaped", has(hostile, "a &lt;script&gt;x&lt;/script&gt;</button>") and count(hostile, "<script") == 1)
 
+-- The card's size, as saved: junk gives the default, too small is raised.
+local function size(saved) local got = plancard.fitSize(saved) return got.w .. "x" .. got.h end
+check("fitSize: nil gives the default", size(nil) == "600x560")
+check("fitSize: a string gives the default", size("big") == "600x560")
+check("fitSize: no numbers give the default", size({ w = "a", h = 3 }) == "600x560")
+check("fitSize: a size is kept", size({ w = 700.6, h = 500 }) == "700x500")
+check("fitSize: too small is raised", size({ w = 10, h = 10 }) == "320x280")
+
 check.done("plan card")
