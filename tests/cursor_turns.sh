@@ -46,7 +46,7 @@ expect "after the session ends, nothing is left behind" \
 
 # Cursor's own chat runs the hooks with no terminal and no TERM_PROGRAM: its lines name the app Cursor.
 work=$(mktemp -d)
-app=$(env -u TERM_PROGRAM HOME="$work" PUPPET_NOW=0 PUPPET_TTY= harnesses/cursor/translate.sh < "$f/prompt.json" > /dev/null;
+app=$(env -u TERM_PROGRAM HOME="$work" PUPPET_NOW=0 PUPPET_TTY='' harnesses/cursor/translate.sh < "$f/prompt.json" > /dev/null;
   cut -d'|' -f9 "$work/.deskmates/events")
 if [ "$app" != "Cursor" ]; then
   echo "cursor turns: a prompt from Cursor's chat names app '$app', expected 'Cursor'"
@@ -57,7 +57,7 @@ rm -rf "$work"
 # Cursor started from a terminal (cursor .) passes that terminal's TERM_PROGRAM on to its chat: with no tty, the
 # line still names Cursor.
 work=$(mktemp -d)
-app=$(TERM_PROGRAM=ghostty HOME="$work" PUPPET_NOW=0 PUPPET_TTY= harnesses/cursor/translate.sh < "$f/prompt.json" \
+app=$(TERM_PROGRAM=ghostty HOME="$work" PUPPET_NOW=0 PUPPET_TTY='' harnesses/cursor/translate.sh < "$f/prompt.json" \
   > /dev/null; cut -d'|' -f9 "$work/.deskmates/events")
 if [ "$app" != "Cursor" ]; then
   echo "cursor turns: a chat in a Cursor started from Ghostty names app '$app', expected 'Cursor'"
