@@ -80,6 +80,7 @@ hs = {
     doAfter = function(seconds, fn) return timer(seconds, fn, false) end,
   },
   fs = {
+    mkdir = function(path) return os.execute("mkdir '" .. path:gsub("'", "'\\''") .. "' 2>/dev/null") end,
     attributes = function(path, field)
       local file = io.open(path, "r")
       if not file then return nil end
@@ -125,6 +126,7 @@ hs = {
       return tap
     end,
   },
+  processInfo = { processID = 4242 },
   dialog = { textPrompt = function() return "Cancel", "" end },
   focus = function() end,
   -- A shell command's output: only `ps` is run; stub.ps holds what it prints (nil: it failed).

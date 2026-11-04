@@ -106,6 +106,24 @@ local function finish(intents, sid, s)
   end
 end
 
+-- Keeps session `sid`'s plan (model/plans.lua's shape, or nil), for the whole session. A step that became done
+-- since the last plan is said for a moment, as intents like apply's. An unknown session is left alone.
+function Sessions:setPlan(sid, plan)
+  local s = self.all[sid]
+  if not s then return {} end
+  local was = {}
+  for _, step in ipairs(s.plan and s.plan.steps or {}) do was[step.id] = step.status end
+  local first = s.plan == nil
+  s.plan = plan
+  if first or not plan or not s.isListed then return {} end
+  for _, step in ipairs(plan.steps) do
+    if step.status == "done" and was[step.id] ~= "done" then
+      return { { key = sid, text = "✓ " .. step.title, seconds = config.STEP_DONE_SECONDS } }
+    end
+  end
+  return {}
+end
+
 -- Applies one event. ctx: mapping, harness (the event's), frame, replayFrom (skip older events).
 function Sessions:apply(e, ctx)
   local intents = {}

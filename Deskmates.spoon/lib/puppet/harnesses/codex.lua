@@ -12,7 +12,7 @@ return {
   capabilities = {
     prompt = true, tools = true, toolFailure = true, subagents = true,
     permission = true, question = false, reply = true, sessionEnd = true,
-    notification = false,
+    notification = false, plan = false,
   },
   character = { body = "owl", palette = { "#2BB3A3", "#1F8A80", "#5FD4C4", "#147A8C", "#7FE0D0" } },
   toolKind = function(tool) return TOOL_KINDS[tool] end,

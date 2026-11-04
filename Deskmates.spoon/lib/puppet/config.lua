@@ -7,6 +7,7 @@ local config = {
   FPS = 10,
   IDLE_SLEEP_SECONDS = 30,
   DONE_SECONDS = 8,
+  STEP_DONE_SECONDS = 4, -- how long a plan's step done is said
   STALE_SECONDS = 2 * 60 * 60,
   GAP = 12,
   CLICK_DISTANCE = 4,

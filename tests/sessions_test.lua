@@ -241,4 +241,36 @@ check("a program list: any name in it keeps the session", onStageOf(listed, "h1"
 listed:applyLiveness(look("ttys004  -zsh\n"))
 check("a program list: none of them running ends it", not onStageOf(listed, "h1"))
 
+-- A plan: setPlan keeps it for the whole session, and a step that becomes done says so.
+local planned = Sessions.new(100)
+local planMapping = Mapping.new({ conversation = "auto" })
+local function planApply(name, fields)
+  return planned:apply(event(name, fields), { mapping = planMapping, harness = fake, frame = 1, now = 100 })
+end
+planApply("UserPromptSubmit", { text = "hello" })
+local function steps(...)
+  local list = {}
+  for i, status in ipairs({ ... }) do list[i] = { id = tostring(i), title = "Step " .. i, status = status } end
+  return { steps = list }
+end
+local said = planned:setPlan("s1", steps("active", "pending"))
+check("setPlan: kept on the session", planned.all.s1.plan and #planned.all.s1.plan.steps == 2)
+check("setPlan: a first plan says nothing", #said == 0)
+said = planned:setPlan("s1", steps("done", "active"))
+check("setPlan: a step done says which", said[1] and said[1].key == "s1" and said[1].text == "✓ Step 1"
+  and said[1].seconds == 4)
+said = planned:setPlan("s1", steps("done", "active"))
+check("setPlan: the same plan again says nothing", #said == 0)
+planApply("Stop", { text = "Fixed the typo." })
+planApply("UserPromptSubmit", { text = "next" })
+check("setPlan: the plan outlives the turn", planned.all.s1.plan ~= nil)
+said = planned:setPlan("s1", nil)
+check("setPlan: nil clears it", planned.all.s1.plan == nil and #said == 0)
+check("setPlan: an unknown session is ignored", #planned:setPlan("nope", steps("done")) == 0)
+check("setPlan: and gets no session", planned.all.nope == nil)
+local quiet = Sessions.new(100)
+quiet:apply(event("UserPromptSubmit", { text = "hello" }), { mapping = mapping, harness = fake, frame = 1, now = 100 })
+quiet:setPlan("s1", steps("active"))
+check("setPlan: an unlisted session says nothing", #quiet:setPlan("s1", steps("done")) == 0)
+
 check.done("sessions")

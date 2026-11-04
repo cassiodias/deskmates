@@ -21,6 +21,7 @@ local Mapping = require("puppet.model.mapping")
 local Sessions = require("puppet.model.sessions")
 local status = require("puppet.model.status")
 local harnesses = require("puppet.harnesses")
+local plans = require("puppet.model.plans")
 local scenes = require("puppet.render.scenes")
 local Stage = require("puppet.stage.stage")
 local Iterm = require("puppet.terminals.iterm")
@@ -69,6 +70,17 @@ obj.pixel = 4
 --- The file the agent hooks append events to.
 obj.eventsFile = os.getenv("HOME") .. "/.deskmates/events"
 
+--- Deskmates.plansDir
+--- Variable
+--- The folder the hooks keep each session's plan in (hook/plan-lib.sh).
+obj.plansDir = os.getenv("HOME") .. "/.deskmates/plans"
+
+--- Deskmates.onFile
+--- Variable
+--- The marker that says Deskmates runs: it holds Hammerspoon's process id, and the hooks keep plans only while
+--- it names a running process.
+obj.onFile = os.getenv("HOME") .. "/.deskmates/on"
+
 -- Applies one events-file line; bubbles are skipped while replaying history.
 function obj:handle(line)
   local event = parse.line(line)
@@ -77,8 +89,28 @@ function obj:handle(line)
     mapping = self.mapping, harness = harnesses.get(event.harness), frame = self.frame, now = os.time(),
     replayFrom = self.replayFrom,
   })
+  -- A line that changed the session's plan: read it again from its file.
+  if event.flag == "plan" and self.sessions.all[event.session] then
+    local path = plans.path(self.plansDir, event.session)
+    for _, intent in ipairs(self.sessions:setPlan(event.session, path and plans.load(path))) do
+      intents[#intents + 1] = intent
+    end
+  end
   if self.replayFrom then return end
   for _, intent in ipairs(intents) do self:say(intent.key, intent.text, intent.seconds) end
+end
+
+-- Marks that Deskmates runs, or no longer does.
+function obj:markOn(isOn)
+  if not isOn then
+    os.remove(self.onFile)
+    return
+  end
+  hs.fs.mkdir(self.onFile:match("^(.*)/[^/]*$") or ".")
+  local file = io.open(self.onFile, "w")
+  if not file then return end
+  file:write(tostring(hs.processInfo.processID) .. "\n")
+  file:close()
 end
 
 --- Deskmates:say(key, text, seconds)
@@ -287,6 +319,7 @@ end
 --- Shows the puppets and starts following the agents' events.
 function obj:start()
   config.carryOverSettings(hs.settings)
+  self:markOn(true)
   local anchor = hs.settings.get(config.POSITION_KEY) or self:defaultPosition()
   if not self:isOnAScreen(anchor) then anchor = self:defaultPosition() end
   self.stage = Stage.new({
@@ -331,6 +364,7 @@ end
 --- Method
 --- Hides the puppets and stops following events.
 function obj:stop()
+  self:markOn(false)
   if self.timer then self.timer:stop() end
   if self.tabsTimer then self.tabsTimer:stop() end
   if self.screenWatcher then self.screenWatcher:stop() end

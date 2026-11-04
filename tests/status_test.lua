@@ -66,4 +66,19 @@ check("card: three or more working are counted", status.card(many, 1000)[3] == "
 
 check("card: a session with no folder still says something", status.card(session({ folder = "" }), 1000)[1] == "unknown folder")
 
+-- A plan: its progress before the line, and on the card.
+local function planOf(...)
+  local list = {}
+  for i, st in ipairs({ ... }) do list[i] = { id = tostring(i), title = "Step " .. i, status = st } end
+  return { steps = list }
+end
+local planned = session({ isWorking = true, plan = planOf("done", "active", "pending") })
+check("line: a plan's progress first", status.line(planned, 1000 + 32 * 60) == "☑ 1/3 · 32m")
+check("line: no steps, no progress", status.line(session({ isWorking = true, plan = { steps = {} } }), 1060) == "1m")
+local cardLines = table.concat(status.card(planned, 1060), "\n")
+check("card: the plan's progress and its step", cardLines:find("plan: 1/3 · now: Step 2", 1, true) ~= nil)
+local doc = session({ plan = { steps = {}, markdown = "# Plan" } })
+check("card: a plan to read", table.concat(status.card(doc, 1060), "\n"):find("plan ready · click to read", 1, true) ~= nil)
+check("card: no plan, no plan line", not table.concat(status.card(session(), 1060), "\n"):find("plan", 1, true))
+
 check.done("status")

@@ -1,6 +1,8 @@
 -- What a session is doing, in words: the short line under the name tag, and the card shown when the mouse
 -- rests on its puppet.
 
+local plans = require("puppet.model.plans")
+
 local status = {}
 
 local REPLY_CHARS, TITLE_CHARS, NAMED_AGENTS = 45, 40, 2
@@ -36,11 +38,15 @@ local function shorten(text, chars)
   return text:sub(1, (utf8.offset(text, chars + 1) or chars + 1) - 1):gsub("%s+$", "") .. "…"
 end
 
--- The line under the name tag: the folder, unless the tag already shows it, and the time.
+-- The line under the name tag: the plan's progress when it has steps, the folder, unless the tag already shows
+-- it, and the time.
 function status.line(s, now)
   local time = since(s, now)
-  if s.folder == "" or s.folder == s.tag then return time end
-  return s.folder .. " · " .. time
+  local progress = plans.progress(s.plan)
+  local line = time
+  if s.folder ~= "" and s.folder ~= s.tag then line = s.folder .. " · " .. time end
+  if progress.total > 0 then line = "☑ " .. progress.done .. "/" .. progress.total .. " · " .. line end
+  return line
 end
 
 -- The card's lines; `tab` is the terminal tab's label, or nil.
@@ -81,6 +87,13 @@ function status.card(s, now, tab)
     local calls = s.tools == 1 and "1 tool call" or (s.tools .. " tool calls")
     lines[#lines + 1] = s.lastTool and (calls .. " · last: " .. s.lastTool) or calls
   end
+  local progress = plans.progress(s.plan)
+  if progress.total > 0 then
+    local line = "plan: " .. progress.done .. "/" .. progress.total
+    if progress.active then line = line .. " · now: " .. shorten(progress.active, TITLE_CHARS) end
+    lines[#lines + 1] = line
+  end
+  if s.plan and s.plan.markdown and s.plan.markdown ~= "" then lines[#lines + 1] = "plan ready · click to read" end
   if not isWorking(s) and s.summary ~= "" then
     lines[#lines + 1] = "last reply: " .. shorten(s.summary, REPLY_CHARS)
   end

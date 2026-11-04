@@ -10,7 +10,7 @@ local parse = require("puppet.events.parse")
 local Sessions = require("puppet.model.sessions")
 local Mapping = require("puppet.model.mapping")
 
-local CAPABILITIES = { "prompt", "tools", "toolFailure", "subagents", "permission", "question", "reply", "sessionEnd", "notification" }
+local CAPABILITIES = { "prompt", "tools", "toolFailure", "subagents", "permission", "question", "reply", "sessionEnd", "notification", "plan" }
 local KINDS = { reading = true, question = true, plan = true, skill = true, agent = true }
 
 -- The event names the Spoon reads: Claude Code's, the common vocabulary every translator maps to.
@@ -29,6 +29,7 @@ local SHOWN_BY = {
   reply = function(e) return e.name == "Stop" and e.text ~= "" end,
   sessionEnd = function(e) return e.name == "SessionEnd" end,
   notification = function(e) return e.name == "Notification" end,
+  plan = function(e) return e.flag == "plan" end,
 }
 
 local function lines(command)
@@ -157,6 +158,9 @@ check("cursor: a click brings its terminal forward, or Cursor itself",
   asked[1] == "focus iTerm.app" and asked[2] == "com.todesktop.230313mzl4w4u92 my-app")
 check("cursor: its chat brings Cursor forward", asked[3] == "com.todesktop.230313mzl4w4u92 my-app")
 check("cursor: a terminal that names no app is still a terminal, not Cursor", asked[4] == "focus ")
+check("claude keeps a plan; codex and cursor do not yet",
+  harnesses.get("claude").capabilities.plan == true and codex.capabilities.plan == false
+  and cursor.capabilities.plan == false)
 check("unknown ids fall back to claude", harnesses.get("nope").id == "claude")
 
 check.done("harness contract")

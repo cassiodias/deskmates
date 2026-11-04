@@ -15,7 +15,7 @@ return {
   capabilities = {
     prompt = true, tools = true, toolFailure = true, subagents = true,
     permission = false, question = false, reply = true, sessionEnd = true,
-    notification = false,
+    notification = false, plan = false,
   },
   character = { body = "rabbit", palette = { "#A99BD6", "#8C7FC0", "#C3B6EA", "#6F63A8", "#B7A6E0" } },
   toolKind = function(tool) return TOOL_KINDS[tool] end,

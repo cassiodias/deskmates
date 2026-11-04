@@ -15,12 +15,12 @@ return {
   -- What this agent's hooks report, for people reading the code and the README's agents table; the contract test
   -- checks each true one against a fixture (prompt: UserPromptSubmit, tools: PreToolUse, toolFailure:
   -- PostToolUseFailure, subagents: SubagentStart, permission: PermissionRequest, question: a "question" tool,
-  -- reply: Stop with text, sessionEnd: SessionEnd, notification: Notification). A false one means that mood
-  -- never shows.
+  -- reply: Stop with text, sessionEnd: SessionEnd, notification: Notification, plan: a line with the plan flag,
+  -- from hook/plan-lib.sh). A false one means that mood never shows.
   capabilities = {
     prompt = true, tools = true, toolFailure = true, subagents = true,
     permission = true, question = true, reply = true, sessionEnd = true,
-    notification = true,
+    notification = true, plan = true,
   },
   -- Looks: the body it wears (render/sprites.lua's BODIES), and each session's puppet takes the first colour of
   -- this palette no other puppet wears.
