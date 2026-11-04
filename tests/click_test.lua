@@ -119,16 +119,20 @@ check("the card's click selects no tab", stub.selected == nil)
 check("the card sits on the screen", card and card.frame_.x >= 0 and card.frame_.y >= 0
   and card.frame_.x + card.frame_.w <= 1440 and card.frame_.y + card.frame_.h <= 900)
 card.content.callback({ body = "focus" })
+check("the card hides at once", not card.shown)
+check("but is not deleted inside its own callback", not card.deleted)
 stub.advance(0.2)
 check("the card's Go to terminal selects the tab", stub.selected == "/dev/ttys001")
-check("and closes the card", card.deleted)
+check("and the card is deleted once its callback is over", card.deleted)
 
 press()
 release()
 stub.advance(0.2)
 local second = stub.webviews[#stub.webviews]
 second.content.callback({ body = "close" })
-check("Close closes the card", second.deleted and not P.planCard:isShown())
+check("Close closes the card", not second.shown and not second.deleted and not P.planCard:isShown())
+stub.advance(0.2)
+check("and deletes it after", second.deleted)
 
 -- An empty plan has nothing to read: the click goes to the terminal as before.
 planFile = io.open(plansDir .. "/tab1.json", "w")

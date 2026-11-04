@@ -211,11 +211,14 @@ function PlanCard:show(key, plan, meta)
   self.view = view
 end
 
+-- Hides the card at once and deletes it a moment later: hide runs inside the card's own callbacks (its
+-- buttons, losing focus), and a web view must not be deleted while it is still handling one.
 function PlanCard:hide()
   if self.view then
     local view = self.view
     self.view = nil
-    view:delete()
+    view:hide()
+    hs.timer.doAfter(0, function() view:delete() end)
   end
   self.key = nil
 end

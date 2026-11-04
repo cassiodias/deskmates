@@ -54,12 +54,17 @@ case "$event:$tool" in
     plan_change '. as $p | $cur | .steps = [($p.tool_input.todos // []) | to_entries[]
       | {id: (.key + 1 | tostring), title: (.value.content | title), status: (.value.status | status)}]' ;;
   PostToolUse:TaskCreate)
-    # The new task's id comes back in the response; when it is not there, it is the next number, as Claude
-    # Code counts them.
-    plan_change '. as $p | ($p.tool_response | if type == "object" then (.task.id // .id // .taskId) else null end
-        // (([$cur.steps[].id | tonumber?] | max // 0) + 1) | tostring) as $id
+    # The new task's id: in the response ("Task #4 created successfully: …", or a task object); else the next
+    # number, as Claude Code counts them: it never reuses the id of a task it deleted, so the plan keeps the
+    # next one (nextId, only for this translator).
+    plan_change '. as $p | ($cur.nextId // 1) as $next
+      | ($p.tool_response
+        | if type == "string" then (capture("#(?<id>[0-9]+)").id // null)
+          elif type == "object" then (.task.id // .id // .taskId) else null end
+        // ([$next, (([$cur.steps[].id | tonumber?] | max // 0) + 1)] | max) | tostring) as $id
       | $cur | .steps = [.steps[] | select(.id != $id)]
-        + [{id: $id, title: ($p.tool_input.subject | title), status: "pending"}]' ;;
+        + [{id: $id, title: ($p.tool_input.subject | title), status: "pending"}]
+      | .nextId = ([$next, (($id | tonumber?) // 0) + 1] | max)' ;;
   PreToolUse:TaskUpdate)
     plan_change '. as $p | ($p.tool_input.taskId | tostring) as $id | $cur
       | if $p.tool_input.status == "deleted" then .steps = [.steps[] | select(.id != $id)]

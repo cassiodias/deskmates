@@ -60,6 +60,16 @@ if [ -n "$found_jq" ]; then
   expect "a filter that makes no object leaves the file" "$(cat "$PLANS/s1.json")" "$before"
   expect "no temp file left behind" "$(ls "$PLANS")" "s1.json"
 
+  # Hooks for tool calls made together run at the same time: no change is lost.
+  PARALLEL='. as $p | $cur | .steps += [{id: $p.id, title: "x", status: "pending"}]'
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+    PUPPET_PAYLOAD="{\"id\": \"$i\"}" plan_update s6 claude "$PARALLEL" &
+  done
+  wait
+  expect "changes made at once are all kept" "$("$found_jq" '.steps | length' "$PLANS/s6.json")" 12
+  expect "no lock left behind" "$(ls -a "$PLANS" | grep -c lock)" 0
+  rm -f "$PLANS/s6.json"
+
   # A broken file is started over, not kept.
   printf '{"steps": [' > "$PLANS/s2.json"
   plan_update s2 claude "$ADD_STEP"
@@ -73,6 +83,11 @@ plans"
   expect "Deskmates off writes nothing" "$(plan_update s3 claude "$ADD_STEP"; echo "|$?")" "|1"
   expect "no file for it" "$(ls "$PLANS")" "s1.json
 s2.json"
+  # A lock left by a hook that was killed does not stop plans for long.
+  mkdir "$PLANS/s1.json.lock"
+  echo "$$" > "$HOME/.deskmates/on"
+  expect "a stale lock is taken over" "$(plan_update s1 claude "$ADD_STEP"; echo "|$?")" "|0"
+  rm "$HOME/.deskmates/on"
   echo "$$" > "$HOME/.deskmates/on"
 fi
 

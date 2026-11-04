@@ -55,6 +55,7 @@ local function webview(frame, _, content)
   end
   function v:html(html) self.html_ = html return self end
   function v:show() self.shown = true return self end
+  function v:hide() self.shown = false return self end
   function v:hswindow() return nil end
   function v:delete() self.deleted = true self.shown = false end
   stub.webviews[#stub.webviews + 1] = v

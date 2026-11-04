@@ -34,20 +34,35 @@ plan_update() {
   file=$(plan_file "$1") || return 1
   session=$1 harness=$2 filter=$3
   shift 3
+  (umask 077; mkdir -p "$PUPPET_PLANS") || return 1
+  # Tool calls made together run their hooks at the same time: one change at a time, or one is lost.
+  plan_lock "$file"
   start=$(printf '{"harness":"%s","session":"%s","steps":[]}' "$harness" "$session")
   cur=$start
   [ -s "$file" ] && cur=$("$PUPPET_JQ" -c 'if type == "object" then . else error("not a plan") end' "$file" \
     2>/dev/null) || cur=$start
-  (umask 077; mkdir -p "$PUPPET_PLANS") || return 1
-  tmp="$file.$$"
-  if (umask 077; printf '%s' "$PUPPET_PAYLOAD" | "$PUPPET_JQ" -c --argjson cur "$cur" \
+  written=1
+  tmp=$(umask 077; mktemp "$file.XXXXXX") || { rmdir "$file.lock" 2>/dev/null; return 1; }
+  if printf '%s' "$PUPPET_PAYLOAD" | "$PUPPET_JQ" -c --argjson cur "$cur" \
       --argjson now "${PUPPET_NOW:-$(date +%s)}" "$@" \
       "($filter) | if type == \"object\" then .updatedAt = \$now else error(\"not a plan\") end" \
-      > "$tmp" 2>/dev/null) && [ -s "$tmp" ]; then
-    mv -f "$tmp" "$file" && return 0
+      > "$tmp" 2>/dev/null && [ -s "$tmp" ]; then
+    mv -f "$tmp" "$file" && written=0
   fi
   rm -f "$tmp"
-  return 1
+  rmdir "$file.lock" 2>/dev/null
+  return "$written"
+}
+
+# Takes the lock of plan file $1 (a folder beside it: mkdir either makes it or fails, at once). A lock still
+# there after about a second was left by a hook that was killed: it is taken over.
+plan_lock() {
+  tries=0
+  until mkdir "$1.lock" 2>/dev/null; do
+    tries=$((tries + 1))
+    [ "$tries" -ge 40 ] && return 0
+    sleep 0.025
+  done
 }
 
 # Deletes session $1's plan, if it has one.
