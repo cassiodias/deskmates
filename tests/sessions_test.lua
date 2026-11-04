@@ -273,4 +273,12 @@ quiet:apply(event("UserPromptSubmit", { text = "hello" }), { mapping = mapping, 
 quiet:setPlan("s1", steps("active"))
 check("setPlan: an unlisted session says nothing", #quiet:setPlan("s1", steps("done")) == 0)
 
+-- Facts: setFacts keeps them on the session.
+planned:setFacts("s1", { tickets = { ["ABC-12"] = { seen = 1 } }, timeline = {} })
+check("setFacts: kept on the session", planned.all.s1.facts and planned.all.s1.facts.tickets["ABC-12"] ~= nil)
+planned:setFacts("s1", nil)
+check("setFacts: nil clears them", planned.all.s1.facts == nil)
+planned:setFacts("nope", { tickets = {}, timeline = {} })
+check("setFacts: an unknown session gets none", planned.all.nope == nil)
+
 check.done("sessions")

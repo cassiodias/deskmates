@@ -22,6 +22,7 @@ local Sessions = require("puppet.model.sessions")
 local status = require("puppet.model.status")
 local harnesses = require("puppet.harnesses")
 local plans = require("puppet.model.plans")
+local facts = require("puppet.model.facts")
 local scenes = require("puppet.render.scenes")
 local Stage = require("puppet.stage.stage")
 local Iterm = require("puppet.terminals.iterm")
@@ -77,6 +78,11 @@ obj.eventsFile = os.getenv("HOME") .. "/.deskmates/events"
 --- The folder the hooks keep each session's plan in (hook/plan-lib.sh).
 obj.plansDir = os.getenv("HOME") .. "/.deskmates/plans"
 
+--- Deskmates.factsDir
+--- Variable
+--- The folder the hooks keep each session's facts in: its tickets, phases and timeline (hook/facts-lib.sh).
+obj.factsDir = os.getenv("HOME") .. "/.deskmates/facts"
+
 --- Deskmates.onFile
 --- Variable
 --- The marker that says Deskmates runs: it holds Hammerspoon's process id, and the hooks keep plans only while
@@ -98,15 +104,21 @@ function obj:handle(line)
       intents[#intents + 1] = intent
     end
   end
+  -- A line that changed the session's facts (a test line may have): read them again from their file.
+  if (event.flag == "facts" or event.flag == "test") and self.sessions.all[event.session] then
+    local path = facts.path(self.factsDir, event.session)
+    self.sessions:setFacts(event.session, path and facts.load(path))
+  end
   if self.replayFrom then return end
   for _, intent in ipairs(intents) do self:say(intent.key, intent.text, intent.seconds) end
 end
 
--- Deletes the plans no session needs: those of sessions it no longer knows, once they are hours old.
+-- Deletes the plans and facts no session needs: those of sessions it no longer knows, once they are hours old.
 function obj:sweepPlans()
   local keep = {}
   for sid in pairs(self.sessions.all) do keep[sid] = true end
   plans.sweep(self.plansDir, keep, os.time(), config.STALE_SECONDS)
+  facts.sweep(self.factsDir, keep, os.time(), config.STALE_SECONDS)
 end
 
 -- Marks that Deskmates runs, or no longer does.

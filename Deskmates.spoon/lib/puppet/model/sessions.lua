@@ -106,6 +106,13 @@ local function finish(intents, sid, s)
   end
 end
 
+-- Keeps session `sid`'s facts (model/facts.lua's shape, or nil), for the whole session. An unknown session is
+-- left alone.
+function Sessions:setFacts(sid, facts)
+  local s = self.all[sid]
+  if s then s.facts = facts end
+end
+
 -- Keeps session `sid`'s plan (model/plans.lua's shape, or nil), for the whole session. A step that became done
 -- since the last plan is said for a moment, as intents like apply's. An unknown session is left alone.
 function Sessions:setPlan(sid, plan)
