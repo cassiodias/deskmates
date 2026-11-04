@@ -100,5 +100,10 @@ R:start()
 check("the marker's folder is made when missing", read(dir .. "/fresh/on") == "4242\n")
 R:stop()
 
+-- A Spoon started with its defaults keeps to the stub's home, never the real one.
+local D = dofile(stub.spoonPath .. "init.lua")
+check("the defaults live in the stub's home", stub.home ~= nil and D.onFile == stub.home .. "/.deskmates/on"
+  and D.plansDir == stub.home .. "/.deskmates/plans" and D.eventsFile == stub.home .. "/.deskmates/events")
+
 os.execute("rm -rf '" .. dir .. "'")
 check.done("plan flow")

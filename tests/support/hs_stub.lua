@@ -161,6 +161,17 @@ hs = {
 
 os.time = function() return math.floor(stub.clock) end
 
+-- A home of the test's own: the Spoon's defaults (events, plans, the marker that says it runs) never reach the
+-- real ~/.deskmates.
+stub.home = os.tmpname()
+os.remove(stub.home)
+os.execute("mkdir -p '" .. stub.home .. "'")
+local getenv = os.getenv
+os.getenv = function(name)
+  if name == "HOME" then return stub.home end
+  return getenv(name)
+end
+
 -- Moves the clock and runs the timers that came due, oldest first.
 function stub.advance(seconds)
   local target = stub.clock + seconds
