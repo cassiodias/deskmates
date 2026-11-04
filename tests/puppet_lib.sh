@@ -54,6 +54,18 @@ EOF" "cat <<-'EOF' > plan.md
   expect "not a test command: $command" "$(is_test_command "$command" && echo yes)" ""
 done
 
+# A huge command (a script pasted inline) is judged by its first 4000 bytes, as jq would have cut it, and soon:
+# reading a whole megabyte would keep the agent waiting minutes.
+expect "a test command past 4000 bytes is not seen" \
+  "$(is_test_command "echo $(printf '%5000s' '' | tr ' ' x); npm test" && echo yes)" ""
+big=$(head -c 1000000 /dev/zero | tr '\0' x)
+(is_test_command "$big pytest"; echo judged > "$HOME/big.judged") &
+watched=$!
+waited=0
+while [ ! -e "$HOME/big.judged" ] && [ "$waited" -lt 60 ]; do sleep 1; waited=$((waited + 1)); done
+pkill -P "$watched" 2> /dev/null; kill "$watched" 2> /dev/null
+expect "a 1 MB command is judged within a minute" "$(cat "$HOME/big.judged" 2> /dev/null)" judged
+
 # Text is cut by characters, never inside one, even when the hook runs with the C locale (a background process).
 a119=$(printf '%119s' '' | tr ' ' a)
 PUPPET_PAYLOAD="{\"message\":\"${a119}éèê\",\"last_assistant_message\":\"$(printf '%89s' '' | tr ' ' b)€€ more\"}"

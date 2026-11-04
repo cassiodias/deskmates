@@ -112,9 +112,10 @@ leading_command() {
 # as the shell would, roughly: quotes, ; & | ( ) between commands, sh -c "…" inside, and here-document bodies
 # skipped. Each command's program counts, past variable settings and wrappers (env, nohup, timeout 300, npx, uv
 # run, bundle exec, python -m, with their flags), so a runner's name in an argument (cat jest.config.js) is not
-# a test run. Scripts named test, or test-…, test_…, test:… count (npm run test:unit).
+# a test run. Scripts named test, or test-…, test_…, test:… count (npm run test:unit). Only the first 4000 bytes
+# count (as jq cuts a value): a command pasted whole, megabytes long, is judged at once.
 is_test_command() {
-  printf '%s\n' "$1" | awk '
+  printf '%s\n' "$1" | head -c 4000 | awk '
     function base(word) { sub(/.*\//, "", word); return word }
     function isTest(word) { return word ~ /^test([-_:].*)?$/ }
     function isRunner(word) { return base(word) ~ /^(pytest|py\.test|unittest|jest|vitest|mocha|rspec|tox|phpunit)$/ }
@@ -146,20 +147,22 @@ is_test_command() {
       return 0
     }
     # Whether any command on line runs tests: splits it into words, as the shell would, roughly.
-    function scan(line,   w, n, i, c, quote, word, inWord, hit) {
+    function scan(line,   ch, w, n, i, c, len, quote, word, inWord, hit) {
       n = 0; quote = ""; word = ""; inWord = 0; hit = 0
       split("", w)
-      for (i = 1; i <= length(line); i++) {
-        c = substr(line, i, 1)
+      # One split into characters: substr would walk the line again for each one.
+      len = split(line, ch, "")
+      for (i = 1; i <= len; i++) {
+        c = ch[i]
         if (quote != "") {
           if (c == quote) quote = ""; else word = word c
         } else if (c == "\"" || c == "\047") {
           quote = c; inWord = 1
         } else if (c == "\\") {
-          i++; word = word substr(line, i, 1); inWord = 1
-        } else if (c == " " || c == "\t" || c ~ /[;&|()]/) {
+          i++; word = word ch[i]; inWord = 1
+        } else if (c == " " || c == "\t" || c == ";" || c == "&" || c == "|" || c == "(" || c == ")") {
           if (inWord) { w[++n] = word; word = ""; inWord = 0 }
-          if (c ~ /[;&|()]/) {
+          if (c != " " && c != "\t") {
             if (n > 0 && judge(w, n)) hit = 1
             n = 0; split("", w)
           }
