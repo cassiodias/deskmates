@@ -80,7 +80,7 @@ tests/run.sh
   for Hammerspoon and compare every frame with `tests/snapshots/`. If you changed a drawing on purpose, record
   it again with `UPDATE=1 lua5.4 tests/scenario_test.lua` and check the diff.
 - `sessions_test.lua` runs the session model with a fake agent; `liveness_test.lua` checks when puppets leave,
-  with iTerm not running; `status_test.lua` checks the status line and the card's text; `settings_test.lua`
+  with iTerm not running; `status_test.lua` checks the status line and the card's text; `plancard_test.lua` checks the plan card's page, and `planblocks_test.lua` what it lifts from a plan's markdown (file maps, endpoints) and what it leaves as text; `settings_test.lua`
   checks the saved settings carry over from the old name.
 - `harness_contract_test.lua` checks every harness and every creature (see "What the tests check for you").
 - `puppet_lib.sh` checks the hook library's helpers on their own (what they keep and drop, cutting text,
