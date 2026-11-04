@@ -3,6 +3,7 @@
 # vocabulary, so they pass through as they are.
 
 . "$(dirname "$0")/../../hook/puppet-lib.sh"
+. "$(dirname "$0")/../../hook/plan-lib.sh"
 puppet_read_payload
 
 # Cursor runs Claude Code's hooks too, with its own payloads: its own harness writes those.
@@ -37,6 +38,43 @@ esac
 case "$tool" in Agent|Task) text=$(field tool_input.description) ;; esac
 flag=""
 [ "$tool" = "Bash" ] && is_test_command "$(payload_value tool_input.command)" && flag="test"
+
+# The plan (hook/plan-lib.sh): Claude Code's checklist (TodoWrite, or TaskCreate and TaskUpdate) and its plan
+# document (ExitPlanMode, inline or in the plan file it names). One task list per session, subagents included.
+PLAN_DEFS='def status: {"pending": "pending", "in_progress": "active", "completed": "done"}[. // ""] // "pending";
+  def title: tostring | .[0:200];'
+plan_change() {
+  filter=$1
+  shift
+  plan_update "$session" claude "$PLAN_DEFS $filter" "$@" 2>/dev/null && flag="plan"
+}
+session=$(field session_id)
+case "$event:$tool" in
+  PreToolUse:TodoWrite)
+    plan_change '. as $p | $cur | .steps = [($p.tool_input.todos // []) | to_entries[]
+      | {id: (.key + 1 | tostring), title: (.value.content | title), status: (.value.status | status)}]' ;;
+  PostToolUse:TaskCreate)
+    # The new task's id comes back in the response; when it is not there, it is the next number, as Claude
+    # Code counts them.
+    plan_change '. as $p | ($p.tool_response | if type == "object" then (.task.id // .id // .taskId) else null end
+        // (([$cur.steps[].id | tonumber?] | max // 0) + 1) | tostring) as $id
+      | $cur | .steps = [.steps[] | select(.id != $id)]
+        + [{id: $id, title: ($p.tool_input.subject | title), status: "pending"}]' ;;
+  PreToolUse:TaskUpdate)
+    plan_change '. as $p | ($p.tool_input.taskId | tostring) as $id | $cur
+      | if $p.tool_input.status == "deleted" then .steps = [.steps[] | select(.id != $id)]
+        else .steps = [.steps[] | if .id == $id then
+          (if $p.tool_input.status then .status = ($p.tool_input.status | status) else . end)
+          | (if $p.tool_input.subject then .title = ($p.tool_input.subject | title) else . end)
+          else . end] end' ;;
+  PreToolUse:ExitPlanMode)
+    plan_file_path=$(path_field tool_input.planFilePath)
+    if [ -n "$plan_file_path" ] && [ -f "$plan_file_path" ]; then set -- --rawfile md "$plan_file_path"
+    else set -- --arg md ""; fi
+    plan_change '. as $p | ($p.tool_input.plan | if type == "string" and . != "" then . else $md end) as $m
+      | if $m == "" then error("no plan") else $cur | .plan = {markdown: $m[0:100000], at: $now} end' "$@" ;;
+  SessionEnd:*) plan_delete "$session" ;;
+esac
 
 write_event claude "$event" "$(field session_id)" "$(field agent_id)" "$tool" "$(field agent_type)" "$text" \
   "$(path_field cwd)" "$flag" "$title"

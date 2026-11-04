@@ -26,9 +26,11 @@ for parser in $parsers; do
     [ -d "${payload%.json}.home" ] && cp -R "${payload%.json}.home/." "$work/"
     # Deskmates runs: its marker names a live process (this runner).
     mkdir -p "$work/.deskmates" && echo "$$" > "$work/.deskmates/on"
+    # @HOME@ in a payload is the case's home (a path the agent names there, like a plan file).
+    sed "s|@HOME@|$work|g" "$payload" > "$work.payload"
     # LC_ALL=C: hooks may run from a background process, with no locale.
     stdout=$(LC_ALL=C HOME="$work" PUPPET_NOW=0 PUPPET_TTY=/dev/ttys009 TERM_PROGRAM=iTerm.app \
-      "harnesses/$harness/translate.sh" < "$payload")
+      "harnesses/$harness/translate.sh" < "$work.payload")
     got=$(cut -d'|' -f2- "$work/.deskmates/events" 2>/dev/null)
     if [ ! -e "$expected" ]; then
       echo "harness $name has no .line file"
@@ -43,12 +45,18 @@ for parser in $parsers; do
       echo "  $(cat "$expected")"
       failed=1
     fi
-    # <name>.plan.json is the plan the jq pass must leave in the plans folder (its time left out); without one,
-    # and in the plutil pass, the folder must hold no plan the case did not start with.
-    expected_plan="${payload%.json}.plan.json"
+    # <name>.plan is the plan the jq pass must leave in the plans folder (its time left out), and an empty one
+    # means none may be left; without it the folder must hold no plan the case did not start with. Without jq
+    # (the plutil pass) a case may delete a plan but never write one.
+    expected_plan="${payload%.json}.plan"
     plans=$(cd "$work/.deskmates/plans" 2>/dev/null && ls)
     started=$(cd "${payload%.json}.home/.deskmates/plans" 2>/dev/null && ls)
-    if [ "$parser" = jq ] && [ -e "$expected_plan" ]; then
+    if [ "$parser" = jq ] && [ -e "$expected_plan" ] && [ ! -s "$expected_plan" ]; then
+      if [ -n "$plans" ]; then
+        echo "harness $name left plans, expected none: '$plans'"
+        failed=1
+      fi
+    elif [ "$parser" = jq ] && [ -e "$expected_plan" ]; then
       got_plan=$("$found_jq" -S 'del(.updatedAt)' "$work/.deskmates/plans/"*.json 2>/dev/null)
       if [ "$plans" != "$(ls "$work/.deskmates/plans/" 2>/dev/null | head -n 1)" ] ||
         [ "$got_plan" != "$("$found_jq" -S . "$expected_plan")" ]; then
@@ -58,8 +66,8 @@ for parser in $parsers; do
         "$found_jq" -S . "$expected_plan" | sed 's/^/  /'
         failed=1
       fi
-    elif [ "$parser" = plutil ] && [ "$plans" != "$started" ]; then
-      echo "harness $name changed the plans without jq: '$plans'"
+    elif [ "$parser" = plutil ] && [ -n "$(printf '%s\n' "$plans" | grep -vxF -e "$started" -e '')" ]; then
+      echo "harness $name wrote a plan without jq: '$plans'"
       failed=1
     elif [ "$parser" = jq ] && [ ! -e "$expected_plan" ] && [ -n "$plans" ] && [ "$plans" != "$started" ]; then
       echo "harness $name left plans it should not have: '$plans'"
@@ -72,7 +80,7 @@ for parser in $parsers; do
       echo "harness $name printed '$stdout'"
       failed=1
     fi
-    rm -rf "$work"
+    rm -rf "$work" "$work.payload"
   done
 done
 [ "$failed" = 0 ] && echo "harnesses: ok"

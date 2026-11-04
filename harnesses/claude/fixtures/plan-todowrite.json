@@ -1,0 +1,26 @@
+{
+  "session_id": "s1",
+  "cwd": "/Users/dev/workspace/my-app",
+  "transcript_path": "/tmp/t.jsonl",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "TodoWrite",
+  "tool_input": {
+    "todos": [
+      {
+        "content": "Write the failing test",
+        "status": "completed",
+        "activeForm": "Writing the failing test"
+      },
+      {
+        "content": "Fixed the typo.",
+        "status": "in_progress",
+        "activeForm": "Fixing the typo"
+      },
+      {
+        "content": "Run the tests",
+        "status": "pending",
+        "activeForm": "Running the tests"
+      }
+    ]
+  }
+}

@@ -38,7 +38,7 @@ plan_update() {
   cur=$start
   [ -s "$file" ] && cur=$("$PUPPET_JQ" -c 'if type == "object" then . else error("not a plan") end' "$file" \
     2>/dev/null) || cur=$start
-  mkdir -p "$PUPPET_PLANS" || return 1
+  (umask 077; mkdir -p "$PUPPET_PLANS") || return 1
   tmp="$file.$$"
   if (umask 077; printf '%s' "$PUPPET_PAYLOAD" | "$PUPPET_JQ" -c --argjson cur "$cur" \
       --argjson now "${PUPPET_NOW:-$(date +%s)}" "$@" \

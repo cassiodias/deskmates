@@ -1,0 +1,7 @@
+{
+  "session_id": "s1",
+  "cwd": "/Users/dev/workspace/my-app",
+  "transcript_path": "/tmp/t.jsonl",
+  "hook_event_name": "SessionEnd",
+  "reason": "exit"
+}

@@ -1,0 +1,9 @@
+{
+  "harness": "claude",
+  "session": "s1",
+  "steps": [],
+  "plan": {
+    "markdown": "# Add a flag\n\n1. Write the failing test.\n2. Fixed the typo.",
+    "at": 0
+  }
+}

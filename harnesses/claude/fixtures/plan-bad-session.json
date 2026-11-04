@@ -1,0 +1,15 @@
+{
+  "session_id": "../evil",
+  "cwd": "/Users/dev/workspace/my-app",
+  "transcript_path": "/tmp/t.jsonl",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "TodoWrite",
+  "tool_input": {
+    "todos": [
+      {
+        "content": "Fixed the typo.",
+        "status": "pending"
+      }
+    ]
+  }
+}

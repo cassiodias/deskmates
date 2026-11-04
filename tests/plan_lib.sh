@@ -49,6 +49,7 @@ if [ -n "$found_jq" ]; then
   expect "the plan written" "$("$found_jq" -c . "$PLANS/s1.json")" \
     '{"harness":"claude","session":"s1","steps":[{"id":"1","title":"Fixed the typo.","status":"pending"}],"updatedAt":100}'
   expect "mode 600" "$(stat -f %Lp "$PLANS/s1.json")" 600
+  expect "its folder mode 700" "$(stat -f %Lp "$PLANS")" 700
   expect "the next change starts from it" "$(plan_update s1 claude "$ADD_STEP" && "$found_jq" '.steps | length' "$PLANS/s1.json")" 2
 
   # A filter that fails, or makes no plan, leaves the file exactly as it was.

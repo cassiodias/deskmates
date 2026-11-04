@@ -1,0 +1,20 @@
+{
+  "harness": "claude",
+  "session": "s1",
+  "steps": [
+    {
+      "id": "1",
+      "title": "Write the failing test",
+      "status": "active"
+    },
+    {
+      "id": "2",
+      "title": "Fixed the typo.",
+      "status": "pending"
+    }
+  ],
+  "plan": {
+    "markdown": "# Add a flag\n\nFixed the typo.\n",
+    "at": 0
+  }
+}

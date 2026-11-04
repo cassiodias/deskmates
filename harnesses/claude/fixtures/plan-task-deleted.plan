@@ -1,0 +1,11 @@
+{
+  "harness": "claude",
+  "session": "s1",
+  "steps": [
+    {
+      "id": "2",
+      "title": "Fixed the typo.",
+      "status": "pending"
+    }
+  ]
+}

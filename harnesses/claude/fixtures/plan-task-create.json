@@ -1,0 +1,18 @@
+{
+  "session_id": "s1",
+  "cwd": "/Users/dev/workspace/my-app",
+  "transcript_path": "/tmp/t.jsonl",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "TaskCreate",
+  "tool_input": {
+    "subject": "Run the tests",
+    "description": "Run them all.",
+    "activeForm": "Running the tests"
+  },
+  "tool_response": {
+    "task": {
+      "id": "3",
+      "subject": "Run the tests"
+    }
+  }
+}
