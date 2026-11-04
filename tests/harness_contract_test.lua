@@ -151,8 +151,12 @@ local fake = {
 }
 cursor.focus({ app = "iTerm.app", folder = "my-app" }, fake)
 cursor.focus({ app = "vscode", folder = "my-app" }, fake)
+cursor.focus({ app = "Cursor", folder = "my-app" }, fake)
+cursor.focus({ app = "", folder = "my-app", tty = "/dev/ttys005" }, fake)
 check("cursor: a click brings its terminal forward, or Cursor itself",
   asked[1] == "focus iTerm.app" and asked[2] == "com.todesktop.230313mzl4w4u92 my-app")
+check("cursor: its chat brings Cursor forward", asked[3] == "com.todesktop.230313mzl4w4u92 my-app")
+check("cursor: a terminal that names no app is still a terminal, not Cursor", asked[4] == "focus ")
 check("unknown ids fall back to claude", harnesses.get("nope").id == "claude")
 
 check.done("harness contract")

@@ -29,7 +29,7 @@ return {
   -- "Cursor", written by the translator when there is no terminal).
   focus = function(session, terminals)
     local app = session.app or ""
-    if app == "vscode" or app == "Cursor" or app == "" then return terminals.app(CURSOR_APP, session.folder) end
+    if app == "vscode" or app == "Cursor" then return terminals.app(CURSOR_APP, session.folder) end
     return terminals.focus(session)
   end,
 }

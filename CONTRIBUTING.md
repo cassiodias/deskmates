@@ -290,9 +290,9 @@ Make every script executable (`chmod +x`).
   of its own may fire the same hooks from the app's chat, with no terminal at all. A session with no terminal
   (no tty on its lines) is read as a background session, which leaves once it rests; to keep its puppet at the
   desk, have the translator name the app with `puppet_app` (Cursor's: `puppet_app Cursor`; `write_event` puts it
-  on a line with neither a terminal nor a `TERM_PROGRAM`), bring the app forward for it in `focus`, and name it
-  in `apps` so the puppet leaves when the app quits. The contract test can check it with a stand-in `terminals`
-  table.
+  on every line with no terminal, whatever `TERM_PROGRAM` says), bring the app forward for it in `focus`, and
+  name it in `apps` so the puppet leaves when the app quits. The contract test can check it with a stand-in
+  `terminals` table.
 - `program` (optional): the program name, or a list of names, its sessions run in their terminal (the last
   part of `ps -o comm`). The session ends once its terminal no longer runs it; for agents that report the end
   of a session late, or never.

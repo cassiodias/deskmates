@@ -54,6 +54,17 @@ if [ "$app" != "Cursor" ]; then
 fi
 rm -rf "$work"
 
+# Cursor started from a terminal (cursor .) passes that terminal's TERM_PROGRAM on to its chat: with no tty, the
+# line still names Cursor.
+work=$(mktemp -d)
+app=$(TERM_PROGRAM=ghostty HOME="$work" PUPPET_NOW=0 PUPPET_TTY= harnesses/cursor/translate.sh < "$f/prompt.json" \
+  > /dev/null; cut -d'|' -f9 "$work/.deskmates/events")
+if [ "$app" != "Cursor" ]; then
+  echo "cursor turns: a chat in a Cursor started from Ghostty names app '$app', expected 'Cursor'"
+  failed=1
+fi
+rm -rf "$work"
+
 # Cursor's CLI in a terminal that sets no TERM_PROGRAM (Alacritty): it has a terminal, so it is not the app.
 work=$(mktemp -d)
 app=$(env -u TERM_PROGRAM HOME="$work" PUPPET_NOW=0 PUPPET_TTY=/dev/ttys009 harnesses/cursor/translate.sh \
