@@ -37,7 +37,14 @@ for command in "pytest -q" "python -m pytest tests" "python3 -m unittest discove
   "cat > notes.txt <<EOF
 hello
 EOF
-pytest -q"; do
+pytest -q" \
+  "git commit -m \"\$(cat <<'EOF'
+Fix the parser.
+EOF
+)\" && npm test" "python -c \"x=1<<y\"
+npm test" "timeout -s KILL 300 pytest" \
+  "sudo -u bob pytest" "npm --prefix app test" "make -C sub test" "make -j 4 test" "cargo +nightly test" \
+  "pnpm --filter web test"; do
   expect "a test command: $command" "$(is_test_command "$command" && echo yes)" yes
 done
 for command in "cat jest.config.js" "grep -r pytest src" "npm install" "go build ./..." "cargo build" \
@@ -50,7 +57,11 @@ npm test
 EOF" "cat <<-'EOF' > plan.md
 	npm test
 	EOF" "npm run testing-docs-build" "echo \"a; pytest\"" \
-  "bash -c \"echo pytest\""; do
+  "bash -c \"echo pytest\"" "git commit -m \"\$(cat <<'EOF'
+npm test
+EOF
+)\"" \
+  "make -C test build" "sudo -u test ls"; do
   expect "not a test command: $command" "$(is_test_command "$command" && echo yes)" ""
 done
 

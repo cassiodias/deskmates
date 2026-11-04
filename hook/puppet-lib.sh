@@ -109,49 +109,72 @@ leading_command() {
 }
 
 # True when a shell command runs tests, so the puppet shows a progress bar and the result. It reads the command
-# as the shell would, roughly: quotes, ; & | ( ) between commands, sh -c "…" inside, and here-document bodies
-# skipped. Each command's program counts, past variable settings and wrappers (env, nohup, timeout 300, npx, uv
-# run, bundle exec, python -m, with their flags), so a runner's name in an argument (cat jest.config.js) is not
-# a test run. Scripts named test, or test-…, test_…, test:… count (npm run test:unit). Only the first 4000 bytes
+# as the shell would, roughly: quotes (across lines too), ; & | ( ) and newlines between commands, sh -c "…"
+# inside, and here-document bodies skipped. Each command's program counts, past variable settings and wrappers
+# (env, nohup, timeout 300, sudo -u me, npx, uv run, bundle exec, python -m) and the flags before a subcommand
+# (npm --prefix app test, make -C sub test), so a runner's name in an argument (cat jest.config.js) is not a
+# test run. Scripts named test, or test-…, test_…, test:… count (npm run test:unit). Only the first 4000 bytes
 # count (as jq cuts a value): a command pasted whole, megabytes long, is judged at once.
 is_test_command() {
   printf '%s\n' "$1" | head -c 4000 | awk '
     function base(word) { sub(/.*\//, "", word); return word }
     function isTest(word) { return word ~ /^test([-_:].*)?$/ }
     function isRunner(word) { return base(word) ~ /^(pytest|py\.test|unittest|jest|vitest|mocha|rspec|tox|phpunit)$/ }
+    # Whether flag (of program) takes the next word as its value.
+    function takesValue(program, flag) {
+      if (flag ~ /=/) return 0
+      if (program == "sudo") return flag ~ /^-[ugCDhpRrt]$/
+      if (program == "timeout") return flag ~ /^(-s|-k|--signal|--kill-after)$/
+      if (program == "nice") return flag == "-n"
+      if (program == "env") return flag ~ /^-[uCS]$/
+      if (program ~ /^(npx|bunx|pnpx)$/) return flag ~ /^(-p|--package)$/
+      if (program ~ /^(npm|yarn|pnpm|bun)$/) return flag ~ /^(-C|--prefix|--dir|--cwd|-F|--filter|-w|--workspace)$/
+      if (program ~ /^g?make$/) return flag ~ /^-[CfIoWj]$/
+      if (program ~ /^(mvn|gradle|gradlew)$/) return flag ~ /^(-f|-p|-pl|-P)$/
+      if (program == "go") return flag == "-C"
+      return 0
+    }
+    # The first word of w from i on that is not a flag of program (with its value), a +toolchain or a count.
+    function past(w, n, i, program) {
+      while (i <= n && (w[i] ~ /^[-+]/ || (program ~ /^(g?make|timeout)$/ && w[i] ~ /^[0-9.]+[smhd]?$/))) {
+        if (takesValue(program, w[i])) i++
+        i++
+      }
+      return i
+    }
     # Whether the command in words w[1..n] runs tests.
-    function judge(w, n,   i, program, first, second) {
+    function judge(w, n,   i, j, program) {
       i = 1
       while (i <= n) {
+        program = base(w[i])
         if (w[i] ~ /^[A-Za-z_][A-Za-z0-9_]*=/) i++
-        else if (base(w[i]) ~ /^(env|nohup|timeout|time|nice|sudo|exec|command|caffeinate|npx|bunx|pnpx)$/) {
-          i++
-          while (i <= n && (w[i] ~ /^-/ || w[i] ~ /^[0-9.]+[smhd]?$/)) i++
-        } else if ((w[i] ~ /^(uv|poetry|pipenv|pdm|hatch|rye)$/ && w[i + 1] == "run") ||
-          (w[i] == "bundle" && w[i + 1] == "exec")) {
-          i += 2
-          while (i <= n && w[i] ~ /^-/) i++
-        } else if (base(w[i]) ~ /^python[0-9.]*$/ && w[i + 1] == "-m") i += 2
+        else if (program ~ /^(env|nohup|timeout|time|nice|sudo|exec|command|caffeinate|npx|bunx|pnpx)$/) {
+          i = past(w, n, i + 1, program)
+        } else if ((program ~ /^(uv|poetry|pipenv|pdm|hatch|rye)$/ && w[i + 1] == "run") ||
+          (program == "bundle" && w[i + 1] == "exec")) {
+          i = past(w, n, i + 2, program)
+        } else if (program ~ /^python[0-9.]*$/ && w[i + 1] == "-m") i += 2
         else break
       }
       if (i > n) return 0
-      program = base(w[i]); first = w[i + 1]; second = w[i + 2]
-      if (program ~ /^(ba|z|da|k)?sh$/ && first ~ /^-[A-Za-z]*c[A-Za-z]*$/) return scan(second)
+      program = base(w[i])
+      if (program ~ /^(ba|z|da|k)?sh$/ && w[i + 1] ~ /^-[A-Za-z]*c[A-Za-z]*$/) return scan(w[i + 2])
       if (isRunner(program)) return 1
-      if (program ~ /^(go|cargo|mvn|gradle|gradlew|make|dotnet|swift|mix|deno)$/) return isTest(first)
+      j = past(w, n, i + 1, program)
+      if (program ~ /^(go|cargo|mvn|gradle|gradlew|g?make|dotnet|swift|mix|deno)$/) return isTest(w[j])
       if (program ~ /^(npm|yarn|pnpm|bun)$/) {
-        if (isTest(first) || (first == "run" && isTest(second))) return 1
-        if (first ~ /^(exec|dlx|x)$/) first = second
-        return first ~ /^(jest|vitest|mocha)$/
+        if (isTest(w[j]) || (w[j] == "run" && isTest(w[j + 1]))) return 1
+        if (w[j] ~ /^(exec|dlx|x)$/) j++
+        return base(w[j]) ~ /^(jest|vitest|mocha)$/
       }
       return 0
     }
-    # Whether any command on line runs tests: splits it into words, as the shell would, roughly.
-    function scan(line,   ch, w, n, i, c, len, quote, word, inWord, hit) {
-      n = 0; quote = ""; word = ""; inWord = 0; hit = 0
+    # Whether any command in text runs tests. It splits text into characters once (substr would walk it again
+    # for each one) and builds the words of each command, quotes taken off.
+    function scan(text,   ch, w, n, i, k, c, len, quote, word, inWord, hit, delim, line) {
+      n = 0; quote = ""; word = ""; inWord = 0; hit = 0; delim = ""
       split("", w)
-      # One split into characters: substr would walk the line again for each one.
-      len = split(line, ch, "")
+      len = split(text, ch, "")
       for (i = 1; i <= len; i++) {
         c = ch[i]
         if (quote != "") {
@@ -159,12 +182,33 @@ is_test_command() {
         } else if (c == "\"" || c == "\047") {
           quote = c; inWord = 1
         } else if (c == "\\") {
-          i++; word = word ch[i]; inWord = 1
-        } else if (c == " " || c == "\t" || c == ";" || c == "&" || c == "|" || c == "(" || c == ")") {
+          i++; if (ch[i] != "\n") { word = word ch[i]; inWord = 1 }
+        } else if (c == "<" && ch[i + 1] == "<" && ch[i + 2] != "<" && ch[i - 1] != "<") {
+          # A here-document: its delimiter word; the body, from the next line, is skipped below.
+          if (inWord) { w[++n] = word; word = ""; inWord = 0 }
+          k = i + 2
+          if (ch[k] == "-") k++
+          while (ch[k] == " " || ch[k] == "\t") k++
+          if (ch[k] == "\"" || ch[k] == "\047") k++
+          delim = ""
+          while (k <= len && ch[k] ~ /[A-Za-z0-9_]/) delim = delim ch[k++]
+          if (ch[k] == "\"" || ch[k] == "\047") k++
+          i = k - 1
+        } else if (c == " " || c == "\t" || c == "\n" || c == ";" || c == "&" || c == "|" || c == "(" || c == ")") {
           if (inWord) { w[++n] = word; word = ""; inWord = 0 }
           if (c != " " && c != "\t") {
             if (n > 0 && judge(w, n)) hit = 1
             n = 0; split("", w)
+          }
+          if (c == "\n" && delim != "") {
+            # Skips the body, up to the line that is the delimiter alone (tabs before it allowed).
+            for (i++; i <= len; i++) {
+              line = ""
+              while (i <= len && ch[i] != "\n") line = line ch[i++]
+              sub(/^\t+/, "", line)
+              if (line == delim) break
+            }
+            delim = ""
           }
         } else {
           word = word c; inWord = 1
@@ -174,20 +218,8 @@ is_test_command() {
       if (n > 0 && judge(w, n)) hit = 1
       return hit
     }
-    # A here-document body is text, not commands.
-    heredoc != "" {
-      line = $0; sub(/^[ \t]+/, "", line); sub(/[ \t]+$/, "", line)
-      if (line == heredoc) heredoc = ""
-      next
-    }
-    {
-      if (scan($0)) found = 1
-      line = $0; gsub(/<<</, "", line)
-      if (match(line, /<<-?[ \t]*["\047]?[A-Za-z_][A-Za-z0-9_]*/)) {
-        heredoc = substr(line, RSTART, RLENGTH); sub(/^<<-?[ \t]*["\047]?/, "", heredoc)
-      }
-    }
-    END { exit !found }'
+    { text = text (NR > 1 ? "\n" : "") $0 }
+    END { exit !scan(text) }'
 }
 
 # The terminal of process $1 (/dev/ttys004), or nothing.
