@@ -100,14 +100,18 @@ end
 
 local MARKS = { done = "☑", active = "▶", pending = "☐" }
 
--- The plan's title and summary (its first heading when that is a `#` one and the paragraph after it, lifted into the header), and
--- the rest of its blocks, with an id on each `##` heading for the contents.
+-- The longest first paragraph shown as the summary; a longer one stays in the plan, where it reads whole.
+local SUMMARY_LENGTH = 240
+
+-- The plan's title and summary (its first heading when that is a `#` one, and a short paragraph after it,
+-- lifted into the header), and the rest of its blocks, with an id on each `##` heading for the contents.
 local function split(markdown)
   local blocks = planblocks.lift(planblocks.parse(markdown or ""))
   local title, summary, first = nil, nil, 1
   if blocks[1] and blocks[1].kind == "heading" and blocks[1].level == 1 then
     title, first = blocks[1].text, 2
-    if blocks[2] and blocks[2].kind == "paragraph" then summary, first = table.concat(blocks[2].lines, " "), 3 end
+    local para = blocks[2] and blocks[2].kind == "paragraph" and table.concat(blocks[2].lines, " ")
+    if para and (utf8.len(para) or #para) <= SUMMARY_LENGTH then summary, first = para, 3 end
   end
   local rest, sections = {}, {}
   for i = first, #blocks do
@@ -173,7 +177,7 @@ function plancard.html(plan, meta)
     ".label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; opacity: 0.55; margin-bottom: 4px; }",
     "header { padding: 10px 14px 8px; border-bottom: 1px solid var(--faint); }",
     "header .title { font-size: 16px; margin: 0; }",
-    ".summary { margin: 4px 0 0; opacity: 0.8; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }",
+    ".summary { margin: 4px 0 0; opacity: 0.8; }",
     ".progress { display: flex; align-items: center; gap: 8px; margin-top: 6px; }",
     "progress { flex: 1; accent-color: var(--accent); } .count { color: var(--accent); font-weight: 600; }",
     ".layout { flex: 1; min-height: 0; display: grid; grid-template-columns: 180px 1fr; }",

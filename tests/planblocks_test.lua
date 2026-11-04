@@ -113,4 +113,18 @@ check("endpoints: a list of them", eps ~= nil and #eps.rows == 2 and eps.rows[1]
 check("endpoints: a paragraph of them", only("PUT /a → 200\nPATCH /a", "endpoints") ~= nil)
 check("endpoints: a mixed list stays a list", only("- POST /a\n- then deploy", "endpoints") == nil and only("- POST /a\n- then deploy", "list") ~= nil)
 
+-- Review fixes: nothing in a file row is lost, and a badge only where the text says so.
+check("file map: a file cell with more than its path stays a table",
+  only("| File | Change |\n|---|---|\n| `a.lua` (new), `b.lua` | parser |", "filemap") == nil)
+check("file map: a badge in brackets in the file cell is still read",
+  same(rows(only("| File | Change |\n|---|---|\n| `a.lua` (new) | parser |", "filemap")), { { "a.lua", "new", "parser" } }))
+check("file map: a verb that starts a sentence is no badge",
+  same(rows(only("| File | Change |\n|---|---|\n| `a.lua` | Add a retry flag |", "filemap")), { { "a.lua", false, "Add a retry flag" } }))
+check("file map: a verb in a list item is no badge",
+  same(rows(only("## Files\n\n- Add tests to `a_test.lua`", "filemap")), { { "a_test.lua", false, "Add tests to" } }))
+check("file map: a word joined by a hyphen is no badge",
+  same(rows(only("## Files\n\n- Add-on: `a.lua`", "filemap")), { { "a.lua", false, "Add-on" } }))
+check("file map: a badge alone in its cell", same(rows(only("| Path | What |\n|---|---|\n| `a/b.sh` | new |", "filemap")),
+  { { "a/b.sh", "new", "" } }))
+
 check.done("plan blocks")

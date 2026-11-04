@@ -104,10 +104,21 @@ local function pathIn(text)
   return code, text:sub(1, s - 1) .. " " .. text:sub(e + 1)
 end
 
--- A badge from the text's first word ("Create: …") or a word in brackets ("(new)"), and the text without it.
+-- Whether text starts with a separator standing alone (":", or a dash or dot with a space after it).
+local function separated(text)
+  text = text:match("^%s*(.*)$")
+  if text == "" or text:sub(1, 1) == ":" then return true end
+  for _, sep in ipairs({ "—", "–", "-", "·" }) do
+    if text:sub(1, #sep) == sep and (#text == #sep or text:sub(#sep + 1, #sep + 1):match("%s")) then return true end
+  end
+  return false
+end
+
+-- A badge from a word in brackets ("(new)"), or from the text's first word when a separator follows it or it
+-- stands alone ("Create: …", "new"), and the text without it. "Add a flag" is a sentence, not a badge.
 local function badgeIn(text)
   local word, rest = text:match("^%s*(%a+)(.*)$")
-  if word and BADGES[word:lower()] then return BADGES[word:lower()], rest end
+  if word and BADGES[word:lower()] and separated(rest) then return BADGES[word:lower()], rest end
   local s, e, inner = text:find("%((%a+)%)")
   if inner and BADGES[inner:lower()] then return BADGES[inner:lower()], text:sub(1, s - 1) .. text:sub(e + 1) end
   return nil, text
@@ -148,9 +159,12 @@ function planblocks.fileMap(block, context)
     end
     if not column then return nil end
     for r = 2, #block.rows do
-      local path = pathIn(block.rows[r][column] or "")
+      local path, left = pathIn(block.rows[r][column] or "")
       if not path then return nil end
-      local badge, notes = nil, {}
+      -- The file's cell holds its path and at most a badge: anything more would be lost from the row.
+      local badge, notes = badgeIn(left)
+      if clean(notes) ~= "" then return nil end
+      notes = {}
       for c, cell in ipairs(block.rows[r]) do
         if c ~= column then
           if not badge then

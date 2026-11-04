@@ -143,4 +143,11 @@ check("endpoints: drawn", has(api, 'class="method post">POST<') and has(api, "<c
 local rude = plancard.html({ steps = {}, markdown = "POST /a/<x> → 201 <b>" }, { title = "x" })
 check("endpoints: escaped", has(rude, "<code>/a/&lt;x&gt;</code>") and not has(rude, "<b>"))
 
+-- Review fix: a long first paragraph stays in the plan, whole, instead of a clipped summary.
+local long = string.rep("This plan explains a lot of things at length. ", 8)
+local longPage = plancard.html({ steps = {}, markdown = "# Title\n\n" .. long }, { title = "x" })
+check("page: a long first paragraph is no summary", not has(longPage, 'class="summary"')
+  and has(longPage:match("<article>(.-)</article>") or "", "at length."))
+check("page: no summary is clipped", not has(longPage, "line-clamp"))
+
 check.done("plan card")
