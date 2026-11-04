@@ -3,7 +3,7 @@
 --- Puppets that float over your desktop, one per busy coding-agent session, acting out what it is doing:
 --- it thinks, codes at its laptop (invaders or Matrix rain on its monitor), reads, runs tests, plays ping pong
 --- while subagents run, shows a question mark when the agent asks you something, and says what it did when it is done.
---- Click a puppet to jump to its session's terminal.
+--- Click a puppet to jump to its session's terminal, or, when its agent made a plan, to read the plan.
 ---
 --- Agent hooks append one line per event to `~/.deskmates/events`; this Spoon reads it. This file is the
 --- Spoon's public surface and its wiring; the parts (events, model, render, stage, terminals, ui and one
@@ -28,12 +28,14 @@ local Iterm = require("puppet.terminals.iterm")
 local Liveness = require("puppet.terminals.liveness")
 local newTerminals = require("puppet.terminals.focus")
 local menuItems = require("puppet.ui.menu")
+local plancard = require("puppet.ui.plancard")
+local bubble = require("puppet.stage.bubble")
 
 local obj = {}
 obj.__index = obj
 
 obj.name = "Deskmates"
-obj.version = "0.12.1"
+obj.version = "0.13.0"
 obj.author = "Cassio Dias"
 obj.license = "MIT - https://opensource.org/licenses/MIT"
 obj.homepage = "https://github.com/cassiodias/deskmates"
@@ -163,6 +165,33 @@ function obj:focus(key)
   if s then harnesses.get(s.harness).focus(s, self.terminals) end
 end
 
+--- Deskmates:click(key)
+--- Method
+--- A click on a session's puppet: its plan card when its session has a plan to show, else its window.
+function obj:click(key)
+  local s, puppet = self.sessions.all[key], self.stage.puppets[key]
+  if s and puppet and plans.hasContent(s.plan) then
+    self.planCard:show(key, s.plan, { title = (s.title and s.title ~= "") and s.title or s.tag, color = puppet.color })
+  else
+    self:focus(key)
+  end
+end
+
+-- Where a plan card of w by h goes: beside its puppet, as its bubble would, and whole on the puppet's screen.
+function obj:cardFrame(key, w, h)
+  local puppet = self.stage.puppets[key]
+  local screen = hs.screen.mainScreen():frame()
+  local f = puppet and bubble.frame(puppet.canvas:topLeft(), self.pixel, w, h)
+    or { x = screen.x + screen.w - w, y = screen.y + screen.h - h, w = w, h = h }
+  for _, each in ipairs(hs.screen.allScreens()) do
+    local s = each:frame()
+    if f.x + w / 2 >= s.x and f.x + w / 2 < s.x + s.w then screen = s end
+  end
+  f.y = math.max(screen.y, math.min(f.y, screen.y + screen.h - h))
+  f.x = math.max(screen.x, math.min(f.x, screen.x + screen.w - w))
+  return f
+end
+
 -- Keeps the menu's choice and applies it at once to every session's current turn.
 function obj:saveChoice()
   hs.settings.set(config.CHOICE_KEY, self.mapping:toSaved())
@@ -237,7 +266,8 @@ function obj:mouseUp(key)
   end
   if not press or press.isDrag or press.key ~= key then return end
   -- Bringing a terminal forward can take a moment (iTerm's AppleScript); not inside the mouse's handling.
-  hs.timer.doAfter(0, function() self:focus(key) end)
+  -- A session with a plan opens its card instead (obj:click).
+  hs.timer.doAfter(0, function() self:click(key) end)
 end
 
 -- Resting the mouse on a puppet shows its card: where it is and what it is doing; render keeps it current.
@@ -329,6 +359,10 @@ function obj:start()
     onBubbleClick = function(key) self:focus(key) end,
     onHover = function(key, isInside) self:hover(key, isInside) end,
   })
+  self.planCard = plancard.new({
+    onFocus = function(key) self:focus(key) end,
+    frameFor = function(key, w, h) return self:cardFrame(key, w, h) end,
+  })
   self.screenWatcher = hs.screen.watcher.new(function()
     if not self:isOnAScreen(self.stage.anchor) then self:moveToCorner() end
   end)
@@ -371,6 +405,7 @@ function obj:stop()
   if self.dragTap then self.dragTap:stop() end
   if self.menu then self.menu:delete() end
   if self.stage then self.stage:removeAll() end
+  if self.planCard then self.planCard:hide() end
   self.timer, self.tabsTimer, self.dragTap, self.menu = nil, nil, nil, nil
   return self
 end

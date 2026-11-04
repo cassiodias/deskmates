@@ -97,5 +97,53 @@ stub.advance(10)
 check("Cursor's chat rabbit leaves when Cursor quits", not (P.stage.puppets.chat1 and P.stage.puppets.chat1.canvas:isShowing()))
 check("the iTerm puppet stays when Cursor quits", P.stage.puppets.tab1 ~= nil and P.stage.puppets.tab1.canvas:isShowing())
 
+-- A puppet whose session has a plan: a click opens the plan card instead, and its button goes to the terminal.
+local plansDir = os.tmpname()
+os.remove(plansDir)
+os.execute("mkdir -p '" .. plansDir .. "'")
+P.plansDir = plansDir
+local planFile = io.open(plansDir .. "/tab1.json", "w")
+planFile:write('{"steps": [{"id": "1", "title": "Fixed the typo.", "status": "active"}], "plan": {"markdown": "# Plan"}}')
+planFile:close()
+write("PreToolUse|tab1||TodoWrite|||app|iTerm.app|plan|/dev/ttys001|claude|")
+stub.advance(0.2)
+f = P.stage.puppets.tab1.canvas:frame()
+stub.selected = nil
+press()
+release()
+stub.advance(0.2)
+local card = stub.webviews[#stub.webviews]
+check("a click on a puppet with a plan opens its card", card ~= nil and card.shown)
+check("the card shows the plan", card and card.html_:find("Fixed the typo.", 1, true) ~= nil)
+check("the card's click selects no tab", stub.selected == nil)
+check("the card sits on the screen", card and card.frame_.x >= 0 and card.frame_.y >= 0
+  and card.frame_.x + card.frame_.w <= 1440 and card.frame_.y + card.frame_.h <= 900)
+card.content.callback({ body = "focus" })
+stub.advance(0.2)
+check("the card's Go to terminal selects the tab", stub.selected == "/dev/ttys001")
+check("and closes the card", card.deleted)
+
+press()
+release()
+stub.advance(0.2)
+local second = stub.webviews[#stub.webviews]
+second.content.callback({ body = "close" })
+check("Close closes the card", second.deleted and not P.planCard:isShown())
+
+-- An empty plan has nothing to read: the click goes to the terminal as before.
+planFile = io.open(plansDir .. "/tab1.json", "w")
+planFile:write('{"steps": []}')
+planFile:close()
+write("PreToolUse|tab1||TodoWrite|||app|iTerm.app|plan|/dev/ttys001|claude|")
+stub.advance(0.2)
+local views = #stub.webviews
+stub.selected = nil
+press()
+release()
+stub.advance(0.2)
+check("an empty plan: the click selects the tab", stub.selected == "/dev/ttys001")
+check("an empty plan: no card", #stub.webviews == views)
+os.execute("rm -rf '" .. plansDir .. "'")
+
 os.remove(eventsFile)
 check.done("click")
