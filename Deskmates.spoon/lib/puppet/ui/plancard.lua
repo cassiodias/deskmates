@@ -187,6 +187,9 @@ function plancard.html(plan, meta)
     ".contents { margin-bottom: 14px; } .contents button { display: block; width: 100%; text-align: left; background: none;",
     " border: 0; padding: 3px 4px; border-radius: 4px; color: inherit; font: inherit; cursor: pointer; }",
     ".contents button:hover { background: var(--faint); }",
+    "article::after { content: ''; display: block; height: 70vh; }",
+    "h2 { scroll-margin-top: 8px; border-radius: 4px; } h2.here { animation: here 1.4s ease-out; }",
+    "@keyframes here { from { background: color-mix(in srgb, var(--accent) 30%, transparent); } to { background: transparent; } }",
     "@media (max-width: 559px) { .layout { display: flex; flex-direction: column; overflow: auto; }",
     " aside { display: contents; } .contents { order: 1; padding: 10px 14px 0; }",
     " article { order: 2; overflow: visible; } .checklist { order: 3; padding: 0 14px 10px; } }",
@@ -223,13 +226,14 @@ function plancard.html(plan, meta)
 end
 
 -- The page's one script: its buttons and Esc tell the Spoon, through the "deskmates" message handler; a click
--- in the contents scrolls to its section, inside the page.
+-- in the contents scrolls to its section, inside the page, and lights its heading up.
 plancard.SCRIPT = "function send(m){window.webkit.messageHandlers.deskmates.postMessage(m)}"
   .. "document.getElementById('focus').onclick=function(){send('focus')};"
   .. "document.getElementById('close').onclick=function(){send('close')};"
   .. "document.addEventListener('keydown',function(e){if(e.key==='Escape')send('close')});"
   .. "document.querySelectorAll('[data-to]').forEach(function(b){b.onclick=function(){"
-  .. "var t=document.getElementById(b.getAttribute('data-to'));if(t)t.scrollIntoView({block:'start'})}});"
+  .. "var t=document.getElementById(b.getAttribute('data-to'));if(!t)return;t.scrollIntoView({block:'start'});"
+  .. "t.classList.remove('here');void t.offsetWidth;t.classList.add('here')}});"
 
 local PlanCard = {}
 PlanCard.__index = PlanCard
@@ -268,7 +272,12 @@ function PlanCard:show(key, plan, meta)
     end
   end)
   local size = plancard.fitSize(self.loadSize and self.loadSize())
-  local view = hs.webview.new(self.frameFor(key, size.w, size.h), { developerExtrasEnabled = false }, content)
+  local rect = self.frameFor(key, size.w, size.h)
+  local view = hs.webview.new(rect, { developerExtrasEnabled = false }, content)
+  -- new() takes the page's rect, but frame() and frameChange give the window's, title bar included: keep
+  -- the difference, so the size saved is the page's and the card does not grow each time it opens.
+  local outer = view:frame()
+  local chromeW, chromeH = outer.w - rect.w, outer.h - rect.h
   view:windowStyle({ "titled", "closable", "utility", "resizable" })
   view:windowTitle(meta.title or "Plan")
   view:allowTextEntry(true)
@@ -285,7 +294,7 @@ function PlanCard:show(key, plan, meta)
     elseif action == "focusChange" and state == false then
       self:hide()
     elseif action == "frameChange" and type(state) == "table" and self.saveSize then
-      self.saveSize(plancard.fitSize({ w = state.w, h = state.h }))
+      self.saveSize(plancard.fitSize({ w = state.w - chromeW, h = state.h - chromeH }))
     end
   end)
   view:html(plancard.html(plan, meta))

@@ -48,6 +48,7 @@ end
 -- Web views the Spoon opens are kept in stub.webviews; a page's message is view.content.callback({ body = … }),
 -- its window's style is view.style_ and its window callback view.windowCallback_.
 stub.webviews = {}
+stub.titleBar = 0      -- the height a web view's title bar adds to its window
 local function webview(frame, _, content)
   local v = { frame_ = frame, content = content, shown = false, deleted = false }
   for _, name in ipairs({ "windowTitle", "allowTextEntry", "deleteOnClose", "level", "policyCallback", "bringToFront" }) do
@@ -59,6 +60,11 @@ local function webview(frame, _, content)
   function v:show() self.shown = true return self end
   function v:hide() self.shown = false return self end
   function v:hswindow() return nil end
+  -- As Hammerspoon does: new() takes the content's rect, frame() gives the window's, title bar included.
+  function v:frame()
+    local f = self.frame_
+    return { x = f.x, y = f.y - stub.titleBar, w = f.w, h = f.h + stub.titleBar }
+  end
   function v:delete() self.deleted = true self.shown = false end
   stub.webviews[#stub.webviews + 1] = v
   return v

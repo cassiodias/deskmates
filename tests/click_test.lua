@@ -166,6 +166,23 @@ local junk = openCard()
 check("a junk size gives the default", junk.frame_.w == 600 and junk.frame_.h == 560)
 closeCard(junk)
 
+-- Hammerspoon reports the window's frame, title bar included, as soon as the card shows: opening the card
+-- again and again must not make it grow.
+stub.titleBar = 19
+stub.settings["Deskmates.cardSize"] = { w = 700, h = 500 }
+for _ = 1, 3 do
+  local view = openCard()
+  view.windowCallback_("frameChange", view, view:frame())
+  closeCard(view)
+end
+local kept = stub.settings["Deskmates.cardSize"]
+check("reopening the card does not make it grow", kept.w == 700 and kept.h == 500)
+local grown = openCard()
+grown.windowCallback_("frameChange", grown, { x = 0, y = 0, w = 800, h = 619 })
+check("a resize saves the card's own size, not its window's", stub.settings["Deskmates.cardSize"].h == 600)
+closeCard(grown)
+stub.titleBar = 0
+
 -- An empty plan has nothing to read: the click goes to the terminal as before.
 planFile = io.open(plansDir .. "/tab1.json", "w")
 planFile:write('{"steps": []}')

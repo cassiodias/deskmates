@@ -140,7 +140,7 @@ check("file map: escaped", has(nasty, "<code>a/&lt;b&gt;.sh</code>") and has(nas
 local api = plancard.html({ steps = {}, markdown = "## API\n\n- POST /a → 201" }, { title = "x" })
 check("endpoints: drawn", has(api, 'class="method post">POST<') and has(api, "<code>/a</code>") and has(api, 'class="status">201<')
   and has(api, '<details class="source">'))
-local rude = plancard.html({ steps = {}, markdown = "POST /a/<x> → 201 <b>" }, { title = "x" })
+local rude = plancard.html({ steps = {}, markdown = "POST /a/<x> → 201 — <b>" }, { title = "x" })
 check("endpoints: escaped", has(rude, "<code>/a/&lt;x&gt;</code>") and not has(rude, "<b>"))
 
 -- Review fix: a long first paragraph stays in the plan, whole, instead of a clipped summary.
@@ -149,5 +149,10 @@ local longPage = plancard.html({ steps = {}, markdown = "# Title\n\n" .. long },
 check("page: a long first paragraph is no summary", not has(longPage, 'class="summary"')
   and has(longPage:match("<article>(.-)</article>") or "", "at length."))
 check("page: no summary is clipped", not has(longPage, "line-clamp"))
+
+-- A click in the contents always shows something: the last section can scroll to the top, and the heading it
+-- went to lights up for a moment.
+check("contents: room to scroll the last section to the top", has(full, "article::after"))
+check("contents: the heading clicked lights up", has(plancard.SCRIPT, "classList.add('here')") and has(full, "h2.here"))
 
 check.done("plan card")

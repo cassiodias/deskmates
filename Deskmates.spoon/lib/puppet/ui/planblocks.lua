@@ -186,10 +186,13 @@ end
 local METHODS = { GET = true, POST = true, PUT = true, PATCH = true, DELETE = true }
 
 -- One line as an endpoint: { method, path, status (three digits after → or ->, or nil), note }, or nil.
--- Backticks are dropped first; the method must be in capitals and the path start with /.
+-- Backticks are dropped first; the method must be in capitals, the path start with /, and anything after the
+-- path or status follow a separator ("POST /a → 201 — makes one"), or the line is a sentence.
 function planblocks.endpoint(line)
   local method, path, rest = line:gsub("`", ""):match("^%s*(%u+)%s+(/%S*)(.*)$")
   if not method or not METHODS[method] then return nil end
+  local colon = path:match("[:,;]$")
+  if colon then path, rest = path:sub(1, -2), colon .. rest end
   rest = trim(rest)
   local status, after
   for _, arrow in ipairs({ "→", "->" }) do
@@ -198,6 +201,8 @@ function planblocks.endpoint(line)
       if status then rest = after break end
     end
   end
+  -- What follows is a note only after a separator; words straight after it make a sentence, not an endpoint.
+  if not separated(rest) and not (rest:sub(1, #"→") == "→" or rest:sub(1, 2) == "->") then return nil end
   return { method = method, path = path, status = status, note = clean(rest) }
 end
 

@@ -127,4 +127,9 @@ check("file map: a word joined by a hyphen is no badge",
 check("file map: a badge alone in its cell", same(rows(only("| Path | What |\n|---|---|\n| `a/b.sh` | new |", "filemap")),
   { { "a/b.sh", "new", "" } }))
 
+-- A sentence that starts with an endpoint is prose, not an endpoint row (seen live).
+check("endpoint: a sentence after the path is no endpoint", ep("DELETE /api/comments/{id} needs a clear ownership rule") == nil
+  and ep("`DELETE /api/comments/{id}` needs a rule") == nil and ep("GET /health returns 200 when up") == nil)
+check("endpoint: a note after a separator is kept", same(ep("DELETE /api/x: only the author"), { "DELETE", "/api/x", false, "only the author" }))
+
 check.done("plan blocks")
