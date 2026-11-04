@@ -7,7 +7,7 @@ local planblocks = require("puppet.ui.planblocks")
 
 local plancard = {}
 
-local WIDTH, HEIGHT = 440, 520
+local WIDTH, HEIGHT = 600, 560
 
 local function escape(text)
   return (text:gsub("[&<>\"']", { ["&"] = "&amp;", ["<"] = "&lt;", [">"] = "&gt;", ['"'] = "&quot;", ["'"] = "&#39;" }))
@@ -78,51 +78,102 @@ end
 
 local MARKS = { done = "☑", active = "▶", pending = "☐" }
 
+-- The plan's title and summary (its first heading when that is a `#` one and the paragraph after it, lifted into the header), and
+-- the rest of its blocks, with an id on each `##` heading for the contents.
+local function split(markdown)
+  local blocks = planblocks.parse(markdown or "")
+  local title, summary, first = nil, nil, 1
+  if blocks[1] and blocks[1].kind == "heading" and blocks[1].level == 1 then
+    title, first = blocks[1].text, 2
+    if blocks[2] and blocks[2].kind == "paragraph" then summary, first = table.concat(blocks[2].lines, " "), 3 end
+  end
+  local rest, sections = {}, {}
+  for i = first, #blocks do
+    local block = blocks[i]
+    if block.kind == "heading" and block.level == 2 then
+      sections[#sections + 1] = block.text
+      rest[#rest + 1] = '<h2 id="sec-' .. #sections .. '">' .. inline(block.text) .. "</h2>"
+    else
+      rest[#rest + 1] = plancard.block(block)
+    end
+  end
+  return title, summary, table.concat(rest, "\n"), sections
+end
+
 -- The whole page for `plan` (model/plans.lua's shape); meta.title names the session, meta.color is its puppet's.
 function plancard.html(plan, meta)
   local nonce = string.format("%08x%08x", math.random(0, 0x7fffffff), math.random(0, 0x7fffffff))
   local color = (meta.color or ""):match("^#%x%x%x%x%x%x$") or "#888888"
-  local body = {}
+  local steps = plan.steps or {}
   local done = 0
-  for _, step in ipairs(plan.steps or {}) do if step.status == "done" then done = done + 1 end end
-  body[#body + 1] = "<header><h2>" .. escape(meta.title or "Plan") .. "</h2>"
-  if #(plan.steps or {}) > 0 then body[#body + 1] = '<span class="count">' .. done .. "/" .. #plan.steps .. "</span>" end
-  body[#body + 1] = "</header><main>"
-  if #(plan.steps or {}) > 0 then
+  for _, step in ipairs(steps) do if step.status == "done" then done = done + 1 end end
+  local title, summary, article, sections = split(plan.markdown)
+
+  local body = { '<header><div class="label">PLAN</div><h1 class="title">', escape(title or meta.title or "Plan"), "</h1>" }
+  if summary then body[#body + 1] = '<p class="summary">' .. inline(summary) .. "</p>" end
+  if #steps > 0 then
+    body[#body + 1] = '<div class="progress"><progress value="' .. done .. '" max="' .. #steps .. '"></progress>'
+      .. '<span class="count">' .. done .. "/" .. #steps .. "</span></div>"
+  end
+  body[#body + 1] = "</header>"
+
+  local aside = {}
+  if #sections >= 2 then
+    aside[#aside + 1] = '<nav class="contents"><div class="label">ON THIS PLAN</div>'
+    for n, text in ipairs(sections) do
+      aside[#aside + 1] = '<button data-to="sec-' .. n .. '">' .. inline(text) .. "</button>"
+    end
+    aside[#aside + 1] = "</nav>"
+  end
+  if #steps > 0 then
     local items = {}
-    for _, step in ipairs(plan.steps) do
+    for _, step in ipairs(steps) do
       items[#items + 1] = '<li class="' .. step.status .. '"><span class="mark">' .. MARKS[step.status] .. "</span>"
         .. escape(step.title) .. "</li>"
     end
-    body[#body + 1] = '<ul class="steps">' .. table.concat(items) .. "</ul>"
+    aside[#aside + 1] = '<section class="checklist"><div class="label">CHECKLIST</div><ul class="steps">'
+      .. table.concat(items) .. "</ul></section>"
   end
-  if plan.markdown and plan.markdown ~= "" then
-    body[#body + 1] = '<article>' .. plancard.markdown(plan.markdown) .. "</article>"
-  end
-  body[#body + 1] = '</main><footer><button id="focus">Go to terminal</button><button id="close">Close</button></footer>'
+  body[#body + 1] = '<div class="layout' .. (#aside == 0 and " solo" or "") .. '">'
+  if #aside > 0 then body[#body + 1] = "<aside>" .. table.concat(aside) .. "</aside>" end
+  body[#body + 1] = "<article>" .. article .. "</article></div>"
+  body[#body + 1] = '<footer><button id="focus">Go to terminal</button><button id="close">Close</button></footer>'
+
+  local faint = "color-mix(in srgb, CanvasText 15%, transparent)"
   return table.concat({
     '<!doctype html><html><head><meta charset="utf-8">',
     "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; ",
     "script-src 'nonce-", nonce, "'\">",
     "<style>",
-    ":root { --accent: ", color, "; color-scheme: light dark; }",
+    ":root { --accent: ", color, "; --faint: ", faint, "; color-scheme: light dark; }",
     "body { margin: 0; font: 13px -apple-system, sans-serif; background: Canvas; color: CanvasText;",
     " display: flex; flex-direction: column; height: 100vh; border-top: 4px solid var(--accent); }",
-    "header { display: flex; align-items: baseline; gap: 8px; padding: 10px 14px 4px; }",
-    "header h2 { font-size: 14px; margin: 0; flex: 1; }",
-    ".count { color: var(--accent); font-weight: 600; }",
-    "main { overflow: auto; padding: 0 14px 10px; flex: 1; }",
-    ".steps { list-style: none; padding: 0; margin: 6px 0 12px; }",
+    ".label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; opacity: 0.55; margin-bottom: 4px; }",
+    "header { padding: 10px 14px 8px; border-bottom: 1px solid var(--faint); }",
+    "header .title { font-size: 16px; margin: 0; }",
+    ".summary { margin: 4px 0 0; opacity: 0.8; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }",
+    ".progress { display: flex; align-items: center; gap: 8px; margin-top: 6px; }",
+    "progress { flex: 1; accent-color: var(--accent); } .count { color: var(--accent); font-weight: 600; }",
+    ".layout { flex: 1; min-height: 0; display: grid; grid-template-columns: 180px 1fr; }",
+    ".layout.solo { grid-template-columns: 1fr; }",
+    "aside { overflow: auto; padding: 10px 10px 10px 14px; border-right: 1px solid var(--faint); }",
+    "article { overflow: auto; padding: 0 14px 10px; }",
+    ".contents { margin-bottom: 14px; } .contents button { display: block; width: 100%; text-align: left; background: none;",
+    " border: 0; padding: 3px 4px; border-radius: 4px; color: inherit; font: inherit; cursor: pointer; }",
+    ".contents button:hover { background: var(--faint); }",
+    "@media (max-width: 559px) { .layout { display: flex; flex-direction: column; overflow: auto; }",
+    " aside { display: contents; } .contents { order: 1; padding: 10px 14px 0; }",
+    " article { order: 2; overflow: visible; } .checklist { order: 3; padding: 0 14px 10px; } }",
+    ".steps { list-style: none; padding: 0; margin: 0; }",
     ".steps li { padding: 3px 0; } .steps .mark { display: inline-block; width: 20px; color: var(--accent); }",
     ".steps .done { opacity: 0.6; text-decoration: line-through; } .steps .active { font-weight: 600; }",
-    "article { border-top: 1px solid color-mix(in srgb, CanvasText 15%, transparent); padding-top: 4px; }",
     "pre { background: color-mix(in srgb, CanvasText 7%, transparent); padding: 8px; overflow: auto; border-radius: 6px; }",
     "code { font: 12px Menlo, monospace; } table { border-collapse: collapse; }",
     "th, td { border: 1px solid color-mix(in srgb, CanvasText 20%, transparent); padding: 3px 6px; text-align: left; }",
     "blockquote { margin: 0; padding-left: 10px; border-left: 3px solid var(--accent); opacity: 0.8; }",
     ".link { text-decoration: underline; }",
-    "footer { display: flex; gap: 8px; justify-content: flex-end; padding: 8px 14px; }",
-    "button { font: inherit; padding: 4px 12px; }",
+    "footer { display: flex; gap: 8px; justify-content: flex-end; padding: 8px 14px; border-top: 1px solid var(--faint); }",
+    "footer button { font: inherit; padding: 4px 12px; }",
     "#focus { background: var(--accent); color: white; border: 0; border-radius: 5px; }",
     "</style></head><body>",
     table.concat(body),
@@ -131,11 +182,14 @@ function plancard.html(plan, meta)
   })
 end
 
--- The page's one script: its buttons and Esc tell the Spoon, through the "deskmates" message handler.
+-- The page's one script: its buttons and Esc tell the Spoon, through the "deskmates" message handler; a click
+-- in the contents scrolls to its section, inside the page.
 plancard.SCRIPT = "function send(m){window.webkit.messageHandlers.deskmates.postMessage(m)}"
   .. "document.getElementById('focus').onclick=function(){send('focus')};"
   .. "document.getElementById('close').onclick=function(){send('close')};"
   .. "document.addEventListener('keydown',function(e){if(e.key==='Escape')send('close')});"
+  .. "document.querySelectorAll('[data-to]').forEach(function(b){b.onclick=function(){"
+  .. "var t=document.getElementById(b.getAttribute('data-to'));if(t)t.scrollIntoView({block:'start'})}});"
 
 local PlanCard = {}
 PlanCard.__index = PlanCard

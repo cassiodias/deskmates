@@ -65,11 +65,11 @@ local page = plancard.html({
   },
   markdown = "# Plan\n\n</script><script>alert(1)</script>",
 }, { title = "my-app <b>", color = "#D97757" })
-check("page: the title, escaped", has(page, "my-app &lt;b&gt;"))
+check("page: the title, escaped", has(plancard.html({ steps = {}, markdown = "Text." }, { title = "my-app <b>" }), "my-app &lt;b&gt;"))
 check("page: the checklist with its marks", has(page, "☑") and has(page, "▶") and has(page, "☐"))
 check("page: a step's title escaped", has(page, "Fix &lt;it&gt;"))
 check("page: progress", has(page, "1/3"))
-check("page: the plan", has(page, "<h1>Plan</h1>"))
+check("page: the plan's heading is its title", has(page, 'class="title">Plan<'))
 local scripts = 0
 for _ in page:gmatch("<script") do scripts = scripts + 1 end
 check("page: only its own script", scripts == 1)
@@ -79,5 +79,43 @@ check("page: the colour only as a colour", has(page, "#D97757"))
 local odd = plancard.html({ steps = {} }, { title = "x", color = 'red;}</style><script>' })
 check("page: a colour that is not one is dropped", not has(odd, "</style><script>"))
 check("page: no steps, no checklist", not has(plancard.html({ steps = {}, markdown = "# P" }, { title = "x" }), "☐"))
+
+-- The page reads like a plan: a header, its sections, the checklist beside it.
+local STEPS = {
+  { id = "1", title = "Write the failing test", status = "done" },
+  { id = "2", title = "Add the flag", status = "active" },
+  { id = "3", title = "Run the tests", status = "pending" },
+}
+local function count(text, what)
+  local n, at = 0, 1
+  while true do
+    local s, e = text:find(what, at, true)
+    if not s then return n end
+    n, at = n + 1, e + 1
+  end
+end
+local full = plancard.html({ steps = STEPS,
+  markdown = "# Add a --version flag\n\n`bin/deskmates --version` prints it.\n\n## Files\n\n- a\n\n## Steps\n\n- b" },
+  { title = "my-app", color = "#D97757" })
+local header = full:match("<header>(.-)</header>") or ""
+local article = full:match("<article>(.-)</article>") or ""
+check("page: the label", has(header, ">PLAN<"))
+check("page: the plan's heading is the title", has(header, "Add a --version flag") and not has(full, "<h1>"))
+check("page: the first paragraph is the summary", has(header, '<p class="summary"><code>bin/deskmates --version</code> prints it.</p>')
+  and count(full, "prints it.") == 1)
+check("page: a progress bar", has(header, '<progress value="1" max="3">') and has(header, "1/3"))
+check("page: contents from ## headings", has(article, '<h2 id="sec-1">Files</h2>') and has(article, '<h2 id="sec-2">Steps</h2>')
+  and has(full, 'data-to="sec-1">Files</button>') and has(full, 'data-to="sec-2">Steps</button>'))
+check("page: the contents scroll, never navigate", has(plancard.SCRIPT, "scrollIntoView") and not has(full, "href"))
+local aside, checklist, art = full:find("<aside>", 1, true), full:find('class="checklist"', 1, true), full:find("<article>", 1, true)
+check("page: the checklist sits in the aside, after the contents", aside and checklist and art
+  and aside < checklist and checklist < art and full:find("data-to", 1, true) < checklist)
+local plain = plancard.html({ steps = {}, markdown = "## Context\n\nWhy." }, { title = "my-app" })
+check("page: no heading first, the session's title and no summary", has(plain:match("<header>(.-)</header>") or "", "my-app")
+  and not has(plain, 'class="summary"') and has(plain, "<p>Why.</p>"))
+check("page: no steps, no progress", not has(plain, "<progress"))
+check("page: one ## heading, no contents", not has(plancard.html({ steps = {}, markdown = "# T\n\n## Only" }, { title = "x" }), "data-to=\""))
+local hostile = plancard.html({ steps = {}, markdown = "## a <script>x</script>\n\n## b" }, { title = "x" })
+check("page: a heading in the contents is escaped", has(hostile, "a &lt;script&gt;x&lt;/script&gt;</button>") and count(hostile, "<script") == 1)
 
 check.done("plan card")
