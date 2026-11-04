@@ -78,6 +78,14 @@ function plancard.block(block)
     end
     return '<div class="filemap">' .. (block.titled and "" or '<div class="label">FILES</div>')
       .. table.concat(rows) .. source(block) .. "</div>"
+  elseif kind == "endpoints" then
+    local rows = {}
+    for _, r in ipairs(block.rows) do
+      rows[#rows + 1] = '<div class="endpoint"><span class="method ' .. r.method:lower() .. '">' .. r.method
+        .. "</span><code>" .. escape(r.path) .. '</code><span class="status">' .. (r.status or "")
+        .. '</span><span class="note">' .. inline(r.note) .. "</span></div>"
+    end
+    return '<div class="endpoints">' .. table.concat(rows) .. source(block) .. "</div>"
   end
   return ""
 end
@@ -193,6 +201,12 @@ function plancard.html(plan, meta)
     ".badge.new { color: #2e9d4e; background: color-mix(in srgb, #2e9d4e 15%, transparent); }",
     ".badge.edit { color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); }",
     ".badge.delete { color: #d0453a; background: color-mix(in srgb, #d0453a 15%, transparent); }",
+    ".endpoints { margin: 8px 0; } .endpoint { display: grid; grid-template-columns: 58px minmax(0, max-content) 36px 1fr;",
+    " gap: 8px; align-items: baseline; padding: 3px 0; border-bottom: 1px solid var(--faint); }",
+    ".endpoint code { overflow-wrap: anywhere; } .status { font: 600 12px Menlo, monospace; opacity: 0.8; }",
+    ".method { --m: #3a7bd5; font: 700 10px Menlo, monospace; text-align: center; border-radius: 4px; padding: 2px 4px;",
+    " color: var(--m); background: color-mix(in srgb, var(--m) 15%, transparent); }",
+    ".method.post { --m: #2e9d4e; } .method.put, .method.patch { --m: #c98a12; } .method.delete { --m: #d0453a; }",
     ".source { margin-top: 4px; font-size: 11px; } .source summary { cursor: pointer; opacity: 0.55; }",
     "footer { display: flex; gap: 8px; justify-content: flex-end; padding: 8px 14px; border-top: 1px solid var(--faint); }",
     "footer button { font: inherit; padding: 4px 12px; }",

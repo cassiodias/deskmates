@@ -169,8 +169,40 @@ function planblocks.fileMap(block, context)
   return nil
 end
 
+local METHODS = { GET = true, POST = true, PUT = true, PATCH = true, DELETE = true }
+
+-- One line as an endpoint: { method, path, status (three digits after → or ->, or nil), note }, or nil.
+-- Backticks are dropped first; the method must be in capitals and the path start with /.
+function planblocks.endpoint(line)
+  local method, path, rest = line:gsub("`", ""):match("^%s*(%u+)%s+(/%S*)(.*)$")
+  if not method or not METHODS[method] then return nil end
+  rest = trim(rest)
+  local status, after
+  for _, arrow in ipairs({ "→", "->" }) do
+    if rest:sub(1, #arrow) == arrow then
+      status, after = rest:sub(#arrow + 1):match("^%s*(%d%d%d)%f[%D](.*)$")
+      if status then rest = after break end
+    end
+  end
+  return { method = method, path = path, status = status, note = clean(rest) }
+end
+
+-- A paragraph whose every line, or a list whose every item, is an endpoint:
+-- { kind = "endpoints", rows = { endpoint }, source }. Nil for anything else.
+function planblocks.endpoints(block)
+  local lines = block.kind == "paragraph" and block.lines or block.kind == "list" and block.items
+  if not lines or #lines == 0 then return nil end
+  local rows = {}
+  for _, line in ipairs(lines) do
+    local row = planblocks.endpoint(line)
+    if not row then return nil end
+    rows[#rows + 1] = row
+  end
+  return { kind = "endpoints", rows = rows, source = block.source }
+end
+
 -- The recognisers, in the order they are tried.
-planblocks.RECOGNISERS = { planblocks.fileMap }
+planblocks.RECOGNISERS = { planblocks.fileMap, planblocks.endpoints }
 
 -- The blocks with each one a recogniser knows replaced by the block it lifts; the rest as they were.
 function planblocks.lift(blocks)

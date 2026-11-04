@@ -136,4 +136,11 @@ check("file map: a table of files gets its label", has(plancard.html({ steps = {
 local nasty = plancard.html({ steps = {}, markdown = "## Files\n\n- `a/<b>.sh` — <i>x</i>" }, { title = "x" })
 check("file map: escaped", has(nasty, "<code>a/&lt;b&gt;.sh</code>") and has(nasty, "&lt;i&gt;x&lt;/i&gt;") and not has(nasty, "<i>"))
 
+-- Endpoint rows, drawn from escaped text.
+local api = plancard.html({ steps = {}, markdown = "## API\n\n- POST /a → 201" }, { title = "x" })
+check("endpoints: drawn", has(api, 'class="method post">POST<') and has(api, "<code>/a</code>") and has(api, 'class="status">201<')
+  and has(api, '<details class="source">'))
+local rude = plancard.html({ steps = {}, markdown = "POST /a/<x> → 201 <b>" }, { title = "x" })
+check("endpoints: escaped", has(rude, "<code>/a/&lt;x&gt;</code>") and not has(rude, "<b>"))
+
 check.done("plan card")

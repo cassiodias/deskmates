@@ -98,4 +98,19 @@ check("file map: a word that is no badge stays in the note", same(rows(only("## 
   { { "tests/x_test.lua", false, "Test" } }))
 check("file map: what is not lifted is left as it was", same(lifted("# T\n\ntext"), planblocks.parse("# T\n\ntext")))
 
+-- Endpoint rows: a method, a path, maybe a status.
+local function ep(line)
+  local e = planblocks.endpoint(line)
+  return e and { e.method, e.path, e.status or false, e.note }
+end
+check("endpoint: method, path, status", same(ep("POST /api/posts/{id}/comments → 201"), { "POST", "/api/posts/{id}/comments", "201", "" }))
+check("endpoint: in backticks, ascii arrow, a note", same(ep("`GET /api/posts` -> 200 — lists them"), { "GET", "/api/posts", "200", "lists them" }))
+check("endpoint: no status", same(ep("DELETE /api/x"), { "DELETE", "/api/x", false, "" }))
+check("endpoint: look-alikes stay text", ep("We GET /x later") == nil and ep("POST the form") == nil and ep("get /x") == nil)
+check("endpoint: a status that is not three digits is a note", same(ep("POST /x → 20"), { "POST", "/x", false, "→ 20" }))
+local eps = only("- POST /a → 201\n- GET /a", "endpoints")
+check("endpoints: a list of them", eps ~= nil and #eps.rows == 2 and eps.rows[1].method == "POST" and eps.rows[2].path == "/a")
+check("endpoints: a paragraph of them", only("PUT /a → 200\nPATCH /a", "endpoints") ~= nil)
+check("endpoints: a mixed list stays a list", only("- POST /a\n- then deploy", "endpoints") == nil and only("- POST /a\n- then deploy", "list") ~= nil)
+
 check.done("plan blocks")
