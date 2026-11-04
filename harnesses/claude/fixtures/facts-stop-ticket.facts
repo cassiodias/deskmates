@@ -1,0 +1,39 @@
+{
+  "current": "ABC-12",
+  "tickets": {
+    "ABC-12": {
+      "seen": 0,
+      "phase": "dev",
+      "phaseAt": 0,
+      "phases": {
+        "dev": 0
+      }
+    },
+    "ABC-34": {
+      "seen": 0
+    }
+  },
+  "timeline": [
+    {
+      "at": 0,
+      "ticket": "ABC-34",
+      "kind": "reply",
+      "text": "ABC-34 is built and committed locally.",
+      "phase": null
+    },
+    {
+      "at": 0,
+      "ticket": "ABC-12",
+      "kind": "skill",
+      "text": "my-developer",
+      "phase": "dev"
+    },
+    {
+      "at": 0,
+      "ticket": "ABC-12",
+      "kind": "phase",
+      "text": "dev",
+      "phase": "dev"
+    }
+  ]
+}

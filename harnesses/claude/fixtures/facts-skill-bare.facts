@@ -1,0 +1,28 @@
+{
+  "tickets": {
+    "-": {
+      "seen": 0,
+      "phase": "review",
+      "phaseAt": 0,
+      "phases": {
+        "review": 0
+      }
+    }
+  },
+  "timeline": [
+    {
+      "at": 0,
+      "ticket": "-",
+      "kind": "skill",
+      "text": "my-reviewer",
+      "phase": "review"
+    },
+    {
+      "at": 0,
+      "ticket": "-",
+      "kind": "phase",
+      "text": "review",
+      "phase": "review"
+    }
+  ]
+}

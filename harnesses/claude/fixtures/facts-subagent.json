@@ -1,0 +1,12 @@
+{
+  "session_id": "s1",
+  "cwd": "/Users/dev/workspace/my-app",
+  "transcript_path": "/tmp/t.jsonl",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Agent",
+  "tool_input": {
+    "description": "Implement ABC-12 via my-developer",
+    "prompt": "a long private brief that must not be kept",
+    "subagent_type": "general-purpose"
+  }
+}

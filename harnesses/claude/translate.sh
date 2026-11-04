@@ -4,6 +4,7 @@
 
 . "$(dirname "$0")/../../hook/puppet-lib.sh"
 . "$(dirname "$0")/../../hook/plan-lib.sh"
+. "$(dirname "$0")/../../hook/facts-lib.sh"
 puppet_read_payload
 
 # Cursor runs Claude Code's hooks too, with its own payloads: its own harness writes those.
@@ -78,7 +79,43 @@ case "$event:$tool" in
     else set -- --arg md ""; fi
     plan_change '. as $p | ($p.tool_input.plan | if type == "string" and . != "" then . else $md end) as $m
       | if $m == "" then error("no plan") else $cur | .plan = {markdown: $m[0:100000], at: $now} end' "$@" ;;
-  SessionEnd:*) plan_delete "$session" ;;
+  SessionEnd:*) plan_delete "$session"; facts_delete "$session" ;;
+esac
+
+# The session's facts (hook/facts-lib.sh): its tickets, their phases and Jira status, and a short timeline, from
+# skills, subagents, Jira calls, test runs and replies. A test line keeps its test flag; the Spoon reads the
+# facts again on both.
+facts_change() {
+  facts_note "$session" "$@" 2>/dev/null && [ "$flag" != test ] && flag="facts"
+}
+case "$event:$tool" in
+  PreToolUse:Skill)
+    facts_change '(.tool_input.skill // "" | tostring) as $s | if $s == "" then null
+      else {kind: "skill", text: $s, from: ($s + " " + (.tool_input.args // "" | tostring)), moves: true} end' ;;
+  PreToolUse:Agent|PreToolUse:Task)
+    facts_change '(.tool_input.description // "" | tostring) as $d | if $d == "" then null
+      else {kind: "subagent", text: $d, from: $d, moves: true} end' ;;
+  PostToolUse:mcp__*Jira*)
+    # Its result: an object, {"content": [text blocks]}, text blocks, or a string; text only when it is JSON.
+    facts_change '(.tool_input.issueIdOrKey // "" | tostring) as $key
+      | .tool_response as $raw
+      | ($raw | type == "object" and (.isError == true or .success == false)) as $failed
+      | ($raw | if type == "object" and (.content | type) == "array" then .content else . end
+        | if type == "array" then (map(select(type == "object" and .type == "text") | .text) | first) else . end
+        | if type == "string" then (try fromjson catch null) else . end) as $r
+      | (if ($failed | not) and ($r | type) == "object" and $r.success != false and $r.isError != true
+         then ($r.statusName // $r.fields.status.name) else null end) as $s
+      | if ($key | tickets) != [$key] then null
+        elif ($s | type) == "string" and $s != "" then {kind: "jira", text: $s, jira: $s, ticket: $key, from: "", moves: true}
+        else {kind: null, ticket: $key, from: "", moves: true} end' ;;
+  PostToolUse:*|PostToolUseFailure:*)
+    if [ "$flag" = test ]; then
+      result=passed
+      [ "$event" = PostToolUseFailure ] && result=failed
+      facts_change '{kind: "tests", text: $result, from: "", moves: false}' --arg result "$result"
+    fi ;;
+  Stop:*)
+    [ -n "$text" ] && facts_change '{kind: "reply", text: $reply, from: $reply, moves: false}' --arg reply "$text" ;;
 esac
 
 write_event claude "$event" "$session" "$(field agent_id)" "$tool" "$(field agent_type)" "$text" \

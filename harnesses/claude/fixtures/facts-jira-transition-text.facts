@@ -1,0 +1,21 @@
+{
+  "current": "ABC-12",
+  "tickets": {
+    "ABC-12": {
+      "seen": 0,
+      "jira": {
+        "status": "In Dev",
+        "at": 0
+      }
+    }
+  },
+  "timeline": [
+    {
+      "at": 0,
+      "ticket": "ABC-12",
+      "kind": "jira",
+      "text": "In Dev",
+      "phase": null
+    }
+  ]
+}

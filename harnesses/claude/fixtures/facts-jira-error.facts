@@ -1,0 +1,9 @@
+{
+  "current": "ABC-12",
+  "tickets": {
+    "ABC-12": {
+      "seen": 0
+    }
+  },
+  "timeline": []
+}

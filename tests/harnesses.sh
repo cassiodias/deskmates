@@ -73,6 +73,38 @@ for parser in $parsers; do
       echo "harness $name left plans it should not have: '$plans'"
       failed=1
     fi
+    # <name>.facts is the facts file the jq pass must leave in the facts folder (its time left out), and an empty
+    # one means none may be left; without it the folder must hold no facts the case did not start with. Without
+    # jq (the plutil pass) a case may delete facts but never write them.
+    expected_facts="${payload%.json}.facts"
+    facts=$(cd "$work/.deskmates/facts" 2>/dev/null && ls)
+    facts_started=$(cd "${payload%.json}.home/.deskmates/facts" 2>/dev/null && ls)
+    if [ "$parser" = jq ] && [ -e "$expected_facts" ] && [ ! -s "$expected_facts" ]; then
+      if [ -n "$facts" ]; then
+        echo "harness $name left facts, expected none: '$facts'"
+        failed=1
+      fi
+    elif [ "$parser" = jq ] && [ -e "$expected_facts" ]; then
+      got_facts=$("$found_jq" -S 'del(.updatedAt)' "$work/.deskmates/facts/"*.json 2>/dev/null)
+      if [ "$facts" != "$(ls "$work/.deskmates/facts/" 2>/dev/null | head -n 1)" ] ||
+        [ "$got_facts" != "$("$found_jq" -S . "$expected_facts")" ]; then
+        echo "harness $name left the facts"
+        echo "$got_facts" | sed 's/^/  /'
+        echo "  expected"
+        "$found_jq" -S . "$expected_facts" | sed 's/^/  /'
+        failed=1
+      fi
+    elif [ "$parser" = plutil ] && [ -n "$facts" ] && [ "$facts" != "$facts_started" ]; then
+      echo "harness $name wrote facts without jq: '$facts'"
+      failed=1
+    elif [ "$parser" = plutil ] && [ -n "$facts" ] &&
+      ! cmp -s "$work/.deskmates/facts/$facts" "${payload%.json}.home/.deskmates/facts/$facts"; then
+      echo "harness $name changed facts without jq"
+      failed=1
+    elif [ "$parser" = jq ] && [ ! -e "$expected_facts" ] && [ -n "$facts" ] && [ "$facts" != "$facts_started" ]; then
+      echo "harness $name left facts it should not have: '$facts'"
+      failed=1
+    fi
     # Without a .stdout file the translator must print nothing: agents may read what it prints.
     expected_stdout=""
     [ -e "${payload%.json}.stdout" ] && expected_stdout=$(cat "${payload%.json}.stdout")
