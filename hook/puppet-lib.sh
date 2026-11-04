@@ -116,7 +116,8 @@ leading_command() {
 # test run. Scripts named test, or test-…, test_…, test:… count (npm run test:unit). Only the first 4000 bytes
 # count (as jq cuts a value): a command pasted whole, megabytes long, is judged at once.
 is_test_command() {
-  printf '%s\n' "$1" | head -c 4000 | awk '
+  # The syntax read here is ASCII, so the bytes are read as they are: a character the cut split stops nothing.
+  printf '%s\n' "$1" | head -c 4000 | LC_ALL=C awk '
     function base(word) { sub(/.*\//, "", word); return word }
     function isTest(word) { return word ~ /^test([-_:].*)?$/ }
     function isRunner(word) { return base(word) ~ /^(pytest|py\.test|unittest|jest|vitest|mocha|rspec|tox|phpunit)$/ }
@@ -189,9 +190,13 @@ is_test_command() {
           k = i + 2
           if (ch[k] == "-") k++
           while (ch[k] == " " || ch[k] == "\t") k++
-          if (ch[k] == "\"" || ch[k] == "\047") k++
-          delim = ""
-          while (k <= len && ch[k] ~ /[A-Za-z0-9_]/) delim = delim ch[k++]
+          quoted = ch[k] == "\"" || ch[k] == "\047"
+          if (quoted) k++
+          d = ""
+          while (k <= len && ch[k] ~ /[A-Za-z0-9_]/) d = d ch[k++]
+          # A delimiter is a quoted word or a name; "1<<3" in $((…)) is a shift, not a here-document.
+          if (!quoted && d !~ /^[A-Za-z_]/) { i++; continue }
+          delim = d
           if (ch[k] == "\"" || ch[k] == "\047") k++
           i = k - 1
         } else if (c == " " || c == "\t" || c == "\n" || c == ";" || c == "&" || c == "|" || c == "(" || c == ")") {

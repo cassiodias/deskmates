@@ -65,6 +65,16 @@ EOF
   expect "not a test command: $command" "$(is_test_command "$command" && echo yes)" ""
 done
 
+# The 4000-byte cut can split a character in two: the command is still read, and nothing goes to the agent.
+long=$(printf '%3985s' '' | tr ' ' a)
+expect "a cut inside a character still reads the command" \
+  "$(LC_ALL=en_US.UTF-8 is_test_command "pytest; echo \"${long}ééé\"" && echo yes)" yes
+expect "a cut inside a character prints nothing" \
+  "$(LC_ALL=en_US.UTF-8 is_test_command "pytest; echo \"${long}ééé\"" 2>&1 >/dev/null)" ""
+# An arithmetic shift is not a here-document: the next line is still read.
+expect "a shift in \$((…)) is not a here-document" "$(is_test_command "echo \$((1<<3))
+pytest" && echo yes)" yes
+
 # A huge command (a script pasted inline) is judged by its first 4000 bytes, as jq would have cut it, and soon:
 # reading a whole megabyte would keep the agent waiting minutes.
 expect "a test command past 4000 bytes is not seen" \
