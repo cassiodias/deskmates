@@ -40,18 +40,21 @@ harnesses/<agent>/            the hook side of one coding agent
   present.sh                  optional: are our hooks on, for a hooks file install-lib cannot read
   fixtures/                   payload samples and the exact line each must produce
 hook/puppet-lib.sh            shared by translators; the only code that writes the events file
+hook/plan-lib.sh              shared by translators whose agent plans: one neutral plan file per session
 hook/install-lib.sh           shared by install scripts: backups, merging and removing hooks in JSON files
 Deskmates.spoon/
   init.lua                    the Spoon's public variables, start/stop, and wiring
   lib/puppet/
     config.lua                sizes, timings, colours
     events/                   parse (line → event), reader (follows the file)
-    model/                    sessions (state per session), mapping (command → animation), status (in words)
+    model/                    sessions (state per session), mapping (command → animation), status (in words),
+                              plans (a session's plan file)
     harnesses/                the Spoon side of each agent, and the registry
     render/                   pixels, text, sprites (the creatures), and scenes/ (one file per animation)
     stage/                    the puppet windows and their bubbles
     terminals/                bringing a session's terminal forward; one look at what runs (liveness.lua)
     ui/menu.lua               the menu bar menu
+    ui/plancard.lua           the plan card a click opens
 tests/                        run.sh runs them all
 tools/screenshots/            makes the README's pictures
 ```
@@ -159,6 +162,10 @@ plutil alone.
 
 Have at least a Stop: without it the puppet never finishes a turn, and the contract test fails.
 
+For a plan (step 3): `NAME.plan` is the plan file the jq pass must leave (`updatedAt` aside), and an empty one
+means none may be left; without jq there is no plan, so the line without the `plan` flag goes in
+`NAME.nojq.line`. `@HOME@` in a payload is the case's home, for a file the agent names (Claude's plan file).
+
 A translator that keeps something between events (step 3) gets one fixture per step, with the state it starts
 from in `NAME.home/.deskmates/`. To check the steps chained in the orders you saw, add a script like
 `tests/cursor_turns.sh` that feeds fixtures in turn into one home, and a line for it in `tests/run.sh` (which
@@ -248,6 +255,11 @@ When the agent's events do not line up with the table (`harnesses/cursor/transla
 - **Another agent's payloads reach your translator** (step 1): drop them by a field only that agent sends
   (Claude's translator drops payloads with `cursor_version`).
 - **Two end-of-turn events for one turn** (Cursor on Ctrl-C: `aborted`, then `error`): write one `Stop`.
+- **A plan** (optional): when the agent keeps a checklist or writes a plan, source `hook/plan-lib.sh` and change
+  the session's plan with `plan_update <session> <agent> '<jq filter>'`: the payload is `.`, the current plan is
+  `$cur`, and the filter makes the whole new plan (`steps` of `{id, title, status: pending|active|done}`, and
+  `plan.markdown`). Write the line with the flag `plan` when it returns 0, and `plan_delete` on `SessionEnd`.
+  It writes nothing while Deskmates is off or without jq. Claude's translator is the example.
 
 ### 4. hooks.json, detect.sh, config.sh, install.sh, uninstall.sh
 
@@ -279,7 +291,8 @@ Make every script executable (`chmod +x`).
 
 - `id` (the name `write_event` writes) and `name` (shown in bubbles, like "Codex needs you").
 - `capabilities`: which of `prompt`, `tools`, `toolFailure`, `subagents`, `permission`, `question`, `reply`,
-  `sessionEnd`, `notification` the agent reports. Each `true` must have a fixture that shows it.
+  `sessionEnd`, `notification`, `plan` the agent reports. Each `true` must have a fixture that shows it (`plan`:
+  a line with the `plan` flag).
 - `character = { body = "…", palette = { colours } }`: the creature, and its colours: each session's puppet takes the first one no
   other puppet wears (five is plenty).
 - `toolKind(tool)`: `"reading"`, `"question"`, `"plan"`, `"skill"`, `"agent"` (starts a subagent) or `nil`.

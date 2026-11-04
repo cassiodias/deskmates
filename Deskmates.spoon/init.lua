@@ -102,6 +102,13 @@ function obj:handle(line)
   for _, intent in ipairs(intents) do self:say(intent.key, intent.text, intent.seconds) end
 end
 
+-- Deletes the plans no session needs: those of sessions it no longer knows, once they are hours old.
+function obj:sweepPlans()
+  local keep = {}
+  for sid in pairs(self.sessions.all) do keep[sid] = true end
+  plans.sweep(self.plansDir, keep, os.time(), config.STALE_SECONDS)
+end
+
 -- Marks that Deskmates runs, or no longer does.
 function obj:markOn(isOn)
   if not isOn then
@@ -377,6 +384,7 @@ function obj:start()
   self.replayFrom = os.time() - config.STALE_SECONDS
   self.reader:read(function(line) self:handle(line) end)
   self.replayFrom = nil
+  self:sweepPlans()
 
   if hs.settings.get(config.HIDDEN_KEY) then self.stage:toggle() end
   -- Named, so macOS keeps the place you ⌘-drag the icon to (out from behind the notch, say).
@@ -389,6 +397,7 @@ function obj:start()
     self:render()
   end)
   self.tabsTimer = hs.timer.doEvery(config.TABS_SECONDS, function() self:refreshLiveness() end)
+  self.sweepTimer = hs.timer.doEvery(3600, function() self:sweepPlans() end)
   self:refreshLiveness()
   self:render()
   return self
@@ -401,12 +410,13 @@ function obj:stop()
   self:markOn(false)
   if self.timer then self.timer:stop() end
   if self.tabsTimer then self.tabsTimer:stop() end
+  if self.sweepTimer then self.sweepTimer:stop() end
   if self.screenWatcher then self.screenWatcher:stop() end
   if self.dragTap then self.dragTap:stop() end
   if self.menu then self.menu:delete() end
   if self.stage then self.stage:removeAll() end
   if self.planCard then self.planCard:hide() end
-  self.timer, self.tabsTimer, self.dragTap, self.menu = nil, nil, nil, nil
+  self.timer, self.tabsTimer, self.sweepTimer, self.dragTap, self.menu = nil, nil, nil, nil, nil
   return self
 end
 

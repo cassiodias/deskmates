@@ -4,7 +4,9 @@
 #   time|event|session|agent id|tool|agent type|text|folder|terminal app|flag|tty|harness|title
 # Kept from an agent: a prompt's leading /command, a skill's name, a notification, the first sentence of the
 # agent's reply, and what the agent itself wrote to name the work: the session's title and a subagent's short
-# description. Never prompts, commands or code. Tests set PUPPET_NOW and PUPPET_TTY to make lines repeatable.
+# description. Never prompts, commands or code. An agent's plan is the one exception, and never on this line: it
+# lives in its own file only while the session does (hook/plan-lib.sh). Tests set PUPPET_NOW and PUPPET_TTY to
+# make lines repeatable.
 
 PUPPET_DIR="$HOME/.deskmates"
 PUPPET_EVENTS="$PUPPET_DIR/events"

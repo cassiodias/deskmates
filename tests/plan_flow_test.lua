@@ -77,6 +77,20 @@ check("a restart finds the plan again", Q.sessions.all.s1 and Q.sessions.all.s1.
   and Q.sessions.all.s1.plan.steps[2].status == "done")
 Q:stop()
 
+-- Start clears plans no session needs (old ones of sessions not on the desk), and so does the hourly timer.
+append(dir .. "/plans/gone.json", '{"steps": [], "updatedAt": 5}', "w")
+local T = dofile(stub.spoonPath .. "init.lua")
+T.eventsFile = eventsFile
+T.plansDir = dir .. "/plans"
+T.onFile = dir .. "/on"
+T:start()
+check("start sweeps an old plan of a session that is gone", read(dir .. "/plans/gone.json") == nil)
+check("start keeps a live session's plan", read(dir .. "/plans/s1.json") ~= nil)
+append(dir .. "/plans/later.json", '{"steps": [], "updatedAt": 5}', "w")
+stub.advance(3600)
+check("the hourly sweep clears it later", read(dir .. "/plans/later.json") == nil)
+T:stop()
+
 -- A first start, before any hook made the folder: the marker is still written.
 local R = dofile(stub.spoonPath .. "init.lua")
 R.eventsFile = eventsFile
