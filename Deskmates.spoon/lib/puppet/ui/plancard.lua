@@ -4,14 +4,13 @@
 -- buttons and Esc) is the only one its policy allows.
 
 local planblocks = require("puppet.ui.planblocks")
+local sessioncard = require("puppet.ui.sessioncard")
 
 local plancard = {}
 
 local WIDTH, HEIGHT = 600, 560
 
-local function escape(text)
-  return (text:gsub("[&<>\"']", { ["&"] = "&amp;", ["<"] = "&lt;", [">"] = "&gt;", ['"'] = "&quot;", ["'"] = "&#39;" }))
-end
+local escape = sessioncard.escape
 
 -- Bold, italic, code and links in one line of text, escaped first. Code is kept apart so its text stays as is.
 local function inline(text)
