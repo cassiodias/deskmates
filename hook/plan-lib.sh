@@ -32,20 +32,30 @@ plan_update() {
   deskmates_on || return 1
   [ -n "$PUPPET_JQ" ] || return 1
   file=$(plan_file "$1") || return 1
-  session=$1 harness=$2 filter=$3
+  start=$(printf '{"harness":"%s","session":"%s","steps":[]}' "$2" "$1")
+  filter=$3
   shift 3
-  (umask 077; mkdir -p "$PUPPET_PLANS") || return 1
+  deskmates_json_update "$file" "$start" 'type == "object"' "$filter" "$@"
+}
+
+# Changes JSON file $1 with jq filter $4, given the payload as `.` and the current file as $cur: the file when
+# it is JSON for which jq test $3 holds, else $2; more jq arguments may follow. The new file is kept only when
+# the filter makes an object (its updatedAt set to now): written to a temp file and moved into place, readable
+# by its owner only, one change at a time. False, and the file left as it was, when the filter fails.
+deskmates_json_update() {
+  file=$1 start=$2 valid=$3 filter=$4
+  shift 4
+  (umask 077; mkdir -p "${file%/*}") || return 1
   # Tool calls made together run their hooks at the same time: one change at a time, or one is lost.
-  plan_lock "$file"
-  start=$(printf '{"harness":"%s","session":"%s","steps":[]}' "$harness" "$session")
+  deskmates_lock "$file"
   cur=$start
-  [ -s "$file" ] && cur=$("$PUPPET_JQ" -c 'if type == "object" then . else error("not a plan") end' "$file" \
+  [ -s "$file" ] && cur=$("$PUPPET_JQ" -c "if $valid then . else error(\"not valid\") end" "$file" \
     2>/dev/null) || cur=$start
   written=1
   tmp=$(umask 077; mktemp "$file.XXXXXX") || { rmdir "$file.lock" 2>/dev/null; return 1; }
   if printf '%s' "$PUPPET_PAYLOAD" | "$PUPPET_JQ" -c --argjson cur "$cur" \
       --argjson now "${PUPPET_NOW:-$(date +%s)}" "$@" \
-      "($filter) | if type == \"object\" then .updatedAt = \$now else error(\"not a plan\") end" \
+      "($filter) | if type == \"object\" then .updatedAt = \$now else error(\"not an object\") end" \
       > "$tmp" 2>/dev/null && [ -s "$tmp" ]; then
     mv -f "$tmp" "$file" && written=0
   fi
@@ -54,9 +64,9 @@ plan_update() {
   return "$written"
 }
 
-# Takes the lock of plan file $1 (a folder beside it: mkdir either makes it or fails, at once). A lock still
-# there after about a second was left by a hook that was killed: it is taken over.
-plan_lock() {
+# Takes the lock of file $1 (a folder beside it: mkdir either makes it or fails, at once). A lock still there
+# after about a second was left by a hook that was killed: it is taken over.
+deskmates_lock() {
   tries=0
   until mkdir "$1.lock" 2>/dev/null; do
     tries=$((tries + 1))
