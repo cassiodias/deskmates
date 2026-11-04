@@ -61,7 +61,9 @@ EOF" "cat <<-'EOF' > plan.md
 npm test
 EOF
 )\"" \
-  "make -C test build" "sudo -u test ls"; do
+  "make -C test build" "sudo -u test ls" "cat <<\"1\" > notes.txt
+npm test
+1"; do
   expect "not a test command: $command" "$(is_test_command "$command" && echo yes)" ""
 done
 
