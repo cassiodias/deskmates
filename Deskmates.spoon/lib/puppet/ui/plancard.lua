@@ -3,6 +3,8 @@
 -- escaped before it is formatted, links show as text and are never followed, and the page's own script (its
 -- buttons and Esc) is the only one its policy allows.
 
+local planblocks = require("puppet.ui.planblocks")
+
 local plancard = {}
 
 local WIDTH, HEIGHT = 440, 520
@@ -26,78 +28,51 @@ local function inline(text)
   return (text:gsub("%z(%d+)%z", function(n) return codes[tonumber(n)] end))
 end
 
-local function cells(line)
+local function box(item)
+  local mark, rest = item:match("^%[([ xX])%]%s+(.*)$")
+  if mark then return (mark == " " and "☐ " or "☑ ") .. inline(rest) end
+  return inline(item)
+end
+
+local function row(cellsOf, tag)
   local out = {}
-  line = line:gsub("^%s*|", ""):gsub("|%s*$", "")
-  for cell in (line .. "|"):gmatch("([^|]*)|") do out[#out + 1] = inline(cell:match("^%s*(.-)%s*$")) end
-  return out
+  for _, cell in ipairs(cellsOf) do out[#out + 1] = inline(cell) end
+  return "<tr><" .. tag .. ">" .. table.concat(out, "</" .. tag .. "><" .. tag .. ">") .. "</" .. tag .. "></tr>"
+end
+
+-- One block of planblocks.parse as HTML, every text in it escaped.
+function plancard.block(block)
+  local kind = block.kind
+  if kind == "heading" then
+    return "<h" .. block.level .. ">" .. inline(block.text) .. "</h" .. block.level .. ">"
+  elseif kind == "paragraph" then
+    return "<p>" .. inline(table.concat(block.lines, " ")) .. "</p>"
+  elseif kind == "list" then
+    local items = {}
+    for _, item in ipairs(block.items) do items[#items + 1] = "<li>" .. box(item) .. "</li>" end
+    local tag = block.ordered and "ol" or "ul"
+    return "<" .. tag .. ">" .. table.concat(items) .. "</" .. tag .. ">"
+  elseif kind == "code" then
+    local code = {}
+    for _, line in ipairs(block.lines) do code[#code + 1] = escape(line) end
+    return "<pre><code>" .. table.concat(code, "\n") .. "</code></pre>"
+  elseif kind == "quote" then
+    return "<blockquote>" .. inline(table.concat(block.lines, " ")) .. "</blockquote>"
+  elseif kind == "table" then
+    local html = { "<table>" }
+    for r, cellsOf in ipairs(block.rows) do html[#html + 1] = row(cellsOf, r == 1 and "th" or "td") end
+    return table.concat(html) .. "</table>"
+  elseif kind == "rule" then
+    return "<hr>"
+  end
+  return ""
 end
 
 -- The markdown plans are written in, as HTML: headings, paragraphs, lists (task boxes too), code blocks,
 -- quotes, tables and rules.
 function plancard.markdown(text)
-  local out, lines, i = {}, {}, 1
-  for line in (text:gsub("\r\n", "\n") .. "\n"):gmatch("([^\n]*)\n") do lines[#lines + 1] = line end
-  local function item(line)
-    local body = line:match("^%s*[-*+]%s+(.*)$") or line:match("^%s*%d+[.)]%s+(.*)$")
-    local box, rest = body:match("^%[([ xX])%]%s+(.*)$")
-    if box then return (box == " " and "☐ " or "☑ ") .. inline(rest) end
-    return inline(body)
-  end
-  while i <= #lines do
-    local line = lines[i]
-    local fence = line:match("^%s*```")
-    if fence then
-      local code = {}
-      i = i + 1
-      while i <= #lines and not lines[i]:match("^%s*```") do code[#code + 1] = escape(lines[i]); i = i + 1 end
-      out[#out + 1] = "<pre><code>" .. table.concat(code, "\n") .. "</code></pre>"
-      i = i + 1
-    elseif line:match("^%s*$") then
-      i = i + 1
-    elseif line:match("^#+%s") then
-      local marks, title = line:match("^(#+)%s+(.-)%s*#*%s*$")
-      local level = math.min(#marks, 6)
-      out[#out + 1] = "<h" .. level .. ">" .. inline(title) .. "</h" .. level .. ">"
-      i = i + 1
-    elseif line:match("^%s*[-*_]%s*[-*_]%s*[-*_][-*_%s]*$") then
-      out[#out + 1] = "<hr>"
-      i = i + 1
-    elseif line:match("^%s*>") then
-      local quote = {}
-      while i <= #lines and lines[i]:match("^%s*>") do quote[#quote + 1] = lines[i]:gsub("^%s*>%s?", ""); i = i + 1 end
-      out[#out + 1] = "<blockquote>" .. inline(table.concat(quote, " ")) .. "</blockquote>"
-    elseif line:match("^%s*|") then
-      local rows = {}
-      while i <= #lines and lines[i]:match("^%s*|") do
-        if not lines[i]:match("^[%s|:-]+$") then rows[#rows + 1] = cells(lines[i]) end
-        i = i + 1
-      end
-      local html = { "<table>" }
-      for r, row in ipairs(rows) do
-        local tag = r == 1 and "th" or "td"
-        html[#html + 1] = "<tr><" .. tag .. ">" .. table.concat(row, "</" .. tag .. "><" .. tag .. ">") .. "</" .. tag .. "></tr>"
-      end
-      out[#out + 1] = table.concat(html) .. "</table>"
-    elseif line:match("^%s*[-*+]%s") or line:match("^%s*%d+[.)]%s") then
-      local ordered = line:match("^%s*%d") ~= nil
-      local items = {}
-      while i <= #lines and (lines[i]:match("^%s*[-*+]%s") or lines[i]:match("^%s*%d+[.)]%s")) do
-        items[#items + 1] = "<li>" .. item(lines[i]) .. "</li>"
-        i = i + 1
-      end
-      local tag = ordered and "ol" or "ul"
-      out[#out + 1] = "<" .. tag .. ">" .. table.concat(items) .. "</" .. tag .. ">"
-    else
-      local para = {}
-      while i <= #lines and not lines[i]:match("^%s*$") and not lines[i]:match("^#+%s") and not lines[i]:match("^%s*```")
-        and not lines[i]:match("^%s*[-*+]%s") and not lines[i]:match("^%s*%d+[.)]%s") and not lines[i]:match("^%s*[>|]") do
-        para[#para + 1] = lines[i]:match("^%s*(.-)%s*$")
-        i = i + 1
-      end
-      out[#out + 1] = "<p>" .. inline(table.concat(para, " ")) .. "</p>"
-    end
-  end
+  local out = {}
+  for _, block in ipairs(planblocks.parse(text)) do out[#out + 1] = plancard.block(block) end
   return table.concat(out, "\n")
 end
 

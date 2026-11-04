@@ -55,6 +55,7 @@ Deskmates.spoon/
     terminals/                bringing a session's terminal forward; one look at what runs (liveness.lua)
     ui/menu.lua               the menu bar menu
     ui/plancard.lua           the plan card a click opens
+    ui/planblocks.lua         the plan card's blocks: markdown read into blocks, and the blocks lifted from it
 tests/                        run.sh runs them all
 tools/screenshots/            makes the README's pictures
 ```
