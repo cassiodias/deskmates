@@ -1,11 +1,15 @@
 -- Staged demo helpers, run inside Hammerspoon: local D = dofile(this file).
 -- D.begin(eventsFile): the Spoon reads a scratch events file, with neutral menu lists and fake iTerm tabs.
 -- D.snap(path): composites every shown puppet and bubble over a dark background into one PNG.
--- D.finish(): back to the real events file and the saved menu choice.
+-- D.hover(key) / D.unhover(): the mouse rests on a puppet, so its card shows / goes back where it was.
+-- D.finish(): back to the real events file, the saved menu choice and the mouse where it was.
+-- Each `hs -c` loads this file afresh, so what must last between calls lives on the Spoon (P.staged).
 local D = {}
 local P = spoon.Deskmates
 
 function D.begin(eventsFile)
+  P.staged = P.staged or {}
+  D.unhover()
   P:stop()
   P.eventsFile = eventsFile
   P:start()
@@ -66,13 +70,26 @@ end
 -- Rests the mouse on a session's puppet, so its card shows.
 function D.hover(key)
   local f = P.stage.puppets[key].canvas:frame()
-  D.mouse = D.mouse or hs.mouse.absolutePosition()
+  P.staged = P.staged or {}
+  P.staged.mouse = P.staged.mouse or hs.mouse.absolutePosition()
   hs.mouse.absolutePosition({ x = f.x + f.w / 4, y = f.y + f.h / 2 })
   return "hovering"
 end
 
+-- Puts the mouse back where it was before D.hover, so no card shows in the next scene.
+function D.unhover()
+  local staged = P.staged
+  if staged and staged.mouse then
+    hs.mouse.absolutePosition(staged.mouse)
+    staged.mouse = nil
+  end
+  return "unhovered"
+end
+
 function D.finish()
-  if D.mouse then hs.mouse.absolutePosition(D.mouse) end
+  D.unhover()
+  if P.smileTimer then P.smileTimer:stop() end
+  P.staged = nil
   if P.unstagedRefreshLiveness then P.refreshLiveness, P.unstagedRefreshLiveness = P.unstagedRefreshLiveness, nil end
   P:stop()
   P.eventsFile = os.getenv("HOME") .. "/.deskmates/events"

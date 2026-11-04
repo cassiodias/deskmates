@@ -40,7 +40,7 @@ Codex and Cursor show the title each gives the session; Codex's subagents show t
 | ![A bubble with the first sentence of the agent's answer](docs/images/response-coder.png) | **Done.** The bubble says the first sentence of the agent's answer. |
 | ![Three puppets side by side: coding, ping pong and Matrix](docs/images/planner-reviewer-ping-pong-coding.png) | **Several sessions.** One puppet per busy session, each in its own colour and scene. |
 | ![A card above a ping pong puppet: the session title, folder and tab, command, subagents and tool calls](docs/images/hover-card.png) | **Where it is and what it does.** Rest the mouse on a puppet for its card. |
-| ![The Codex owl coding beside a Claude Code puppet whose subagents play ping pong](docs/images/agents.png) | **Claude Code and Codex side by side.** Each agent has its own creature: the owl codes for Codex while Claude's subagents play ping pong. |
+| ![The Codex owl and the Cursor rabbit coding beside a Claude Code puppet whose subagents play ping pong](docs/images/agents.png) | **Three agents side by side.** Each agent has its own creature: the owl codes for Codex, the rabbit for Cursor, while Claude's subagents play ping pong. |
 | ![Three puppets with Done bubbles](docs/images/3-desk-done.png) | **All done.** Each session says so above its own puppet. |
 | ![Three puppets dozing at their desks, monitors off](docs/images/3-desks-sleeping.png) | **Between turns.** Each puppet rests at its desk, monitor off, and dozes off. |
 | ![A single puppet waiting on an empty table](docs/images/big-desk.png) | **Nothing running.** One puppet waits at home. |

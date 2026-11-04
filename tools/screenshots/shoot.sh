@@ -8,14 +8,29 @@ S=$(pwd)/tools/screenshots
 OUT=$(pwd)/docs/images
 EV=$(mktemp -t puppet-events)
 
-hsq() { perl -e 'alarm 20; exec @ARGV' hs -c "$1"; }
 D="local D=dofile('$S/stage.lua')"
+SCENE=start
+# Asks Hammerspoon; a call that fails or times out stops the run, and the trap below gives you your puppets back.
+hsq() {
+  answer=$(perl -e 'alarm 20; exec @ARGV' hs -c "$1" 2>&1) && [ -n "$answer" ] && return 0
+  echo "shoot: Hammerspoon did not answer during \"$SCENE\" (${answer:-no answer}); stopping" >&2
+  exit 1
+}
+# However the run ends, the real events file, menu choice and mouse come back.
+restore() {
+  perl -e 'alarm 20; exec @ARGV' hs -c "$D; return D.finish()" > /dev/null 2>&1 ||
+    echo "shoot: could not restore; click Reload Config in the Hammerspoon menu" >&2
+  rm -f "$EV"
+}
+trap restore EXIT
+trap 'exit 1' INT TERM
 wait() { perl -e "select(undef,undef,undef,$1)"; }
 # ev <seconds ago> <event> <session> <agent> <tool> <agent type> <text> <tty> [title] [harness, default claude]
 ev() {
   echo "$(( $(date +%s) - $1 ))|$2|$3|$4|$5|$6|$7|shop-api|iTerm.app||/dev/ttys$8|${10:-claude}|$9" >> "$EV"
 }
-fresh() { : > "$EV"; hsq "$D; return D.begin('$EV')"; wait 1; }
+# fresh <scene name>: a new scene on an empty events file.
+fresh() { SCENE=$1; : > "$EV"; hsq "$D; return D.begin('$EV')"; wait 1; }
 snap() { wait "${2:-0.4}"; hsq "$D; return D.snap('$OUT/$1.png')"; }
 # Saves the next moment the puppets turn to smile. Hammerspoon waits for it itself: asking it many times a
 # second breaks its command line.
@@ -27,19 +42,19 @@ smile_snap() {
 }
 
 # Coding: one puppet at its laptop, an invader hit.
-fresh
+fresh coding
 ev 900 UserPromptSubmit s1 "" "" "" "/my-coding-skill" 101
 for i in 1 2 3 4 5 6 7 8 9 10 11; do ev 0 PreToolUse s1 "" Edit "" "" 101; done
 snap coding 0.3
 
 # Matrix.
-fresh
+fresh planning
 ev 600 UserPromptSubmit s1 "" "" "" "/my-planner" 101
 for i in 1 2 3 4 5 6; do ev 0 PreToolUse s1 "" Edit "" "" 101; done
 snap planning 1.5
 
 # Ping pong.
-fresh
+fresh ping-pong
 ev 300 UserPromptSubmit s1 "" "" "" "/my-reviewer" 101 "PR 12 review"
 ev 300 PreToolUse s1 "" Agent "" "Check the contract" 101
 ev 300 PreToolUse s1 "" Agent "" "Try to break it" 101
@@ -50,14 +65,14 @@ ev 0 PreToolUse s1 a2 Bash "" "" 101
 snap ping-pong 0.6
 
 # Thinking and smiling: left smiles at you, right has just been given a prompt.
-fresh
+fresh coding-smiling-thinking
 ev 1200 UserPromptSubmit s1 "" "" "" "/my-coding-skill" 101
 ev 1200 PreToolUse s1 "" Edit "" "" 101
 ev 0 UserPromptSubmit s2 "" "" "" "/my-coding-skill" 102
 wait 0.5; smile_snap coding-smiling-thinking
 
 # Happy: two puppets smiling.
-fresh
+fresh dev-planner-happy
 ev 1200 UserPromptSubmit s1 "" "" "" "/my-coding-skill" 101
 ev 1200 PreToolUse s1 "" Edit "" "" 101
 ev 600 UserPromptSubmit s2 "" "" "" "/my-planner" 102
@@ -65,14 +80,14 @@ ev 600 PreToolUse s2 "" Edit "" "" 102
 wait 0.5; smile_snap dev-planner-happy
 
 # Coder and Matrix side by side, the Matrix one just given a prompt.
-fresh
+fresh coding-planning
 ev 1200 UserPromptSubmit s1 "" "" "" "/my-coding-skill" 101
 for i in 1 2 3 4 5 6 7; do ev 0 PreToolUse s1 "" Edit "" "" 101; done
 ev 0 UserPromptSubmit s2 "" "" "" "/my-planner" 102
 snap coding-planning 0.3
 
 # Waiting for you: a coder, and a resting puppet with Claude's notification.
-fresh
+fresh coding-waiting
 ev 1800 UserPromptSubmit s1 "" "" "" "/my-coding-skill" 101
 for i in 1 2 3 4 5 6 7 8 9; do ev 0 PreToolUse s1 "" Edit "" "" 101; done
 ev 900 UserPromptSubmit s2 "" "" "" "" 102
@@ -82,25 +97,25 @@ ev 0 Notification s2 "" "" "" "Claude is waiting for your input" 102
 snap coding-waiting 0.5
 
 # Permission.
-fresh
+fresh bash-may-I-use-bash
 ev 120 UserPromptSubmit s1 "" "" "" "/my-coding-skill" 101
 ev 0 PermissionRequest s1 "" Bash "" "" 101
 snap bash-may-I-use-bash 0.5
 
 # Question.
-fresh
+fresh question
 ev 120 UserPromptSubmit s1 "" "" "" "/my-coding-skill" 101
 ev 0 PreToolUse s1 "" AskUserQuestion "" "" 101
 snap question 0.5
 
 # Done: the first sentence of the answer.
-fresh
+fresh response-coder
 ev 600 UserPromptSubmit s1 "" "" "" "/my-coding-skill" 101
 ev 0 Stop s1 "" "" "" "Fixed the parser and added two tests." 101
 snap response-coder 0.5
 
 # Several sessions: Matrix, ping pong and coding.
-fresh
+fresh planner-reviewer-ping-pong-coding
 ev 1500 UserPromptSubmit s1 "" "" "" "/my-planner" 101
 for i in 1 2 3 4 5; do ev 0 PreToolUse s1 "" Edit "" "" 101; done
 ev 900 UserPromptSubmit s2 "" "" "" "/my-reviewer" 102
@@ -114,18 +129,18 @@ for i in 1 2 3 4 5 6 7 8; do ev 0 PreToolUse s3 "" Edit "" "" 103; done
 snap planner-reviewer-ping-pong-coding 1.2
 
 # All done.
-fresh
+fresh 3-desk-done
 for n in 1 2 3; do ev 600 UserPromptSubmit s$n "" "" "" "" 10$n; done
 for n in 1 2 3; do ev 0 Stop s$n "" "" "" "" 10$n; done
 snap 3-desk-done 0.5
 
 # Between turns: three puppets dozing.
-fresh
+fresh 3-desks-sleeping
 for n in 1 2 3; do ev 1200 UserPromptSubmit s$n "" "" "" "" 10$n; ev 300 Stop s$n "" "" "" "Done." 10$n; done
 snap 3-desks-sleeping 9
 
 # The card: the mouse rests on a puppet whose subagents work.
-fresh
+fresh hover-card
 ev 1900 UserPromptSubmit s1 "" "" "" "/my-reviewer" 101 "Shop-api PR 12 review"
 ev 1900 PreToolUse s1 "" Agent "" "Check the contract" 101
 ev 1900 PreToolUse s1 "" Agent "" "Try to break it" 101
@@ -134,24 +149,26 @@ ev 1900 SubagentStart s1 a2 "" general-purpose "" 101
 for i in 1 2 3 4 5 6; do ev 30 PreToolUse s1 a1 Read "" "" 101; ev 30 PreToolUse s1 a2 Bash "" "" 101; done
 wait 0.6; hsq "$D; return D.hover('s1')"; snap hover-card 0.6
 
-# Claude Code and Codex side by side: a Claude puppet's subagents play ping pong, the Codex owl codes.
-fresh
+# Three agents side by side: a Claude puppet's subagents play ping pong, the Codex owl and the Cursor rabbit code.
+fresh agents
 ev 900 UserPromptSubmit s1 "" "" "" "/my-reviewer" 101
 ev 900 PreToolUse s1 "" Agent "" "Check the contract" 101
 ev 900 PreToolUse s1 "" Agent "" "Try to break it" 101
 ev 900 SubagentStart s1 a1 "" general-purpose "" 101
 ev 900 SubagentStart s1 a2 "" general-purpose "" 101
 ev 600 UserPromptSubmit s2 "" "" "" "/my-coding-skill" 102 "" codex
+ev 300 UserPromptSubmit s3 "" "" "" "/my-coding-skill" 103 "" cursor
 for i in 1 2 3 4 5 6; do
   ev 0 PreToolUse s1 a1 Read "" "" 101; ev 0 PreToolUse s1 a2 Bash "" "" 101
   ev 0 PreToolUse s2 "" Bash "" "" 102 "" codex
+  ev 0 PreToolUse s3 "" Shell "" "" 103 "" cursor
 done
 snap agents 0.8
 
 # Nothing running: the home puppet.
-fresh
+fresh big-desk
 snap big-desk 0.5
 
-hsq "$D; return D.finish()"
+SCENE=bodies
 hsq "return dofile('$S/bodies.lua')('$OUT/bodies.png')"
-rm -f "$EV"
+echo "shoot: saved the pictures in docs/images; check each one before you commit it"

@@ -1,5 +1,5 @@
--- The bodies drawn for agents still to come, in a few poses, through the real scenes, as one PNG. Run inside
--- Hammerspoon: dofile(this file)(outPath)
+-- The creatures agents wear (and one still waiting for its agent), in a few poses, through the real scenes, as
+-- one PNG. Run inside Hammerspoon: dofile(this file)(outPath)
 return function(out)
   local scenes = require("puppet.render.scenes")
   local pixels = require("puppet.render.pixels")
