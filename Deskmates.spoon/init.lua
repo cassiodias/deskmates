@@ -30,6 +30,7 @@ local Liveness = require("puppet.terminals.liveness")
 local newTerminals = require("puppet.terminals.focus")
 local menuItems = require("puppet.ui.menu")
 local plancard = require("puppet.ui.plancard")
+local sessioncard = require("puppet.ui.sessioncard")
 local bubble = require("puppet.stage.bubble")
 
 local obj = {}
@@ -110,6 +111,11 @@ function obj:handle(line)
     self.sessions:setFacts(event.session, path and facts.load(path))
   end
   if self.replayFrom then return end
+  -- The card open on this session shows the change at once.
+  if (event.flag == "plan" or event.flag == "facts" or event.flag == "test") and self.planCard.key == event.session then
+    local plan, meta = self:cardContent(event.session)
+    if meta then self.planCard:update(event.session, plan, meta) end
+  end
   for _, intent in ipairs(intents) do self:say(intent.key, intent.text, intent.seconds) end
 end
 
@@ -184,13 +190,24 @@ function obj:focus(key)
   if s then harnesses.get(s.harness).focus(s, self.terminals) end
 end
 
+-- What session `key`'s card shows: its plan (nil when it has none to show) and the card's meta, with the session's
+-- facts; nil when there is neither a plan nor facts.
+function obj:cardContent(key)
+  local s, puppet = self.sessions.all[key], self.stage.puppets[key]
+  if not (s and puppet) then return nil end
+  local plan = plans.hasContent(s.plan) and s.plan or nil
+  local session = facts.hasContent(s.facts) and sessioncard.view(s.facts, os.time()) or nil
+  if not plan and not session then return nil end
+  return plan, { title = (s.title and s.title ~= "") and s.title or s.tag, color = puppet.color, session = session }
+end
+
 --- Deskmates:click(key)
 --- Method
---- A click on a session's puppet: its plan card when its session has a plan to show, else its window.
+--- A click on a session's puppet: its card when its session has a plan or facts to show, else its window.
 function obj:click(key)
-  local s, puppet = self.sessions.all[key], self.stage.puppets[key]
-  if s and puppet and plans.hasContent(s.plan) then
-    self.planCard:show(key, s.plan, { title = (s.title and s.title ~= "") and s.title or s.tag, color = puppet.color })
+  local plan, meta = self:cardContent(key)
+  if meta then
+    self.planCard:show(key, plan, meta)
   else
     self:focus(key)
   end

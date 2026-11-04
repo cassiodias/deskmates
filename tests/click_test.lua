@@ -196,7 +196,59 @@ release()
 stub.advance(0.2)
 check("an empty plan: the click selects the tab", stub.selected == "/dev/ttys001")
 check("an empty plan: no card", #stub.webviews == views)
-os.execute("rm -rf '" .. plansDir .. "'")
+
+-- Facts: a session with facts opens the card too, with its ticket; a facts line refreshes an open card.
+local factsDir = os.tmpname()
+os.remove(factsDir)
+os.execute("mkdir -p '" .. factsDir .. "'")
+P.factsDir = factsDir
+local function writeFacts(reply)
+  local file = io.open(factsDir .. "/tab1.json", "w")
+  file:write('{"current": "ABC-12", "tickets": {"ABC-12": {"phase": "dev", "phaseAt": 1, "phases": {"dev": 1}, "seen": 2}},'
+    .. ' "timeline": [{"at": 2, "ticket": "ABC-12", "kind": "reply", "text": "' .. reply .. '", "phase": "dev"}]}')
+  file:close()
+end
+writeFacts("Fixed the typo.")
+write("PreToolUse|tab1||Skill||my-developer|app|iTerm.app|facts|/dev/ttys001|claude|")
+stub.advance(0.2)
+stub.selected = nil
+local factsCard = openCard()
+check("facts only: a click opens the card", factsCard and factsCard.shown and #stub.webviews == views + 1)
+check("facts only: with the ticket", factsCard.html_:find("ABC-12", 1, true) ~= nil)
+check("facts only: no tab selected", stub.selected == nil)
+writeFacts("Built and committed.")
+write("Stop|tab1||||Built and committed.|app|iTerm.app|facts|/dev/ttys001|claude|")
+stub.advance(0.2)
+check("a facts line refreshes the open card", factsCard.html_:find("Built and committed.", 1, true) ~= nil
+  and #stub.webviews == views + 1 and factsCard.shown)
+closeCard(factsCard)
+
+planFile = io.open(plansDir .. "/tab1.json", "w")
+planFile:write('{"steps": [{"id": "1", "title": "Write the failing test", "status": "active"}]}')
+planFile:close()
+write("PreToolUse|tab1||TodoWrite|||app|iTerm.app|plan|/dev/ttys001|claude|")
+stub.advance(0.2)
+local bothCard = openCard()
+check("plan and facts: one card with both", bothCard.html_:find("ABC-12", 1, true) ~= nil
+  and bothCard.html_:find("Write the failing test", 1, true) ~= nil)
+closeCard(bothCard)
+
+planFile = io.open(plansDir .. "/tab1.json", "w")
+planFile:write('{"steps": []}')
+planFile:close()
+write("PreToolUse|tab1||TodoWrite|||app|iTerm.app|plan|/dev/ttys001|claude|")
+local junkFacts = io.open(factsDir .. "/tab1.json", "w")
+junkFacts:write('{"tickets": {')
+junkFacts:close()
+write("Stop|tab1||||Done.|app|iTerm.app|facts|/dev/ttys001|claude|")
+stub.advance(0.2)
+views = #stub.webviews
+stub.selected = nil
+press()
+release()
+stub.advance(0.2)
+check("junk facts and no plan: the click selects the tab", stub.selected == "/dev/ttys001" and #stub.webviews == views)
+os.execute("rm -rf '" .. plansDir .. "' '" .. factsDir .. "'")
 
 os.remove(eventsFile)
 check.done("click")

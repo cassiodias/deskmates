@@ -155,4 +155,30 @@ check("page: no summary is clipped", not has(longPage, "line-clamp"))
 check("contents: room to scroll the last section to the top", has(full, "article::after"))
 check("contents: the heading clicked lights up", has(plancard.SCRIPT, "classList.add('here')") and has(full, "h2.here"))
 
+-- The session on top: its ticket, strip and NOW in the header; the plan below, or the timeline when there is none.
+local sessioncard = require("puppet.ui.sessioncard")
+local facts = { current = "ABC-12", tickets = { ["ABC-12"] = { phase = "dev", phaseAt = 100, phases = { dev = 100 }, seen = 200 } },
+  timeline = { { at = 200, ticket = "ABC-12", kind = "reply", text = "Fixed the typo.", phase = "dev" },
+               { at = 100, ticket = "ABC-12", kind = "subagent", text = "Implement ABC-12", phase = "dev" } } }
+local view = sessioncard.view(facts, 300)
+local only = plancard.html(nil, { title = "my-app", session = view })
+local onlyHeader = only:match("<header>(.-)</header>") or ""
+check("session: the ticket and strip in the header", has(onlyHeader, "ABC-12") and has(onlyHeader, 'data-phase="dev"')
+  and has(onlyHeader, "NOW"))
+check("session, no plan: the timeline is the body", has(only, '<div id="timeline" class="timeline-body">')
+  and has(only, "Implement ABC-12") and not has(only, "<article>") and not has(only, ">PLAN<"))
+local both = plancard.html({ steps = STEPS, markdown = "# Add a flag\n\n## Files\n\n- a" }, { title = "my-app", session = view })
+check("session and plan: the plan shows", has(both, 'id="plan"') and has(both, "<article>") and has(both, ">PLAN<")
+  and has(both, "ABC-12"))
+check("session and plan: the timeline waits, hidden", has(both, '<div id="timeline" class="timeline-body" hidden>'))
+check("no session: the page as before", not has(full, 'id="timeline"') and not has(full, 'class="session"'))
+check("session: hidden really hides", has(both, "[hidden] { display: none !important; }"))
+local evilView = sessioncard.view({ current = "ABC-1", tickets = { ["ABC-1"] = { seen = 1, phases = {} } },
+  timeline = { { at = 1, ticket = "ABC-1", kind = "reply", text = "</script><script>alert(1)</script>" } } }, 1)
+local evilPage = plancard.html(nil, { title = "x", session = evilView })
+check("session: escaped on the page", count(evilPage, "<script") == 1 and has(evilPage, "default-src 'none'"))
+check("script: Also switches tickets", has(plancard.SCRIPT, "select.also") and has(plancard.SCRIPT, "data-key"))
+check("script: a phase click filters, or brings the plan back", has(plancard.SCRIPT, "button.phase")
+  and has(plancard.SCRIPT, "data-phase") and has(plancard.SCRIPT, "getElementById('plan')"))
+
 check.done("plan card")

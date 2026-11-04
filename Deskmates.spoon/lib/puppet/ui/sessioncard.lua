@@ -118,7 +118,8 @@ end
 
 -- The styles for the session part, in the page's tokens (--accent, --faint).
 sessioncard.CSS = table.concat({
-  ".session { margin-bottom: 8px; } .ticket .head { display: flex; gap: 8px; align-items: baseline; }",
+  ".session { margin-bottom: 8px; } .session ~ .label { padding-top: 8px; border-top: 1px solid var(--faint); }",
+  ".ticket .head { display: flex; gap: 8px; align-items: baseline; }",
   ".key { font-size: 16px; font-weight: 700; }",
   ".jira { font-size: 11px; font-weight: 600; border-radius: 4px; padding: 1px 6px; color: var(--accent);",
   " background: color-mix(in srgb, var(--accent) 15%, transparent); } .jira small { opacity: 0.7; }",

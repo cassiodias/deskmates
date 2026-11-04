@@ -125,20 +125,29 @@ local function split(markdown)
   return title, summary, table.concat(rest, "\n"), sections
 end
 
--- The whole page for `plan` (model/plans.lua's shape); meta.title names the session, meta.color is its puppet's.
+-- The whole page for `plan` (model/plans.lua's shape, or nil); meta.title names the session, meta.color is its
+-- puppet's, meta.session (sessioncard.view, or nil) what the session is working on: shown on top, with the plan
+-- below, or the session's timeline when there is no plan (the timeline also waits, hidden, behind the plan).
 function plancard.html(plan, meta)
   local nonce = string.format("%08x%08x", math.random(0, 0x7fffffff), math.random(0, 0x7fffffff))
   local color = (meta.color or ""):match("^#%x%x%x%x%x%x$") or "#888888"
+  local session, timeline
+  if meta.session then session, timeline = sessioncard.html(meta.session) end
+  local hasPlan = plan ~= nil
+  plan = plan or { steps = {} }
   local steps = plan.steps or {}
   local done = 0
   for _, step in ipairs(steps) do if step.status == "done" then done = done + 1 end end
   local title, summary, article, sections = split(plan.markdown)
 
-  local body = { '<header><div class="label">PLAN</div><h1 class="title">', escape(title or meta.title or "Plan"), "</h1>" }
-  if summary then body[#body + 1] = '<p class="summary">' .. inline(summary) .. "</p>" end
-  if #steps > 0 then
-    body[#body + 1] = '<div class="progress"><progress value="' .. done .. '" max="' .. #steps .. '"></progress>'
-      .. '<span class="count">' .. done .. "/" .. #steps .. "</span></div>"
+  local body = { "<header>", session or "" }
+  if hasPlan then
+    body[#body + 1] = '<div class="label">PLAN</div><h1 class="title">' .. escape(title or meta.title or "Plan") .. "</h1>"
+    if summary then body[#body + 1] = '<p class="summary">' .. inline(summary) .. "</p>" end
+    if #steps > 0 then
+      body[#body + 1] = '<div class="progress"><progress value="' .. done .. '" max="' .. #steps .. '"></progress>'
+        .. '<span class="count">' .. done .. "/" .. #steps .. "</span></div>"
+    end
   end
   body[#body + 1] = "</header>"
 
@@ -159,9 +168,14 @@ function plancard.html(plan, meta)
     aside[#aside + 1] = '<section class="checklist"><div class="label">CHECKLIST</div><ul class="steps">'
       .. table.concat(items) .. "</ul></section>"
   end
-  body[#body + 1] = '<div class="layout' .. (#aside == 0 and " solo" or "") .. '">'
-  if #aside > 0 then body[#body + 1] = "<aside>" .. table.concat(aside) .. "</aside>" end
-  body[#body + 1] = "<article>" .. article .. "</article></div>"
+  if hasPlan then
+    body[#body + 1] = '<div class="layout' .. (#aside == 0 and " solo" or "") .. '" id="plan">'
+    if #aside > 0 then body[#body + 1] = "<aside>" .. table.concat(aside) .. "</aside>" end
+    body[#body + 1] = "<article>" .. article .. "</article></div>"
+  end
+  if timeline then
+    body[#body + 1] = '<div id="timeline" class="timeline-body"' .. (hasPlan and " hidden" or "") .. ">" .. timeline .. "</div>"
+  end
   body[#body + 1] = '<footer><button id="focus">Go to terminal</button><button id="close">Close</button></footer>'
 
   local faint = "color-mix(in srgb, CanvasText 15%, transparent)"
@@ -214,6 +228,9 @@ function plancard.html(plan, meta)
     " color: var(--m); background: color-mix(in srgb, var(--m) 15%, transparent); }",
     ".method.post { --m: #2e9d4e; } .method.put, .method.patch { --m: #c98a12; } .method.delete { --m: #d0453a; }",
     ".source { margin-top: 4px; font-size: 11px; } .source summary { cursor: pointer; opacity: 0.55; }",
+    "[hidden] { display: none !important; }",
+    ".timeline-body { flex: 1; min-height: 0; overflow: auto; padding: 0 14px 10px; }",
+    sessioncard.CSS,
     "footer { display: flex; gap: 8px; justify-content: flex-end; padding: 8px 14px; border-top: 1px solid var(--faint); }",
     "footer button { font: inherit; padding: 4px 12px; }",
     "#focus { background: var(--accent); color: white; border: 0; border-radius: 5px; }",
@@ -233,6 +250,19 @@ plancard.SCRIPT = "function send(m){window.webkit.messageHandlers.deskmates.post
   .. "document.querySelectorAll('[data-to]').forEach(function(b){b.onclick=function(){"
   .. "var t=document.getElementById(b.getAttribute('data-to'));if(!t)return;t.scrollIntoView({block:'start'});"
   .. "t.classList.remove('here');void t.offsetWidth;t.classList.add('here')}});"
+  -- Also: show the ticket chosen (its header and its timeline), hide the others.
+  .. "var also=document.querySelector('select.also');if(also)also.onchange=function(){"
+  .. "document.querySelectorAll('[data-key]').forEach(function(el){el.hidden=el.getAttribute('data-key')!==also.value})};"
+  -- A phase: with a plan, Plan (or the phase shown, again) shows the plan and the others the timeline of that
+  -- phase; without one, it filters the timeline, and a second click clears it.
+  .. "function only(p){document.querySelectorAll('.timeline li').forEach(function(li){"
+  .. "li.classList.toggle('out',p!==''&&li.getAttribute('data-phase')!==p)})}"
+  .. "document.querySelectorAll('button.phase').forEach(function(b){b.onclick=function(){"
+  .. "var p=b.getAttribute('data-phase'),plan=document.getElementById('plan'),tl=document.getElementById('timeline'),"
+  .. "on=b.classList.contains('on');"
+  .. "document.querySelectorAll('button.phase').forEach(function(x){x.classList.remove('on')});only('');"
+  .. "if(plan&&(p==='plan'||on)){plan.hidden=false;if(tl)tl.hidden=true;return}"
+  .. "if(on)return;b.classList.add('on');if(plan)plan.hidden=true;if(tl)tl.hidden=false;only(p)}});"
 
 local PlanCard = {}
 PlanCard.__index = PlanCard
@@ -315,6 +345,12 @@ function PlanCard:hide()
     hs.timer.doAfter(0, function() view:delete() end)
   end
   self.key = nil
+end
+
+-- Shows a newer page in the card of session `key`, in the same window; nothing when the card shows another
+-- session, or none.
+function PlanCard:update(key, plan, meta)
+  if self.view and self.key == key then self.view:html(plancard.html(plan, meta)) end
 end
 
 function PlanCard:isShown() return self.view ~= nil end
