@@ -3,7 +3,7 @@
 --- Puppets that float over your desktop, one per busy coding-agent session, acting out what it is doing:
 --- it thinks, codes at its laptop (invaders or Matrix rain on its monitor), reads, runs tests, plays ping pong
 --- while subagents run, shows a question mark when the agent asks you something, and says what it did when it is done.
---- Click a puppet to jump to its session's terminal, or, when its agent made a plan, to read the plan.
+--- Click a puppet to jump to its session's terminal, or, when its agent made a plan or works on a ticket, to read its card.
 ---
 --- Agent hooks append one line per event to `~/.deskmates/events`; this Spoon reads it. This file is the
 --- Spoon's public surface and its wiring; the parts (events, model, render, stage, terminals, ui and one
@@ -37,7 +37,7 @@ local obj = {}
 obj.__index = obj
 
 obj.name = "Deskmates"
-obj.version = "0.13.0"
+obj.version = "0.14.0"
 obj.author = "Cassio Dias"
 obj.license = "MIT - https://opensource.org/licenses/MIT"
 obj.homepage = "https://github.com/cassiodias/deskmates"

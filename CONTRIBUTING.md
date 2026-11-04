@@ -41,6 +41,7 @@ harnesses/<agent>/            the hook side of one coding agent
   fixtures/                   payload samples and the exact line each must produce
 hook/puppet-lib.sh            shared by translators; the only code that writes the events file
 hook/plan-lib.sh              shared by translators whose agent plans: one neutral plan file per session
+hook/facts-lib.sh             shared by translators: what a session works on (tickets, phases, timeline), one file per session
 hook/install-lib.sh           shared by install scripts: backups, merging and removing hooks in JSON files
 Deskmates.spoon/
   init.lua                    the Spoon's public variables, start/stop, and wiring
@@ -48,13 +49,14 @@ Deskmates.spoon/
     config.lua                sizes, timings, colours
     events/                   parse (line → event), reader (follows the file)
     model/                    sessions (state per session), mapping (command → animation), status (in words),
-                              plans (a session's plan file)
+                              plans (a session's plan file), facts (a session's facts file)
     harnesses/                the Spoon side of each agent, and the registry
     render/                   pixels, text, sprites (the creatures), and scenes/ (one file per animation)
     stage/                    the puppet windows and their bubbles
     terminals/                bringing a session's terminal forward; one look at what runs (liveness.lua)
     ui/menu.lua               the menu bar menu
-    ui/plancard.lua           the plan card a click opens
+    ui/plancard.lua           the card a click opens: the session on top, the plan or the timeline below
+    ui/sessioncard.lua        the card's session part: ticket, Jira badge, phase strip, NOW and the timeline
     ui/planblocks.lua         the plan card's blocks: markdown read into blocks, and the blocks lifted from it
 tests/                        run.sh runs them all
 tools/screenshots/            makes the README's pictures
@@ -80,7 +82,7 @@ tests/run.sh
   for Hammerspoon and compare every frame with `tests/snapshots/`. If you changed a drawing on purpose, record
   it again with `UPDATE=1 lua5.4 tests/scenario_test.lua` and check the diff.
 - `sessions_test.lua` runs the session model with a fake agent; `liveness_test.lua` checks when puppets leave,
-  with iTerm not running; `status_test.lua` checks the status line and the card's text; `plancard_test.lua` checks the plan card's page, and `planblocks_test.lua` what it lifts from a plan's markdown (file maps, endpoints) and what it leaves as text; `settings_test.lua`
+  with iTerm not running; `status_test.lua` checks the status line and the card's text; `plancard_test.lua` checks the card's page, `sessioncard_test.lua` and `facts_test.lua` its session part and the facts file it reads, and `planblocks_test.lua` what it lifts from a plan's markdown (file maps, endpoints) and what it leaves as text; `settings_test.lua`
   checks the saved settings carry over from the old name.
 - `harness_contract_test.lua` checks every harness and every creature (see "What the tests check for you").
 - `puppet_lib.sh` checks the hook library's helpers on their own (what they keep and drop, cutting text,
@@ -166,6 +168,8 @@ Have at least a Stop: without it the puppet never finishes a turn, and the contr
 For a plan (step 3): `NAME.plan` is the plan file the jq pass must leave (`updatedAt` aside), and an empty one
 means none may be left; without jq there is no plan, so the line without the `plan` flag goes in
 `NAME.nojq.line`. `@HOME@` in a payload is the case's home, for a file the agent names (Claude's plan file).
+Facts work the same way: `NAME.facts` is the facts file the jq pass must leave, an empty one means none, and
+without jq none are written.
 
 A translator that keeps something between events (step 3) gets one fixture per step, with the state it starts
 from in `NAME.home/.deskmates/`. To check the steps chained in the orders you saw, add a script like
@@ -261,6 +265,13 @@ When the agent's events do not line up with the table (`harnesses/cursor/transla
   `$cur`, and the filter makes the whole new plan (`steps` of `{id, title, status: pending|active|done}`, and
   `plan.markdown`). Write the line with the flag `plan` when it returns 0, and `plan_delete` on `SessionEnd`.
   It writes nothing while Deskmates is off or without jq. Claude's translator is the example.
+- **Facts** (optional): what the session works on, for the card. Source `hook/facts-lib.sh` and, on an event that
+  names something, call `facts_note <session> '<jq filter>'`: the filter makes a note from the payload,
+  `{kind, text, from, moves, ticket?, jira?}` (`kind` is the timeline line: `skill`, `subagent`, `jira`, `tests`,
+  `reply`, or null; `from` the text tickets like `ABC-12` and phase words are looked for in; `moves` whether its
+  ticket becomes the current one), or null for none. The rules (ticket shape, phase words, limits) live in
+  `FACTS_DEFS`, so every agent's facts read alike. Write the line with the flag `facts` when it returns 0 (a test
+  line keeps `test`), and `facts_delete` on `SessionEnd`. Claude's translator is the example.
 
 ### 4. hooks.json, detect.sh, config.sh, install.sh, uninstall.sh
 

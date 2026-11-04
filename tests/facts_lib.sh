@@ -103,7 +103,7 @@ if [ -n "$found_jq" ]; then
   expect "phase: review wins over plan" "$(def phase '"Review the plan"')" '"review"'
   expect "phase: dev wins over plan" "$(def phase '"Implement the plan"')" '"dev"'
   expect "phase: only whole words" "$(def phase '"rebuild the planet"')" 'null'
-  expect "phase: an engineer plans" "$(def phase '"principal-engineer"')" '"plan"'
+  expect "phase: an engineer plans" "$(def phase '"my-engineer"')" '"plan"'
   long=$(printf 'a%.0s' $(seq 1 300))
   expect "clean: control characters out, 200 characters" \
     "$(def clean "\"bell\\u0007$long\"" | "$found_jq" -r '[length, (explode | any(. < 32))] | @csv')" '200,false'
