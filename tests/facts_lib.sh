@@ -83,6 +83,82 @@ if [ -n "$found_jq" ]; then
   echo "$$" > "$HOME/.deskmates/on"
 fi
 
+# The rules (facts_note): a note made from an event, applied to the session's facts.
+if [ -n "$found_jq" ]; then
+  # A def from FACTS_DEFS on JSON value $2.
+  def() { printf '%s' "$2" | "$found_jq" -c "$FACTS_DEFS $1"; }
+  # Applies note $2 (JSON) to session $1 at time $3; prints the status.
+  note() { PUPPET_NOW=$3 PUPPET_PAYLOAD=$2 facts_note "$1" '.'; echo "$?"; }
+  # The value of jq filter $2 on session $1's facts.
+  got() { "$found_jq" -c "$2" "$FACTS/$1.json" 2>/dev/null; }
+
+  expect "tickets: one" "$(def tickets '"Implement ABC-12 via my-developer"')" '["ABC-12"]'
+  expect "tickets: first first" "$(def tickets '"ABC-34 then ABC-12"')" '["ABC-34","ABC-12"]'
+  expect "tickets: not tickets" "$(def tickets '"UTF-8 and SHA-256, RFC-2119"')" '[]'
+  expect "tickets: inside a word" "$(def tickets '"xABC-12"')" '[]'
+  expect "tickets: one letter" "$(def tickets '"A-1"')" '[]'
+  expect "tickets: too long a project" "$(def tickets '"ABCDEFGHIJK-1"')" '[]'
+  expect "phase: a developer" "$(def phase '"my-developer"')" '"dev"'
+  expect "phase: QA" "$(def phase '"QA ABC-12 lens break"')" '"review"'
+  expect "phase: review wins over plan" "$(def phase '"Review the plan"')" '"review"'
+  expect "phase: dev wins over plan" "$(def phase '"Implement the plan"')" '"dev"'
+  expect "phase: only whole words" "$(def phase '"rebuild the planet"')" 'null'
+  expect "phase: an engineer plans" "$(def phase '"principal-engineer"')" '"plan"'
+  long=$(printf 'a%.0s' $(seq 1 300))
+  expect "clean: control characters out, 200 characters" \
+    "$(def clean "\"bell\\u0007$long\"" | "$found_jq" -r '[length, (explode | any(. < 32))] | @csv')" '200,false'
+
+  # A skill naming a ticket: it becomes current, in the skill's phase.
+  expect "a skill note writes" "$(note n1 '{"kind":"skill","text":"my-developer","from":"my-developer ABC-12","moves":true}' 10)" 0
+  expect "its ticket is current" "$(got n1 .current)" '"ABC-12"'
+  expect "in the skill's phase" "$(got n1 '.tickets["ABC-12"] | [.phase, .phaseAt, .phases.dev, .seen]')" '["dev",10,10,10]'
+  expect "a phase line, then the skill's, newest first" "$(got n1 '[.timeline[] | [.kind, .text, .ticket, .phase, .at]]')" \
+    '[["skill","my-developer","ABC-12","dev",10],["phase","dev","ABC-12","dev",10]]'
+
+  # A phase with no ticket waits under "-", and moves to the first ticket that appears.
+  note n2 '{"kind":"skill","text":"my-reviewer","from":"my-reviewer","moves":true}' 10 > /dev/null
+  expect "the phase waits" "$(got n2 '[.current, .tickets["-"].phase]')" '[null,"review"]'
+  note n2 '{"kind":"subagent","text":"Implement ABC-12","from":"Implement ABC-12","moves":true}' 20 > /dev/null
+  expect "the waiting ticket is gone" "$(got n2 '.tickets | keys')" '["ABC-12"]'
+  expect "its phases moved" "$(got n2 '.tickets["ABC-12"] | [.phase, .phases.review, .phases.dev]')" '["dev",10,20]'
+  expect "its lines moved" "$(got n2 '[.timeline[].ticket] | unique')" '["ABC-12"]'
+  expect "current is the ticket" "$(got n2 .current)" '"ABC-12"'
+
+  # A reply naming another ticket: a line under it; current stays.
+  note n3 '{"kind":"skill","text":"my-developer","from":"my-developer ABC-12","moves":true}' 10 > /dev/null
+  note n3 '{"kind":"reply","text":"ABC-34 is done.","from":"ABC-34 is done.","moves":false}' 20 > /dev/null
+  expect "the reply's line is the other ticket's" "$(got n3 '.timeline[0] | [.ticket, .kind]')" '["ABC-34","reply"]'
+  expect "current stays" "$(got n3 .current)" '"ABC-12"'
+  note n3 '{"kind":"reply","text":"Fixed the typo.","from":"Fixed the typo.","moves":false}' 30 > /dev/null
+  expect "a reply naming none is current's" "$(got n3 '.timeline[0] | [.ticket, .text]')" '["ABC-12","Fixed the typo."]'
+
+  # Nothing to hang a line on: no file.
+  expect "a reply with no facts yet writes nothing" "$(note n4 '{"kind":"reply","text":"Fixed the typo.","from":"Fixed the typo.","moves":false}' 10)" 1
+  expect "a test run with no facts yet writes nothing" "$(note n4 '{"kind":"tests","text":"passed","from":"","moves":false}' 10)" 1
+  expect "a skill with no ticket and no phase writes nothing" "$(note n4 '{"kind":"skill","text":"my-skill","from":"my-skill","moves":true}' 10)" 1
+  expect "no file for them" "$(ls "$FACTS" | grep -c n4)" 0
+
+  # Jira: a status, or the ticket only.
+  expect "a Jira status" "$(note n5 '{"kind":"jira","text":"In Dev","ticket":"ABC-12","jira":"In Dev","from":"","moves":true}' 10)" 0
+  expect "its status kept" "$(got n5 '[.current, .tickets["ABC-12"].jira.status, .tickets["ABC-12"].jira.at, .timeline[0].kind]')" '["ABC-12","In Dev",10,"jira"]'
+  note n6 '{"kind":null,"ticket":"ABC-12","from":"","moves":true}' 10 > /dev/null
+  expect "a Jira read with no status: the ticket, no line" "$(got n6 '[.current, (.timeline | length)]')" '["ABC-12",0]'
+  expect "a key that is no ticket writes nothing" "$(note n7 '{"kind":null,"ticket":"nope","from":"","moves":true}' 10)" 1
+
+  # A test run of the current ticket.
+  note n8 '{"kind":"skill","text":"my-developer","from":"my-developer ABC-12","moves":true}' 10 > /dev/null
+  note n8 '{"kind":"tests","text":"failed","from":"","moves":false}' 20 > /dev/null
+  expect "a test run's line" "$(got n8 '.timeline[0] | [.ticket, .kind, .text, .phase]')" '["ABC-12","tests","failed","dev"]'
+
+  # The cut: 30 lines, 10 tickets, never current.
+  note n9 '{"kind":"skill","text":"my-developer","from":"my-developer ABC-12","moves":true}' 1 > /dev/null
+  for i in $(seq 2 32); do note n9 "{\"kind\":\"reply\",\"text\":\"line $i\",\"from\":\"line $i\",\"moves\":false}" "$i" > /dev/null; done
+  expect "30 lines, the newest kept" "$(got n9 '[(.timeline | length), .timeline[0].text, .timeline[29].text]')" '[30,"line 32","line 3"]'
+  note n10 '{"kind":"skill","text":"my-developer","from":"my-developer ABC-1","moves":true}' 1 > /dev/null
+  for i in $(seq 2 11); do note n10 "{\"kind\":\"reply\",\"text\":\"ABC-$i done.\",\"from\":\"ABC-$i done.\",\"moves\":false}" "$i" > /dev/null; done
+  expect "cut keeps current" "$(got n10 '[(.tickets | length), .current, (.tickets | has("ABC-1")), (.tickets | has("ABC-2"))]')" '[10,"ABC-1",true,false]'
+fi
+
 # Without jq there are no facts.
 expect "no jq writes nothing" "$(PUPPET_JQ= facts_update s7 "$SET"; echo "|$?")" "|1"
 expect "no file without jq" "$(ls "$FACTS" 2>/dev/null | grep -c s7)" 0
