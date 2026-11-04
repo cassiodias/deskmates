@@ -28,7 +28,7 @@ local md = plancard.markdown(table.concat({
   "",
   "> a quote",
   "",
-  "| File | Change |",
+  "| Step | Change |",
   "| --- | --- |",
   "| `a.sh` | Fixed the typo. |",
   "",
@@ -45,7 +45,7 @@ check("markdown: task boxes", has(md, "<li>☑ done</li>") and has(md, "<li>☐ 
 check("markdown: a numbered list", has(md, "<ol><li>first</li><li>second</li></ol>"))
 check("markdown: a code block, escaped", has(md, "<pre><code>echo &lt;hi&gt; &amp;&amp; exit</code></pre>"))
 check("markdown: a quote", has(md, "<blockquote>a quote</blockquote>"))
-check("markdown: a table", has(md, "<table><tr><th>File</th><th>Change</th></tr><tr><td><code>a.sh</code></td><td>Fixed the typo.</td></tr></table>"))
+check("markdown: a table", has(md, "<table><tr><th>Step</th><th>Change</th></tr><tr><td><code>a.sh</code></td><td>Fixed the typo.</td></tr></table>"))
 check("markdown: a link is text, never followed", has(md, '<span class="link">the docs</span>') and not has(md, "href"))
 check("markdown: a rule", has(md, "<hr>"))
 
@@ -125,5 +125,15 @@ check("fitSize: a string gives the default", size("big") == "600x560")
 check("fitSize: no numbers give the default", size({ w = "a", h = 3 }) == "600x560")
 check("fitSize: a size is kept", size({ w = 700.6, h = 500 }) == "700x500")
 check("fitSize: too small is raised", size({ w = 10, h = 10 }) == "320x280")
+
+-- The file map, drawn from escaped text, with its source a click away.
+local mapped = plancard.html({ steps = {}, markdown = "## Files\n\n- Create: `bin/x.sh`" }, { title = "x" })
+check("file map: drawn", has(mapped, 'class="filemap"') and has(mapped, "<code>bin/x.sh</code>") and has(mapped, 'class="badge new"'))
+check("file map: its source a click away", has(mapped, '<details class="source">') and has(mapped, "<pre><code>- Create: `bin/x.sh`</code></pre>"))
+check("file map: under Files, no second label", not has(mapped, ">FILES<"))
+check("file map: a table of files gets its label", has(plancard.html({ steps = {},
+  markdown = "| File | Change |\n|---|---|\n| `a/b.sh` | new |" }, { title = "x" }), ">FILES<"))
+local nasty = plancard.html({ steps = {}, markdown = "## Files\n\n- `a/<b>.sh` — <i>x</i>" }, { title = "x" })
+check("file map: escaped", has(nasty, "<code>a/&lt;b&gt;.sh</code>") and has(nasty, "&lt;i&gt;x&lt;/i&gt;") and not has(nasty, "<i>"))
 
 check.done("plan card")

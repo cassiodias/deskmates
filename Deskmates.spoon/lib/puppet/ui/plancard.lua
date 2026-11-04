@@ -40,7 +40,12 @@ local function row(cellsOf, tag)
   return "<tr><" .. tag .. ">" .. table.concat(out, "</" .. tag .. "><" .. tag .. ">") .. "</" .. tag .. "></tr>"
 end
 
--- One block of planblocks.parse as HTML, every text in it escaped.
+-- A lifted block's markdown, a click away: the reader can always check what it was drawn from.
+local function source(block)
+  return '<details class="source"><summary>source</summary><pre><code>' .. escape(block.source) .. "</code></pre></details>"
+end
+
+-- One block of planblocks.parse or planblocks.lift as HTML, every text in it escaped.
 function plancard.block(block)
   local kind = block.kind
   if kind == "heading" then
@@ -64,15 +69,24 @@ function plancard.block(block)
     return table.concat(html) .. "</table>"
   elseif kind == "rule" then
     return "<hr>"
+  elseif kind == "filemap" then
+    local rows = {}
+    for _, r in ipairs(block.rows) do
+      rows[#rows + 1] = '<div class="file"><code>' .. escape(r.path) .. '</code><span class="badge'
+        .. (r.badge and " " .. r.badge or "") .. '">' .. (r.badge or "") .. '</span><span class="note">'
+        .. inline(r.note) .. "</span></div>"
+    end
+    return '<div class="filemap">' .. (block.titled and "" or '<div class="label">FILES</div>')
+      .. table.concat(rows) .. source(block) .. "</div>"
   end
   return ""
 end
 
 -- The markdown plans are written in, as HTML: headings, paragraphs, lists (task boxes too), code blocks,
--- quotes, tables and rules.
+-- quotes, tables and rules, and the blocks lifted from them (planblocks.lift).
 function plancard.markdown(text)
   local out = {}
-  for _, block in ipairs(planblocks.parse(text)) do out[#out + 1] = plancard.block(block) end
+  for _, block in ipairs(planblocks.lift(planblocks.parse(text))) do out[#out + 1] = plancard.block(block) end
   return table.concat(out, "\n")
 end
 
@@ -81,7 +95,7 @@ local MARKS = { done = "☑", active = "▶", pending = "☐" }
 -- The plan's title and summary (its first heading when that is a `#` one and the paragraph after it, lifted into the header), and
 -- the rest of its blocks, with an id on each `##` heading for the contents.
 local function split(markdown)
-  local blocks = planblocks.parse(markdown or "")
+  local blocks = planblocks.lift(planblocks.parse(markdown or ""))
   local title, summary, first = nil, nil, 1
   if blocks[1] and blocks[1].kind == "heading" and blocks[1].level == 1 then
     title, first = blocks[1].text, 2
@@ -172,6 +186,14 @@ function plancard.html(plan, meta)
     "th, td { border: 1px solid color-mix(in srgb, CanvasText 20%, transparent); padding: 3px 6px; text-align: left; }",
     "blockquote { margin: 0; padding-left: 10px; border-left: 3px solid var(--accent); opacity: 0.8; }",
     ".link { text-decoration: underline; }",
+    ".filemap { margin: 8px 0; } .file { display: grid; grid-template-columns: minmax(0, max-content) 52px 1fr; gap: 8px;",
+    " align-items: baseline; padding: 3px 0; border-bottom: 1px solid var(--faint); }",
+    ".file code { overflow-wrap: anywhere; } .note { opacity: 0.75; }",
+    ".badge { font-size: 10px; font-weight: 600; text-align: center; border-radius: 4px; padding: 1px 4px; }",
+    ".badge.new { color: #2e9d4e; background: color-mix(in srgb, #2e9d4e 15%, transparent); }",
+    ".badge.edit { color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); }",
+    ".badge.delete { color: #d0453a; background: color-mix(in srgb, #d0453a 15%, transparent); }",
+    ".source { margin-top: 4px; font-size: 11px; } .source summary { cursor: pointer; opacity: 0.55; }",
     "footer { display: flex; gap: 8px; justify-content: flex-end; padding: 8px 14px; border-top: 1px solid var(--faint); }",
     "footer button { font: inherit; padding: 4px 12px; }",
     "#focus { background: var(--accent); color: white; border: 0; border-radius: 5px; }",

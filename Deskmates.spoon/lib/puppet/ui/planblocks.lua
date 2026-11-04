@@ -73,4 +73,118 @@ function planblocks.parse(text)
   return blocks
 end
 
+local BADGES = {
+  new = "new", create = "new", created = "new", add = "new", added = "new",
+  edit = "edit", modify = "edit", modified = "edit", change = "edit", changed = "edit", update = "edit", updated = "edit",
+  delete = "delete", deleted = "delete", remove = "delete", removed = "delete",
+}
+local SEPARATORS = { ":", "-", "—", "–", "·", "," }
+
+-- Text with spaces and separators taken off both ends.
+local function clean(text)
+  local again = true
+  while again do
+    again = false
+    text = trim(text)
+    for _, sep in ipairs(SEPARATORS) do
+      if text:sub(1, #sep) == sep then text, again = text:sub(#sep + 1), true end
+      if #text >= #sep and text:sub(-#sep) == sep then text, again = text:sub(1, -#sep - 1), true end
+    end
+  end
+  return text
+end
+
+-- The first code span of text when it names a file (no space; a folder or an extension, maybe with :lines),
+-- and the text without it.
+local function pathIn(text)
+  local s, e, code = text:find("`([^`]+)`")
+  if not code or code:find("%s") then return nil end
+  local bare = code:gsub(":[%d][%d%-,]*$", "")
+  if not (bare:find("/") or bare:find("%.%w+$")) then return nil end
+  return code, text:sub(1, s - 1) .. " " .. text:sub(e + 1)
+end
+
+-- A badge from the text's first word ("Create: …") or a word in brackets ("(new)"), and the text without it.
+local function badgeIn(text)
+  local word, rest = text:match("^%s*(%a+)(.*)$")
+  if word and BADGES[word:lower()] then return BADGES[word:lower()], rest end
+  local s, e, inner = text:find("%((%a+)%)")
+  if inner and BADGES[inner:lower()] then return BADGES[inner:lower()], text:sub(1, s - 1) .. text:sub(e + 1) end
+  return nil, text
+end
+
+local function named(text, names)
+  text = trim((text or ""):gsub("[%*_]", "")):lower():gsub(":$", "")
+  for _, name in ipairs(names) do if text == name or text:sub(1, #name + 1) == name .. " " then return true end end
+  return false
+end
+
+local FILE_HEADINGS = { "files", "file map" }
+local FILE_COLUMNS = { file = true, files = true, path = true, paths = true }
+
+-- A list under a Files heading or a "Files:" line, or a table with a File or Path column, every row naming a
+-- file: { kind = "filemap", rows = { { path, badge, note } }, titled, source }. `titled` when a heading or line
+-- above already says Files. Nil for anything else.
+function planblocks.fileMap(block, context)
+  local rows = {}
+  if block.kind == "list" then
+    local before = context.before
+    local marked = before and before.kind == "paragraph" and #before.lines == 1
+      and named(before.lines[1], { "files" }) and trim(before.lines[1]):match(":%**$") ~= nil
+    local titled = marked or (context.heading and named(context.heading.text, FILE_HEADINGS))
+    if not titled then return nil end
+    for _, item in ipairs(block.items) do
+      local path, rest = pathIn(item)
+      if not path then return nil end
+      local badge
+      badge, rest = badgeIn(rest)
+      rows[#rows + 1] = { path = path, badge = badge, note = clean(rest) }
+    end
+    return { kind = "filemap", rows = rows, titled = true, source = block.source }
+  elseif block.kind == "table" and #block.rows >= 2 then
+    local column
+    for c, cell in ipairs(block.rows[1]) do
+      if FILE_COLUMNS[trim(cell:gsub("[%*_`]", "")):lower()] then column = c break end
+    end
+    if not column then return nil end
+    for r = 2, #block.rows do
+      local path = pathIn(block.rows[r][column] or "")
+      if not path then return nil end
+      local badge, notes = nil, {}
+      for c, cell in ipairs(block.rows[r]) do
+        if c ~= column then
+          if not badge then
+            local found, rest = badgeIn(cell)
+            if found then badge, cell = found, rest end
+          end
+          cell = clean(cell)
+          if cell ~= "" then notes[#notes + 1] = cell end
+        end
+      end
+      rows[#rows + 1] = { path = path, badge = badge, note = table.concat(notes, " · ") }
+    end
+    local titled = context.heading ~= nil and named(context.heading.text, FILE_HEADINGS)
+    return { kind = "filemap", rows = rows, titled = titled, source = block.source }
+  end
+  return nil
+end
+
+-- The recognisers, in the order they are tried.
+planblocks.RECOGNISERS = { planblocks.fileMap }
+
+-- The blocks with each one a recogniser knows replaced by the block it lifts; the rest as they were.
+function planblocks.lift(blocks)
+  local out, heading = {}, nil
+  for i, block in ipairs(blocks) do
+    local lifted
+    for _, recognise in ipairs(planblocks.RECOGNISERS) do
+      lifted = recognise(block, { heading = heading, before = blocks[i - 1] })
+      if lifted then break end
+    end
+    out[#out + 1] = lifted or block
+    if block.kind == "heading" then heading = block end
+  end
+  return out
+end
+
 return planblocks

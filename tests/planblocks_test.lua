@@ -66,4 +66,36 @@ end)())
 check("parse: nothing, no blocks", #planblocks.parse("") == 0)
 check("parse: CRLF like LF", same(planblocks.parse(SAMPLE:gsub("\n", "\r\n")), blocks))
 
+-- The file map: a Files list or a table with a file column, one row per file.
+local function lifted(text) return planblocks.lift(planblocks.parse(text)) end
+local function only(text, kind)
+  local found
+  for _, b in ipairs(lifted(text)) do if b.kind == kind then found = b end end
+  return found
+end
+local function rows(block)
+  local out = {}
+  for _, r in ipairs(block and block.rows or {}) do out[#out + 1] = { r.path, r.badge or false, r.note } end
+  return out
+end
+local list = only("## Files\n\n- Create: `bin/x.sh`\n- Modify: `README.md` — the flag", "filemap")
+check("file map: a Files list", same(rows(list), { { "bin/x.sh", "new", "" }, { "README.md", "edit", "the flag" } }))
+check("file map: under its heading, it needs no label", list and list.titled == true)
+check("file map: its source", list and list.source == "- Create: `bin/x.sh`\n- Modify: `README.md` — the flag")
+check("file map: a **Files:** line", same(rows(only("**Files:**\n- `a/b.lua` (new)", "filemap")), { { "a/b.lua", "new", "" } }))
+local tableMap = only("| File | Change |\n|---|---|\n| `bin/deskmates` | edit: add the flag |", "filemap")
+check("file map: a file table", same(rows(tableMap), { { "bin/deskmates", "edit", "add the flag" } }))
+check("file map: a table anywhere gets a label", tableMap and not tableMap.titled)
+check("file map: a path with its lines", same(rows(only("## Files\n\n- Modify: `tests/a.lua:12-30`", "filemap")),
+  { { "tests/a.lua:12-30", "edit", "" } }))
+check("file map: an item with no path stays a list", only("## Files\n\n- `a.sh`\n- No other files change.", "list") ~= nil
+  and only("## Files\n\n- `a.sh`\n- No other files change.", "filemap") == nil)
+check("file map: a code span that is no path stays a list", only("## Files\n\n- `run the tests`", "filemap") == nil)
+check("file map: a list under another heading stays a list", only("## Steps\n\n- `a.sh`", "filemap") == nil)
+check("file map: a table with no file column stays a table", only("| Name | Type |\n|---|---|\n| `a.sh` | edit |", "filemap") == nil)
+check("file map: no badge word, no badge", same(rows(only("## Files\n\n- `a.sh` the helper", "filemap")), { { "a.sh", false, "the helper" } }))
+check("file map: a word that is no badge stays in the note", same(rows(only("## Files\n\n- Test: `tests/x_test.lua`", "filemap")),
+  { { "tests/x_test.lua", false, "Test" } }))
+check("file map: what is not lifted is left as it was", same(lifted("# T\n\ntext"), planblocks.parse("# T\n\ntext")))
+
 check.done("plan blocks")
