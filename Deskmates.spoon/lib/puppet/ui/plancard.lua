@@ -274,11 +274,12 @@ function PlanCard:show(key, plan, meta)
   local size = plancard.fitSize(self.loadSize and self.loadSize())
   local rect = self.frameFor(key, size.w, size.h)
   local view = hs.webview.new(rect, { developerExtrasEnabled = false }, content)
-  -- new() takes the page's rect, but frame() and frameChange give the window's, title bar included: keep
-  -- the difference, so the size saved is the page's and the card does not grow each time it opens.
+  view:windowStyle({ "titled", "closable", "utility", "resizable" })
+  -- new() takes the page's rect, but frame() and frameChange give the window's, title bar included (once the
+  -- style above gives it one): keep the difference, so the size saved is the page's and the card does not grow
+  -- each time it opens.
   local outer = view:frame()
   local chromeW, chromeH = outer.w - rect.w, outer.h - rect.h
-  view:windowStyle({ "titled", "closable", "utility", "resizable" })
   view:windowTitle(meta.title or "Plan")
   view:allowTextEntry(true)
   view:deleteOnClose(true)

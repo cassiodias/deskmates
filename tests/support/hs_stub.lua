@@ -60,10 +60,12 @@ local function webview(frame, _, content)
   function v:show() self.shown = true return self end
   function v:hide() self.shown = false return self end
   function v:hswindow() return nil end
-  -- As Hammerspoon does: new() takes the content's rect, frame() gives the window's, title bar included.
+  -- As Hammerspoon does: new() takes the content's rect, frame() gives the window's, with its title bar once
+  -- the window has a "titled" style.
   function v:frame()
-    local f = self.frame_
-    return { x = f.x, y = f.y - stub.titleBar, w = f.w, h = f.h + stub.titleBar }
+    local f, bar = self.frame_, 0
+    for _, style in ipairs(self.style_ or {}) do if style == "titled" then bar = stub.titleBar end end
+    return { x = f.x, y = f.y - bar, w = f.w, h = f.h + bar }
   end
   function v:delete() self.deleted = true self.shown = false end
   stub.webviews[#stub.webviews + 1] = v
