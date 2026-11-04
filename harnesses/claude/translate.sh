@@ -25,6 +25,7 @@ subagent_description() {
 }
 
 event=$(field hook_event_name)
+session=$(field session_id)
 tool=$(field tool_name)
 text=""
 title=""
@@ -48,7 +49,6 @@ plan_change() {
   shift
   plan_update "$session" claude "$PLAN_DEFS $filter" "$@" 2>/dev/null && flag="plan"
 }
-session=$(field session_id)
 case "$event:$tool" in
   PreToolUse:TodoWrite)
     plan_change '. as $p | $cur | .steps = [($p.tool_input.todos // []) | to_entries[]
@@ -81,6 +81,6 @@ case "$event:$tool" in
   SessionEnd:*) plan_delete "$session" ;;
 esac
 
-write_event claude "$event" "$(field session_id)" "$(field agent_id)" "$tool" "$(field agent_type)" "$text" \
+write_event claude "$event" "$session" "$(field agent_id)" "$tool" "$(field agent_type)" "$text" \
   "$(path_field cwd)" "$flag" "$title"
 exit 0
