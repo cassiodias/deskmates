@@ -279,6 +279,25 @@ When the agent's events do not line up with the table (`harnesses/cursor/transla
   phase words name, with an optional `verdict` the agent wrote), or null for none. The rules (ticket shape, phase words, limits) live in
   `FACTS_DEFS`, so every agent's facts read alike. Write the line with the flag `facts` when it returns 0 (a test
   line keeps `test`), and `facts_delete` on `SessionEnd`. Claude's translator is the example.
+- **Plan vs actual** (optional, needs git): the card sets the plan's file map against what git says changed, and
+  lists the session's turns. It needs two calls from your translator, after `facts-lib.sh` is sourced:
+  - `facts_track <session> <folder> <event> <flag> <yes|no>`, once per event, with the event as Claude Code's
+    names have it and the flag the line has so far. It takes the repo's base at the session's first event, starts a
+    turn on `UserPromptSubmit`, ends it on `Stop`, and counts test runs. The last argument is `yes` when the
+    agent's failure event means a non-zero exit (Claude Code's `PostToolUseFailure`), `no` when it reports no exit
+    code and "passed" and "failed" cannot be told. It returns 0 when a turn started or ended and the line has no
+    other flag: set the flag `facts` then.
+  - `facts_edit <session> <folder> <path>...` on the agent's edit tool, with only the paths it names, never file
+    contents. Paths may be absolute or relative to the folder; one outside the repo is left out. An edit sets no
+    flag: the card reads the file when it opens.
+
+  Name your agent's edit tool in a comment beside the call, and test both with `NAME.repo` fixtures (step 2).
+  The helpers keep their working variables private (`_facts_`, `_plan_`), so a translator never needs to know
+  their internals and may use any other name. The facts file keeps the repo's root, the commit it started from, the
+  paths that were already dirty, the paths the agent edited, and per turn its start, end, files, test counts and
+  commits: never prompts or contents. Git runs with `GIT_OPTIONAL_LOCKS=0`, so it never takes the `index.lock` the
+  agent's own git needs. The Spoon says "not seen from the agent" for a path git shows changed that no edit
+  named, such as a write through a shell command.
 
 ### 4. hooks.json, detect.sh, config.sh, install.sh, uninstall.sh
 
