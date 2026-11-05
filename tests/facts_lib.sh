@@ -258,8 +258,10 @@ if [ -n "$found_jq" ] && command -v git > /dev/null; then
   # A session started in a subfolder: its relative paths are the subfolder's.
   facts_git_start g4 "$repo/src"
   facts_turn_start g4
-  facts_edit g4 "$repo/src" app.js "$repo/src/my file.js" ../notes.txt
-  expect "relative to the subfolder" "$(got g4 '.turns[0].files')" '["src/app.js","src/my file.js","notes.txt"]'
+  expect "the folder and its place in the repo" "$(got g4 '.git | [.folder, .prefix]')" "[\"$repo/src\",\"src/\"]"
+  facts_edit g4 "$repo/src" app.js "$repo/src/my file.js" ../notes.txt "$(cd "$repo" && pwd -P)/docs/ção.md"
+  expect "relative to the subfolder, or to the real root" "$(got g4 '.turns[0].files')" \
+    '["src/app.js","src/my file.js","notes.txt","docs/ção.md"]'
 
   # A folder spelled through a symlink: its paths still land relative to the root.
   ln -s repo "$HOME/alias"
@@ -267,6 +269,11 @@ if [ -n "$found_jq" ] && command -v git > /dev/null; then
   facts_turn_start g5
   facts_edit g5 "$HOME/alias" "$HOME/alias/src/app.js"
   expect "through a symlink" "$(got g5 '.turns[0].files')" '["src/app.js"]'
+  # A subfolder spelled through a symlink: a path beside it is still in the repo.
+  facts_git_start g12 "$HOME/alias/src"
+  facts_turn_start g12
+  facts_edit g12 "$HOME/alias/src" "$HOME/alias/docs/ção.md" "$HOME/alias/src/app.js"
+  expect "beside a subfolder spelled through a symlink" "$(got g12 '.turns[0].files')" '["docs/ção.md","src/app.js"]'
 
   # The cuts: 30 turns, subjects of 120 characters.
   facts_git_start g6 "$repo"
@@ -302,6 +309,27 @@ if [ -n "$found_jq" ] && command -v git > /dev/null; then
   expect "the fake git was used" "$(got g9 '.turns | length')" 2
   expect "every git call without optional locks" "$(sort -u "$HOME/locks")" 0
   expect "no index.lock left" "$(ls "$repo/.git" | grep -c index.lock)" 0
+
+  # An edit from the folder the session started in asks git nothing; from another folder, once.
+  (
+    PATH="$HOME/fakebin:$PATH"
+    before=$(wc -l < "$HOME/locks")
+    facts_edit g9 "$repo" src/app.js "src/my file.js"
+    expect "an edit from the session's folder runs no git" "$(($(wc -l < "$HOME/locks") - before))" 0
+    facts_edit g9 "$repo/src" app.js
+    expect "an edit from another folder runs git once" "$(($(wc -l < "$HOME/locks") - before))" 1
+    [ "$failed" = 0 ]
+  ) || failed=1
+  expect "both edits written" "$(got g9 '.seen | keys')" '["src/app.js","src/my file.js"]'
+
+  # The git to run is looked up once per hook (again when PATH changes).
+  (
+    PATH="$HOME/fakebin:$PATH"
+    expect "the git found" "$(deskmates_git > /dev/null; mv "$HOME/fakebin/git" "$HOME/git.moved"; deskmates_git)" \
+      "$HOME/fakebin/git"
+    mv "$HOME/git.moved" "$HOME/fakebin/git"
+    [ "$failed" = 0 ]
+  ) || failed=1
 
   # Without git, or with Deskmates off: nothing.
   mkdir -p "$HOME/nogit"
