@@ -282,7 +282,7 @@ When the agent's events do not line up with the table (`harnesses/cursor/transla
 - **Plan vs actual** (optional, needs git): the card sets the plan's file map against what git says changed, and
   lists the session's turns. It needs two calls from your translator, after `facts-lib.sh` is sourced:
   - `facts_track <session> <folder> <event> <flag> <yes|no>`, once per event, with the event as Claude Code's
-    names have it and the flag the line has so far. It takes the repo's base at the session's first event, starts a
+    names have it and the flag the line has so far. It takes the repo's base (its current commit) at the session's first event in a repo that has a commit, starts a
     turn on `UserPromptSubmit`, ends it on `Stop`, and counts test runs. The last argument is `yes` when the
     agent's failure event means a non-zero exit (Claude Code's `PostToolUseFailure`), `no` when it reports no exit
     code and "passed" and "failed" cannot be told. It returns 0 when a turn started or ended and the line has no
