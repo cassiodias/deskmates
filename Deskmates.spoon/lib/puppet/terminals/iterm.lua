@@ -49,17 +49,20 @@ end
 -- Selects the tab and pane running a terminal device and brings their window forward, in one go; false when iTerm
 -- has none. AppleScript only selects inside iTerm and answers the window's id (macOS's window number too):
 -- Hammerspoon raises that window itself, as activating iTerm from AppleScript raised its last front window
--- instead, a step per click.
+-- instead, a step per click. The id is read before anything is selected (`w` is "window N", and selecting a tab
+-- reorders the windows), and the window is made iTerm's front one, or iTerm raises its old one once active.
 function Iterm:select(tty)
   local ok, id = hs.osascript.applescript(string.format([[
     tell application id "com.googlecode.iterm2"
       repeat with w in windows
+        set wid to id of w
         repeat with t in tabs of w
           repeat with s in sessions of t
             if tty of s is "%s" then
               select t
               select s
-              return id of w
+              select (first window whose id is wid)
+              return wid
             end if
           end repeat
         end repeat

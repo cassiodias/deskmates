@@ -136,6 +136,7 @@ hs = {
     applescript = function(script)
       if script:find("set out to", 1, true) then return true, stub.tabs end
       -- Selecting a tab: iTerm answers the id of the window holding it (its window number + 100), or 0.
+      stub.selectScript = script
       local tty = script:match('tty of s is "([^"]+)"')
       stub.selected = tty
       local window = stub.tabs:match(tty:gsub("%p", "%%%0") .. "=(%d+)/")

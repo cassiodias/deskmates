@@ -42,6 +42,13 @@ release()
 stub.advance(0.2)
 check("a quick click selects its tab", stub.selected == "/dev/ttys001")
 check("one click raises the tab's own window, in a second iTerm window too", stub.raised == 102)
+-- Live (5 Nov): AppleScript's `w` is "window N", and selecting a tab reorders iTerm's windows, so `id of w` read
+-- after it named another window; and iTerm, once active, raised its own front window over ours.
+local script = stub.selectScript or ""
+local idAt, selectAt = script:find("set wid to id of w", 1, true), script:find("select t", 1, true)
+check("the window's id is read before anything is selected", idAt ~= nil and selectAt ~= nil and idAt < selectAt)
+check("the tab's window becomes iTerm's front window", script:find("select (first window whose id is wid)", 1, true) ~= nil
+  and script:find("return wid", 1, true) ~= nil)
 check("a quick click leaves the puppets where they were", anchor() == before)
 check("a quick click leaves no tap running", running() == 0)
 
