@@ -287,6 +287,144 @@ stub.selected = nil
 doubleClick()
 stub.advance(0.2)
 check("junk facts and no plan: a double click selects the tab", stub.selected == "/dev/ttys001" and #stub.webviews == views)
+
+-- Plan vs actual: a session in a git repo opens its card at once, reading git, and git's answer fills it.
+-- git is found at /opt/homebrew/bin/git whatever this machine has; its commands are the stub's tasks.
+local attributes = hs.fs.attributes
+hs.fs.attributes = function(path, field)
+  if path == "/opt/homebrew/bin/git" then return { mode = "file" } end
+  if path:find("git", 1, true) then return nil end
+  return attributes(path, field)
+end
+local REPO, BASE = "/Users/me/my-app", "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+-- The facts as the hooks write them (harnesses/claude/fixtures/actual-stop.facts), with updatedAt `n` and the
+-- turns given as JSON.
+local function writeGitFacts(n, turnsJson)
+  local file = io.open(factsDir .. "/git1.json", "w")
+  file:write('{"git": {"base": "' .. BASE .. '", "dirtyAtStart": [], "folder": "' .. REPO .. '", "prefix": "", "root": "'
+    .. REPO .. '", "top": null}, "seen": {"src/app.js": true}, "tickets": {}, "timeline": [], "turns": ' .. turnsJson
+    .. ', "updatedAt": ' .. n .. '}')
+  file:close()
+end
+local TURN1 = '{"at": 1000, "commits": [{"hash": "e4f5a6b", "subject": "Fixed the typo."}], "endAt": 1300, "files": '
+  .. '["src/app.js"], "head": "' .. BASE .. '", "tests": {"failed": 0, "passed": 2, "ran": 2}}'
+os.execute("mkdir -p '" .. factsDir .. "'")
+write("UserPromptSubmit|git1||||Fix it|my-app|iTerm.app||/dev/ttys009|claude|")
+write("Stop|git1||||Done.|my-app|iTerm.app||/dev/ttys009|claude|")
+stub.advance(0.2)
+-- Written with no facts line after it: the double click reads the file again itself.
+writeGitFacts(1, "[" .. TURN1 .. "]")
+local function doubleClickOn(key)
+  local c = P.stage.puppets[key].canvas
+  local function once()
+    c.onMouse(c, "mouseDown", nil, 0, 0)
+    c.onMouse(c, "mouseUp", nil, 0, 0)
+  end
+  stub.advance(1)
+  once()
+  stub.advance(0.1)
+  once()
+  stub.advance(0.2)
+  return stub.webviews[#stub.webviews]
+end
+-- Answers the git read whose first command is task `from` + 1; each next command is the newest task.
+local ANSWER = { "1\n", "M\0src/app.js\0", "", "scratch.sh\0" }
+local function answer(from, outputs)
+  local i = from + 1
+  for k = 1, 4 do
+    stub.finishTask(i, 0, outputs[k], "")
+    i = #stub.tasks
+  end
+end
+
+local tasks = #stub.tasks
+views = #stub.webviews
+local gitCard = doubleClickOn("git1")
+check("git only: a double click opens the card", #stub.webviews == views + 1 and gitCard.shown)
+check("git only: reading git at once", gitCard.html_:find("reading git…", 1, true) ~= nil)
+check("git only: the turns at once, from the facts file", gitCard.html_:find("Fixed the typo.", 1, true) ~= nil
+  and gitCard.html_:find("ran 2 · ✓ 2 · ✗ 0", 1, true) ~= nil)
+local first = stub.tasks[tasks + 1]
+check("git only: git runs in the session's repo", first ~= nil and first.path == "/opt/homebrew/bin/git"
+  and first.args[1] == "-C" and first.args[2] == REPO and first.args[3] == "rev-list" and first.started)
+answer(tasks, ANSWER)
+check("git's answer fills the card", gitCard.html_:find("since a1b2c3d · 1 commit · 1 uncommitted", 1, true) ~= nil
+  and gitCard.html_:find("<li><code>src/app.js</code></li>", 1, true) ~= nil
+  and gitCard.html_:find('<li><code>scratch.sh</code> <span class="unseen">not seen from the agent</span></li>', 1, true) ~= nil
+  and not gitCard.html_:find("reading git…", 1, true))
+
+-- A facts line: the card shows the new facts with the git answer it has, and reads git again.
+local draws = 0
+local html = gitCard.html
+gitCard.html = function(self, page) draws = draws + 1 return html(self, page) end
+writeGitFacts(2, '[{"at": 1400, "commits": [], "endAt": 1500, "files": [], "head": "' .. BASE .. '", "tests": '
+  .. '{"failed": 0, "passed": 0, "ran": 0}}, ' .. TURN1 .. "]")
+tasks = #stub.tasks
+write("Stop|git1||||Done.|my-app|iTerm.app|facts|/dev/ttys009|claude|")
+stub.advance(0.2)
+check("a facts line redraws with the git answer kept", draws == 1 and gitCard.html_:find("0 files", 1, true) ~= nil
+  and gitCard.html_:find("since a1b2c3d · 1 commit", 1, true) ~= nil)
+check("a facts line reads git again", #stub.tasks == tasks + 1 and stub.tasks[tasks + 1].args[3] == "rev-list")
+draws = 0
+answer(tasks, ANSWER)
+check("the same answer again does not redraw", draws == 0)
+tasks = #stub.tasks
+write("PostToolUse|git1||Bash|||my-app|iTerm.app|test|/dev/ttys009|claude|")
+stub.advance(0.2)
+draws = 0
+answer(tasks, { "2\n", "M\0src/app.js\0", "src/app.js\0", "" })
+check("a new answer redraws", draws == 1 and gitCard.html_:find("since a1b2c3d · 2 commits · 1 uncommitted", 1, true) ~= nil)
+-- Two reads at once: the older one answering last does not undo the newer.
+local older = #stub.tasks
+write("PreToolUse|git1||Bash|||my-app|iTerm.app|test|/dev/ttys009|claude|")
+stub.advance(0.2)
+local newer = #stub.tasks
+write("PostToolUse|git1||Bash|||my-app|iTerm.app|test|/dev/ttys009|claude|")
+stub.advance(0.2)
+answer(newer, { "3\n", "M\0src/app.js\0", "", "" })
+answer(older, ANSWER)
+check("an older read answering last is dropped", gitCard.html_:find("since a1b2c3d · 3 commits", 1, true) ~= nil)
+closeCard(gitCard)
+
+-- git fails, is too slow, or lost the base: one line in the block, the turns still there.
+tasks = #stub.tasks
+local failed = doubleClickOn("git1")
+stub.finishTask(tasks + 1, 128, "", "fatal: not a git repository")
+check("a failing git: git did not answer", failed.html_:find('<p class="line">git did not answer</p>', 1, true) ~= nil
+  and failed.html_:find("Fixed the typo.", 1, true) ~= nil)
+check("a failing git: no command after it", #stub.tasks == tasks + 1)
+closeCard(failed)
+tasks = #stub.tasks
+local slow = doubleClickOn("git1")
+stub.advance(3)
+check("a slow git: git did not answer, and it is stopped", slow.html_:find("git did not answer", 1, true) ~= nil
+  and stub.tasks[tasks + 1].terminated)
+closeCard(slow)
+tasks = #stub.tasks
+local gone = doubleClickOn("git1")
+stub.finishTask(tasks + 1, 128, "", "fatal: bad revision 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678..HEAD'")
+check("a base gone: says so", gone.html_:find("base a1b2c3d no longer exists", 1, true) ~= nil)
+closeCard(gone)
+
+-- A card closed before git answers gets nothing; nor does another session's card opened since.
+tasks = #stub.tasks
+local closed = doubleClickOn("git1")
+closeCard(closed)
+answer(tasks, ANSWER)
+check("a card closed before git answers: no update", closed.html_:find("reading git…", 1, true) ~= nil)
+tasks = #stub.tasks
+local left = doubleClickOn("git1")
+writeFacts("Fixed the typo.")
+write("PreToolUse|tab1||Skill||my-developer|app|iTerm.app|facts|/dev/ttys001|claude|")
+stub.advance(0.2)
+local other = doubleClickOn("tab1")
+check("a session with no git opens as today: no git read", #stub.tasks == tasks + 1
+  and other.html_:find("ABC-12", 1, true) ~= nil and not other.html_:find("PLAN VS ACTUAL", 1, true))
+local otherPage = other.html_
+answer(tasks, ANSWER)
+check("git's late answer leaves another session's card alone", other.html_ == otherPage and left.html_:find("reading git…", 1, true) ~= nil)
+closeCard(other)
+hs.fs.attributes = attributes
 os.execute("rm -rf '" .. plansDir .. "' '" .. factsDir .. "'")
 
 os.remove(eventsFile)

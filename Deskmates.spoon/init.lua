@@ -3,7 +3,8 @@
 --- Puppets that float over your desktop, one per busy coding-agent session, acting out what it is doing:
 --- it thinks, codes at its laptop (invaders or Matrix rain on its monitor), reads, runs tests, plays ping pong
 --- while subagents run, shows a question mark when the agent asks you something, and says what it did when it is done.
---- Click a puppet to jump to its session's terminal; double-click it to read its card, when its agent made a plan or works on a ticket.
+--- Click a puppet to jump to its session's terminal; double-click it to read its card, when its agent made a plan, works on a ticket
+--- or works in a git repo (plan vs actual and its turns).
 ---
 --- Agent hooks append one line per event to `~/.deskmates/events`; this Spoon reads it. This file is the
 --- Spoon's public surface and its wiring; the parts (events, model, render, stage, terminals, ui and one
@@ -25,12 +26,14 @@ local plans = require("puppet.model.plans")
 local facts = require("puppet.model.facts")
 local scenes = require("puppet.render.scenes")
 local Stage = require("puppet.stage.stage")
+local git = require("puppet.terminals.git")
 local Iterm = require("puppet.terminals.iterm")
 local Liveness = require("puppet.terminals.liveness")
 local newTerminals = require("puppet.terminals.focus")
 local menuItems = require("puppet.ui.menu")
 local plancard = require("puppet.ui.plancard")
 local sessioncard = require("puppet.ui.sessioncard")
+local workcard = require("puppet.ui.workcard")
 local bubble = require("puppet.stage.bubble")
 
 local obj = {}
@@ -111,14 +114,10 @@ function obj:handle(line)
     self.sessions:setFacts(event.session, path and facts.load(path))
   end
   if self.replayFrom then return end
-  -- The card open on this session shows the change at once.
+  -- The card open on this session shows the change at once, and what git says now.
   if (event.flag == "plan" or event.flag == "facts" or event.flag == "test") and self.planCard.key == event.session then
-    local plan, meta, version = self:cardContent(event.session)
-    -- Only a change: a new page loses the reader's place.
-    if meta and (version == nil or version ~= self.cardVersion) then
-      self.cardVersion = version
-      self.planCard:update(event.session, plan, meta)
-    end
+    self:refreshCard(event.session)
+    self:readGit(event.session)
   end
   for _, intent in ipairs(intents) do self:say(intent.key, intent.text, intent.seconds) end
 end
@@ -194,27 +193,77 @@ function obj:focus(key)
   if s then harnesses.get(s.harness).focus(s, self.terminals) end
 end
 
+-- What git said for session `key`'s card: { reading = true } until it answers, then { error = text } or
+-- git.read's result.
+function obj:gitState(key)
+  local kept = self.cardGit
+  return kept and kept.key == key and kept.state or { reading = true }
+end
+
+-- The part of a card's version that git's answer `state` gives: its raw texts, so the same answer twice is the
+-- same version.
+local function gitVersion(state)
+  if state.reading then return "reading" end
+  if state.error then return "error " .. state.error end
+  return table.concat({ tostring(state.commits), tostring(state.diff), tostring(state.uncommitted),
+    tostring(state.untracked) }, "\0|\0")
+end
+
 -- What session `key`'s card shows: its plan (nil when it has none to show), the card's meta, with the session's
--- facts, and which version of the two files it shows (nil when a file does not say); nil when there is neither
--- a plan nor facts.
+-- facts and, in a git repo, plan vs actual and its turns (meta.work), and which version of the files and of git's
+-- answer it shows (nil when a file does not say); nil when there is no plan, no facts and no git.
 function obj:cardContent(key)
   local s, puppet = self.sessions.all[key], self.stage.puppets[key]
   if not (s and puppet) then return nil end
   local plan = plans.hasContent(s.plan) and s.plan or nil
   local session = facts.hasContent(s.facts) and sessioncard.view(s.facts, os.time(), s.isWorking) or nil
-  if not plan and not session then return nil end
+  local state = self:gitState(key)
+  local work = workcard.view(s.facts, state, s.plan, s.isWorking)
+  if not plan and not session and not work then return nil end
   local version
-  if (not plan or plan.updatedAt) and (not session or s.facts.updatedAt) then
-    version = tostring(plan and plan.updatedAt) .. "|" .. tostring(session and s.facts.updatedAt)
+  if (not plan or plan.updatedAt) and (not (session or work) or s.facts.updatedAt) then
+    version = tostring(plan and plan.updatedAt) .. "|" .. tostring((session or work) and s.facts.updatedAt)
+      .. (work and "|" .. tostring(s.isWorking) .. "|" .. gitVersion(state) or "")
   end
-  return plan, { title = (s.title and s.title ~= "") and s.title or s.tag, color = puppet.color, session = session },
-    version
+  return plan, { title = (s.title and s.title ~= "") and s.title or s.tag, color = puppet.color, session = session,
+    work = work and workcard.html(work) }, version
+end
+
+-- Shows the card open on session `key` again, only when what it shows changed: a new page loses the reader's
+-- place.
+function obj:refreshCard(key)
+  local plan, meta, version = self:cardContent(key)
+  if meta and (version == nil or version ~= self.cardVersion) then
+    self.cardVersion = version
+    self.planCard:update(key, plan, meta)
+  end
+end
+
+-- Asks git, off the main thread, what changed in session `key`'s repo since its base, for the card open on it;
+-- the answer is kept in self.cardGit and shown, unless the card no longer shows that session or a newer read
+-- started. Nothing for a session not in a git repo.
+function obj:readGit(key)
+  local s = self.sessions.all[key]
+  if not (s and facts.hasGit(s.facts)) then return end
+  local kept = self.cardGit
+  if not (kept and kept.key == key) then
+    kept = { key = key, state = { reading = true } }
+    self.cardGit = kept
+  end
+  local read = (kept.reads or 0) + 1
+  kept.reads = read
+  git.read(s.facts.git.root, s.facts.git.base, function(result, message)
+    if self.cardGit ~= kept or kept.reads ~= read or self.planCard.key ~= key then return end
+    kept.state = result or { error = message }
+    self:refreshCard(key)
+  end)
 end
 
 --- Deskmates:click(key)
 --- Method
 --- A click on a session's puppet goes to its terminal; the second click of a double click opens its card when its
---- session has a plan or facts to show (the terminal is already in front, the card opens beside it).
+--- session has a plan, facts or a git repo to show (the terminal is already in front, the card opens beside it).
+--- The card opens at once; what git says fills it when git answers.
 function obj:click(key)
   local now = hs.timer.secondsSinceEpoch()
   local last = self.lastClick
@@ -222,10 +271,17 @@ function obj:click(key)
   -- A third click starts again: it goes to the terminal, as a first one.
   self.lastClick = not isDouble and { key = key, at = now } or nil
   local plan, meta, version
-  if isDouble then plan, meta, version = self:cardContent(key) end
+  if isDouble then
+    -- The facts as they are now, the hooks may have written them since the last line said so; git not read yet.
+    local path = facts.path(self.factsDir, key)
+    self.sessions:setFacts(key, path and facts.load(path))
+    self.cardGit = nil
+    plan, meta, version = self:cardContent(key)
+  end
   if meta then
     self.cardVersion = version
     self.planCard:show(key, plan, meta)
+    self:readGit(key)
   else
     self:focus(key)
   end

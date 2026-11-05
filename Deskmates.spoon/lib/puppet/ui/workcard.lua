@@ -97,20 +97,23 @@ local function testsText(t)
   return text .. " · ✓ " .. t.passed .. " · ✗ " .. t.failed
 end
 
--- One turn's row: { time, took ("running" while open), files, more, total, tests, commits }.
-local function turnRow(t)
+-- One turn's row: { time, took, files, more, total, tests, commits }. took is how long it took; for an open turn
+-- "running" when `isRunning`, else nil (a turn left open says only when it started).
+local function turnRow(t, isRunning)
   local files, more = capped(t.files)
-  return { time = os.date("%H:%M", t.at), took = t.endAt and sessioncard.took(t.endAt - t.at) or "running",
+  local took = t.endAt and sessioncard.took(t.endAt - t.at) or (isRunning and "running" or nil)
+  return { time = os.date("%H:%M", t.at), took = took,
     files = files, more = more, total = #t.files, tests = testsText(t.tests), commits = t.commits }
 end
 
 -- What the two blocks show for facts `f`, git's answer `gitState` ({ reading = true }, { error = text }, or
 -- terminals/git.lua's result) and `plan` (model/plans.lua's shape, or nil): { actual = actualView, turns = { turn
--- rows, newest first } }; nil when the facts know no git base. `now` is not read: an open turn shows "running".
-function workcard.view(f, gitState, plan, now)
+-- rows, newest first } }; nil when the facts know no git base. Only the newest turn, open while the session
+-- `isWorking`, says "running".
+function workcard.view(f, gitState, plan, isWorking)
   if not facts.hasGit(f) then return nil end
   local turns = {}
-  for _, t in ipairs(f.turns or {}) do turns[#turns + 1] = turnRow(t) end
+  for i, t in ipairs(f.turns or {}) do turns[#turns + 1] = turnRow(t, i == 1 and isWorking == true) end
   return { actual = actualView(f, gitState, plan), turns = turns }
 end
 
@@ -145,7 +148,7 @@ local function actualHtml(a)
   return table.concat(out)
 end
 
--- One turn's `<li>`: time, how long, the file count opening to the paths, tests, commits.
+-- One turn's `<li>`: time, how long (empty when not known), the file count opening to the paths, tests, commits.
 local function turnHtml(t)
   local files
   if t.total == 0 then
@@ -160,7 +163,7 @@ local function turnHtml(t)
   for _, c in ipairs(t.commits) do
     commits[#commits + 1] = '<span class="commit"><code>' .. escape(c.hash) .. "</code> " .. escape(c.subject) .. "</span>"
   end
-  return '<li><span class="time">' .. t.time .. '</span><span class="took">' .. escape(t.took) .. "</span>" .. files
+  return '<li><span class="time">' .. t.time .. '</span><span class="took">' .. escape(t.took or "") .. "</span>" .. files
     .. (t.tests and '<span class="tests">' .. t.tests .. "</span>" or "")
     .. (#commits > 0 and '<span class="commits">' .. table.concat(commits) .. "</span>" or "") .. "</li>"
 end
