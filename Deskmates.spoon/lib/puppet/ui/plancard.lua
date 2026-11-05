@@ -5,6 +5,7 @@
 
 local planblocks = require("puppet.ui.planblocks")
 local sessioncard = require("puppet.ui.sessioncard")
+local workcard = require("puppet.ui.workcard")
 
 local plancard = {}
 
@@ -128,6 +129,7 @@ end
 -- The whole page for `plan` (model/plans.lua's shape, or nil); meta.title names the session, meta.color is its
 -- puppet's, meta.session (sessioncard.view, or nil) what the session is working on: shown on top, with the plan
 -- below, or the session's timeline when there is no plan (the timeline also waits, hidden, behind the plan).
+-- meta.work (workcard.html, or nil), the git blocks, goes under the session, before the plan.
 function plancard.html(plan, meta)
   local nonce = string.format("%08x%08x", math.random(0, 0x7fffffff), math.random(0, 0x7fffffff))
   local color = (meta.color or ""):match("^#%x%x%x%x%x%x$") or "#888888"
@@ -141,6 +143,7 @@ function plancard.html(plan, meta)
   local title, summary, article, sections = split(plan.markdown)
 
   local body = { "<header>", session or "" }
+  if meta.work then body[#body + 1] = '<div class="work">' .. meta.work .. "</div>" end
   if hasPlan then
     body[#body + 1] = '<div class="label">PLAN</div><h1 class="title">' .. escape(title or meta.title or "Plan") .. "</h1>"
     if summary then body[#body + 1] = '<p class="summary">' .. inline(summary) .. "</p>" end
@@ -231,6 +234,8 @@ function plancard.html(plan, meta)
     "[hidden] { display: none !important; }",
     ".timeline-body { flex: 1; min-height: 0; overflow: auto; padding: 0 14px 10px; }",
     sessioncard.CSS,
+    workcard.CSS,
+    ".work { max-height: 45vh; overflow: auto; }",
     "footer { display: flex; gap: 8px; justify-content: flex-end; padding: 8px 14px; border-top: 1px solid var(--faint); }",
     "footer button { font: inherit; padding: 4px 12px; }",
     "#focus { background: var(--accent); color: white; border: 0; border-radius: 5px; }",

@@ -15,12 +15,14 @@ local escape = sessioncard.escape
 
 local function clock(t) return t and os.date("%H:%M", t) or nil end
 
-local function took(seconds)
+-- How long `seconds` lasted, in words: "<1 min", "12 min", "1 h 5 min".
+function sessioncard.took(seconds)
   local minutes = math.floor(math.max(0, seconds) / 60)
   if minutes < 1 then return "<1 min" end
   if minutes < 60 then return minutes .. " min" end
   return math.floor(minutes / 60) .. " h " .. minutes % 60 .. " min"
 end
+local took = sessioncard.took
 
 local function label(e)
   if e.kind == "phase" then return e.text end

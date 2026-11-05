@@ -181,4 +181,17 @@ check("script: Also switches tickets", has(plancard.SCRIPT, "select.also") and h
 check("script: a phase click filters, or brings the plan back", has(plancard.SCRIPT, "button.phase")
   and has(plancard.SCRIPT, "data-phase") and has(plancard.SCRIPT, "getElementById('plan')"))
 
+-- The git blocks (meta.work): under the session's header, before the plan; a card on their own without a plan
+-- or tickets.
+local WORK = '<section class="actual"><p class="line">reading git…</p></section>'
+local workOnly = plancard.html(nil, { title = "my-app", work = WORK })
+check("work, no plan or tickets: the card shows it", has(workOnly, WORK) and not has(workOnly, ">PLAN<")
+  and not has(workOnly, 'class="session"') and not has(workOnly, 'id="timeline"') and has(workOnly, "Go to terminal"))
+check("work: its styles", has(workOnly, ".actual") and has(workOnly, ".unseen"))
+local workAll = plancard.html({ steps = STEPS, markdown = "# Add a flag\n\n## Files\n\n- a" },
+  { title = "my-app", session = view, work = WORK })
+local wAt, sAt, pAt = workAll:find(WORK, 1, true), workAll:find('class="strip"', 1, true), workAll:find(">PLAN<", 1, true)
+check("work: under the session's strip, before the plan", wAt and sAt and pAt and sAt < wAt and wAt < pAt)
+check("no work: no work block", not has(both, 'class="work"'))
+
 check.done("plan card")
