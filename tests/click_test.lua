@@ -130,11 +130,15 @@ check("the card's click selects no tab", stub.selected == nil)
 check("the card sits on the screen", card and card.frame_.x >= 0 and card.frame_.y >= 0
   and card.frame_.x + card.frame_.w <= 1440 and card.frame_.y + card.frame_.h <= 900)
 card.content.callback({ body = "focus" })
-check("the card hides at once", not card.shown)
-check("but is not deleted inside its own callback", not card.deleted)
 stub.advance(0.2)
 check("the card's Go to terminal selects the tab", stub.selected == "/dev/ttys001")
-check("and the card is deleted once its callback is over", card.deleted)
+-- Cassio (5 Nov): the card stays beside the terminal; losing the focus to it does not hide the card.
+check("Go to terminal leaves the card open", card.shown and not card.deleted and P.planCard:isShown())
+card.windowCallback_("focusChange", card, false)
+check("and the terminal taking the focus does not hide it", card.shown and P.planCard:isShown())
+card.content.callback({ body = "close" })
+stub.advance(0.2)
+check("Close still closes it", not card.shown and card.deleted)
 
 press()
 release()
