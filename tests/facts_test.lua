@@ -71,6 +71,79 @@ local ends = ended and ended.tickets["ABC-12"].ends
 check("load: a lane's end", ends and ends.dev.at == 2 and ends.dev.outcome == "Applied." and ends.dev.verdict == nil)
 check("load: its verdict", ends and ends.review.verdict == "CHANGES_REQUESTED")
 check("load: an end without a time, or of no lane, dropped", ends and ends.plan == nil and ends.qa == nil)
+-- git, seen and turns: the session's edits as the hooks record them.
+local full = facts.load(file("git.json", [[{
+  "git": { "root": "/work/my-app", "base": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678", "dirtyAtStart": ["src/a.js", "docs/ção.md"],
+           "folder": "/work/my-app", "prefix": "", "top": null },
+  "seen": { "src/app.js": true, "src/my file.js": true },
+  "tickets": {}, "timeline": [],
+  "turns": [
+    { "at": 200, "head": "ffff", "files": ["src/app.js"], "tests": { "ran": 2, "passed": 1, "failed": 1 },
+      "commits": [ { "hash": "a1b2c3d", "subject": "Fixed the typo." } ] },
+    { "at": 100, "endAt": 150, "files": [], "tests": { "ran": 0, "passed": 0, "failed": 0 }, "commits": [] }
+  ]
+}]]))
+check("git: root and base", full and full.git and full.git.root == "/work/my-app"
+  and full.git.base == "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678")
+check("git: dirty at start as a set", full and full.git.dirtyAtStart["src/a.js"] == true
+  and full.git.dirtyAtStart["docs/ção.md"] == true and not full.git.dirtyAtStart["x"])
+check("seen: a set of paths", full and full.seen["src/app.js"] == true and full.seen["src/my file.js"] == true)
+local t1, t2 = full and full.turns[1], full and full.turns[2]
+check("turns: newest first, as written", t1 and t2 and t1.at == 200 and t2.at == 100)
+check("turns: open turn has no end, closed has", t1 and t1.endAt == nil and t2.endAt == 150)
+check("turns: files", t1 and #t1.files == 1 and t1.files[1] == "src/app.js" and #t2.files == 0)
+check("turns: tests", t1 and t1.tests.ran == 2 and t1.tests.passed == 1 and t1.tests.failed == 1)
+check("turns: commits", t1 and #t1.commits == 1 and t1.commits[1].hash == "a1b2c3d"
+  and t1.commits[1].subject == "Fixed the typo.")
+check("hasGit: with git", facts.hasGit(full))
+check("hasContent: git alone is no content", not facts.hasContent(full))
+
+local gitOnly = facts.load(file("gitonly.json", '{"git": {"root": "/r", "base": "abcdef1"}}'))
+check("git only: loads with no tickets", gitOnly and next(gitOnly.tickets) == nil and #gitOnly.timeline == 0)
+check("git only: hasGit, no content, no turns", gitOnly and facts.hasGit(gitOnly) and not facts.hasContent(gitOnly)
+  and #gitOnly.turns == 0 and next(gitOnly.seen) == nil and next(gitOnly.git.dirtyAtStart) == nil)
+check("hasGit: nil and old facts", not facts.hasGit(nil) and not facts.hasGit(f))
+check("load: old facts have no git, seen or turns", f and f.git == nil and next(f.seen) == nil and #f.turns == 0)
+
+local function gitOf(json) local g = facts.load(file("g.json", '{"tickets": {}, "git": ' .. json .. "}")) return g and g.git end
+check("git: a base that is not hex, no git", gitOf('{"root": "/r", "base": "main"}') == nil)
+check("git: a base too short or too long, no git", gitOf('{"root": "/r", "base": "abc12"}') == nil
+  and gitOf('{"root": "/r", "base": "' .. string.rep("a", 41) .. '"}') == nil)
+check("git: a short 7-hex base is fine", gitOf('{"root": "/r", "base": "ABCDEF1"}') ~= nil)
+check("git: no root, no git", gitOf('{"base": "abcdef1"}') == nil)
+check("git: root not a string, no git", gitOf('{"root": 5, "base": "abcdef1"}') == nil)
+check("git: not a table, no git", gitOf('"x"') == nil)
+local dirty = gitOf('{"root": "/r", "base": "abcdef1", "dirtyAtStart": ["a.js", 3, {"x": 1}, "b.js"]}')
+check("git: junk dirty entries dropped alone", dirty and dirty.dirtyAtStart["a.js"] and dirty.dirtyAtStart["b.js"]
+  and not dirty.dirtyAtStart[3])
+check("git: dirtyAtStart not a list is empty", next(gitOf('{"root": "/r", "base": "abcdef1", "dirtyAtStart": "a.js"}').dirtyAtStart) == nil)
+
+local odd2 = facts.load(file("odd2.json", [[{
+  "tickets": {},
+  "git": "junk",
+  "seen": { "a.js": true, "b.js": false, "c.js": "yes", "d.js": true },
+  "turns": [ 7, { "files": ["no-time.js"] },
+    { "at": 5, "endAt": "later", "files": ["a.js", 3, "b.js"], "tests": { "ran": "2", "passed": 1 },
+      "commits": [ { "hash": "a1b2c3d" }, { "subject": "no hash" }, { "hash": "e4f5a6b", "subject": "Kept." }, "x" ] },
+    { "at": 4, "files": "a.js", "tests": 3, "commits": "none" } ]
+}]]))
+check("load: a git that is not a table dropped, file kept", odd2 and odd2.git == nil and not facts.hasGit(odd2))
+check("seen: only true entries kept", odd2 and odd2.seen["a.js"] and odd2.seen["d.js"] and not odd2.seen["b.js"]
+  and not odd2.seen["c.js"])
+check("turns: entries without a time dropped", odd2 and #odd2.turns == 2 and odd2.turns[1].at == 5)
+local o1, o2 = odd2 and odd2.turns[1], odd2 and odd2.turns[2]
+check("turns: a bad endAt dropped", o1 and o1.endAt == nil)
+check("turns: junk files dropped alone", o1 and #o1.files == 2 and o1.files[1] == "a.js" and o1.files[2] == "b.js")
+check("turns: bad test counts are zero", o1 and o1.tests.ran == 0 and o1.tests.passed == 1 and o1.tests.failed == 0)
+check("turns: bad commits dropped alone", o1 and #o1.commits == 1 and o1.commits[1].hash == "e4f5a6b")
+check("turns: bad files, tests and commits give empty ones", o2 and #o2.files == 0 and #o2.commits == 0
+  and o2.tests.ran == 0 and o2.tests.passed == 0 and o2.tests.failed == 0)
+check("load: seen and turns not tables give none", (function()
+  local g = facts.load(file("g2.json", '{"tickets": {}, "seen": [1], "turns": "x"}'))
+  return g and next(g.seen) == nil and #g.turns == 0
+end)())
+check("load: no tickets and no git is not facts", facts.load(file("g3.json", '{"seen": {"a.js": true}}')) == nil)
+
 check("path: a session's file", facts.path(dir, "s1") == dir .. "/s1.json")
 check("path: refuses a path out", facts.path(dir, "../x") == nil and facts.path(dir, "..") == nil)
 
