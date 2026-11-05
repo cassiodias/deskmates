@@ -59,7 +59,9 @@ local function webview(frame, _, content)
   function v:html(html) self.html_ = html return self end
   function v:show() self.shown = true return self end
   function v:hide() self.shown = false return self end
-  function v:hswindow() return nil end
+  -- Looking up a web view's window asks macOS about every app's windows: slow (1.5 s live). Counted, so a
+  -- test can say it never happens.
+  function v:hswindow() stub.windowLookups = (stub.windowLookups or 0) + 1 return nil end
   -- As Hammerspoon does: new() takes the content's rect, frame() gives the window's, with its title bar once
   -- the window has a "titled" style.
   function v:frame()
@@ -160,7 +162,8 @@ hs = {
   },
   processInfo = { processID = 4242 },
   dialog = { textPrompt = function() return "Cancel", "" end },
-  focus = function() end,
+  -- hs.focus makes Hammerspoon the active app; counted.
+  focus = function() stub.activated = (stub.activated or 0) + 1 end,
   -- A shell command's output: only `ps` is run; stub.ps holds what it prints (nil: it failed).
   execute = function() return stub.ps, stub.ps ~= nil end,
   spoons = {

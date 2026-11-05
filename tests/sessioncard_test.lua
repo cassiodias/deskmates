@@ -25,7 +25,7 @@ local f = {
     { at = at(9, 30), ticket = "ABC-34", kind = "reply", text = "ABC-34 reviewed." },
   },
 }
-local v = sessioncard.view(f, at(15, 52))
+local v = sessioncard.view(f, at(15, 52), true)
 local t = v and v.tickets[1]
 check("view: the current ticket first", v and v.current == "ABC-12" and t.key == "ABC-12")
 check("view: then the others", v and v.tickets[2] and v.tickets[2].key == "ABC-34" and #v.tickets == 2)
@@ -41,9 +41,19 @@ check("view: row labels", t and t.rows[1].label == "" and t.rows[2].label == "re
 check("view: the other ticket's NOW", v and v.tickets[2].now == "ABC-34 reviewed.")
 check("view: a phase not reached is ahead", v and v.tickets[2].strip[1].state == "ahead" and v.tickets[2].strip[1].time == nil)
 
+-- Live (5 Nov): a session done at 10:23 still read "10:19 · 2 min", its minutes counted from 10:22 (Review again).
+local again = { current = "ABC-12", tickets = { ["ABC-12"] = { phase = "review", phaseAt = at(10, 22),
+  phases = { plan = at(10, 17), dev = at(10, 20), review = at(10, 19) }, seen = at(10, 23) } }, timeline = {} }
+local working = sessioncard.view(again, at(10, 25), true).tickets[1].strip[3]
+check("working: minutes from the time shown", working.time == "10:19" and working.took == "6 min" and working.ended == nil)
+local idle = sessioncard.view(again, at(10, 40), false).tickets[1].strip[3]
+check("idle: the phase ends at the last thing that happened", idle.time == "10:19" and idle.took == nil and idle.ended == "10:23")
+local idleHead = sessioncard.html(sessioncard.view(again, at(10, 40), false))
+check("idle: drawn as a span", idleHead:find("10:19 → 10:23", 1, true) ~= nil and not idleHead:find(" min", 1, true))
+
 local function took(seconds)
   local one = { current = "ABC-1", tickets = { ["ABC-1"] = { phase = "dev", phaseAt = 1000, phases = { dev = 1000 }, seen = 1000 } }, timeline = {} }
-  return sessioncard.view(one, 1000 + seconds).tickets[1].strip[2].took
+  return sessioncard.view(one, 1000 + seconds, true).tickets[1].strip[2].took
 end
 check("took: under a minute", took(30) == "<1 min")
 check("took: hours", took(2 * 3600 + 5 * 60) == "2 h 5 min")

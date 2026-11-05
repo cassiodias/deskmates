@@ -30,7 +30,7 @@ local function label(e)
   return e.phase or ""
 end
 
-local function ticketView(key, t, timeline, now)
+local function ticketView(key, t, timeline, now, isWorking)
   local v = { key = key ~= "-" and key or nil, strip = {}, rows = {} }
   if t.jira then v.jira = { status = t.jira.status, time = clock(t.jira.at) } end
   for _, p in ipairs(PHASES) do
@@ -38,7 +38,10 @@ local function ticketView(key, t, timeline, now)
     local step = { phase = p, time = clock(entered) }
     if p == t.phase then
       step.state = "current"
-      if t.phaseAt then step.took = took(now - t.phaseAt) end
+      -- Counted from the time shown; once the agent's turn is over, it ends at the last thing that happened.
+      local from = entered or t.phaseAt
+      if from and isWorking then step.took = took(now - from)
+      elseif from and t.seen and t.seen > from then step.ended = clock(t.seen) end
     else
       step.state = entered and "reached" or "ahead"
     end
@@ -54,9 +57,10 @@ local function ticketView(key, t, timeline, now)
   return v
 end
 
--- What the card shows for facts `f` at time `now`: { current = key, tickets = { ticket views } }, the current
--- ticket first, then the others by when they were last worked on; nil when there is nothing to show.
-function sessioncard.view(f, now)
+-- What the card shows for facts `f` at time `now`, `isWorking` while the agent's turn runs: { current = key,
+-- tickets = { ticket views } }, the current ticket first, then the others by when they were last worked on;
+-- nil when there is nothing to show.
+function sessioncard.view(f, now, isWorking)
   if not f or next(f.tickets) == nil then return nil end
   local keys = {}
   for key in pairs(f.tickets) do keys[#keys + 1] = key end
@@ -68,7 +72,7 @@ function sessioncard.view(f, now)
     return a < b
   end)
   local v = { current = f.current, tickets = {} }
-  for _, key in ipairs(keys) do v.tickets[#v.tickets + 1] = ticketView(key, f.tickets[key], f.timeline, now) end
+  for _, key in ipairs(keys) do v.tickets[#v.tickets + 1] = ticketView(key, f.tickets[key], f.timeline, now, isWorking) end
   return v
 end
 
@@ -99,7 +103,8 @@ function sessioncard.html(v)
     local strip = {}
     for _, s in ipairs(t.strip) do
       strip[#strip + 1] = '<button class="phase ' .. s.state .. '" data-phase="' .. s.phase .. '"><span class="dot"></span>'
-        .. NAMES[s.phase] .. "<small>" .. (s.time or "") .. (s.took and " · " .. escape(s.took) or "") .. "</small></button>"
+        .. NAMES[s.phase] .. "<small>" .. (s.time or "") .. (s.took and " · " .. escape(s.took) or "")
+        .. (s.ended and " → " .. s.ended or "") .. "</small></button>"
     end
     head[#head + 1] = '<div class="strip">' .. table.concat(strip) .. "</div>"
     if t.now then head[#head + 1] = '<p class="now"><span class="label">NOW</span> ' .. escape(t.now) .. "</p>" end

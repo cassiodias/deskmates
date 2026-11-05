@@ -329,9 +329,11 @@ function PlanCard:show(key, plan, meta)
   end)
   view:html(plancard.html(plan, meta))
   view:show()
+  -- Hammerspoon becomes the active app, so the card is the key window: an inactive card loses its first click
+  -- and hides a moment later when the app in front keeps the focus. (view:hswindow() would find the window,
+  -- but it asks macOS about every app's windows: 1.5 s.)
+  hs.focus()
   view:bringToFront(true)
-  local window = view:hswindow()
-  if window then window:focus() end
   self.view = view
 end
 

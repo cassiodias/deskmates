@@ -114,6 +114,10 @@ release()
 stub.advance(0.2)
 local card = stub.webviews[#stub.webviews]
 check("a click on a puppet with a plan opens its card", card ~= nil and card.shown)
+-- Live: looking up the card's window took 1.5 s, and a card left inactive behind the terminal lost its first
+-- click and hid itself a second later. Hammerspoon is made the active app instead.
+check("the card makes Hammerspoon the active app", (stub.activated or 0) >= 1)
+check("the card never looks up its window", (stub.windowLookups or 0) == 0)
 check("the card shows the plan", card and card.html_:find("Fixed the typo.", 1, true) ~= nil)
 check("the card's click selects no tab", stub.selected == nil)
 check("the card sits on the screen", card and card.frame_.x >= 0 and card.frame_.y >= 0

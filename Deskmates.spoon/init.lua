@@ -201,7 +201,7 @@ function obj:cardContent(key)
   local s, puppet = self.sessions.all[key], self.stage.puppets[key]
   if not (s and puppet) then return nil end
   local plan = plans.hasContent(s.plan) and s.plan or nil
-  local session = facts.hasContent(s.facts) and sessioncard.view(s.facts, os.time()) or nil
+  local session = facts.hasContent(s.facts) and sessioncard.view(s.facts, os.time(), s.isWorking) or nil
   if not plan and not session then return nil end
   local version
   if (not plan or plan.updatedAt) and (not session or s.facts.updatedAt) then
