@@ -108,7 +108,9 @@ check("load: old facts have no git, seen or turns", f and f.git == nil and next(
 local function gitOf(json) local g = facts.load(file("g.json", '{"tickets": {}, "git": ' .. json .. "}")) return g and g.git end
 check("git: a base that is not hex, no git", gitOf('{"root": "/r", "base": "main"}') == nil)
 check("git: a base too short or too long, no git", gitOf('{"root": "/r", "base": "abc12"}') == nil
-  and gitOf('{"root": "/r", "base": "' .. string.rep("a", 41) .. '"}') == nil)
+  and gitOf('{"root": "/r", "base": "' .. string.rep("a", 65) .. '"}') == nil)
+check("git: a SHA-256 repo's 64-hex base is fine", (gitOf('{"root": "/r", "base": "' .. string.rep("a1", 32) .. '"}') or {}).base
+  == string.rep("a1", 32))
 check("git: a short 7-hex base is fine", gitOf('{"root": "/r", "base": "ABCDEF1"}') ~= nil)
 check("git: no root, no git", gitOf('{"base": "abcdef1"}') == nil)
 check("git: root not a string, no git", gitOf('{"root": 5, "base": "abcdef1"}') == nil)

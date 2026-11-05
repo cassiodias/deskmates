@@ -17,8 +17,8 @@ local IS_PHASE = { plan = true, dev = true, review = true }
 local function num(v) return type(v) == "number" and v or nil end
 local function str(v) return type(v) == "string" and v or nil end
 
--- Whether `v` is a git commit name: 7 to 40 hex digits.
-local function isHash(v) return type(v) == "string" and #v >= 7 and #v <= 40 and v:match("^%x+$") ~= nil end
+-- Whether `v` is a git commit name: 7 to 64 hex digits (40 in a SHA-1 repo, 64 in a SHA-256 one).
+local function isHash(v) return type(v) == "string" and #v >= 7 and #v <= 64 and v:match("^%x+$") ~= nil end
 
 -- The strings in list `v`, in order, junk dropped; empty for anything but a list.
 local function strings(v)
