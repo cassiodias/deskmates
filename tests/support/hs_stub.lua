@@ -112,6 +112,7 @@ hs = {
   timer = {
     doEvery = function(seconds, fn) return timer(seconds, fn, true) end,
     doAfter = function(seconds, fn) return timer(seconds, fn, false) end,
+    secondsSinceEpoch = function() return stub.clock end,
   },
   fs = {
     mkdir = function(path) return os.execute("mkdir '" .. path:gsub("'", "'\\''") .. "' 2>/dev/null") end,
@@ -154,6 +155,7 @@ hs = {
   eventtap = {
     event = { types = { leftMouseDragged = 6, leftMouseUp = 2 } },
     checkKeyboardModifiers = function() return {} end,
+    doubleClickInterval = function() return 0.5 end,
     new = function(_, fn)
       local tap = { fn = fn, running = false }
       function tap:start() self.running = true stub.taps[#stub.taps + 1] = self return self end

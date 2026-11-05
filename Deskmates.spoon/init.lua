@@ -3,7 +3,7 @@
 --- Puppets that float over your desktop, one per busy coding-agent session, acting out what it is doing:
 --- it thinks, codes at its laptop (invaders or Matrix rain on its monitor), reads, runs tests, plays ping pong
 --- while subagents run, shows a question mark when the agent asks you something, and says what it did when it is done.
---- Click a puppet to jump to its session's terminal, or, when its agent made a plan or works on a ticket, to read its card.
+--- Click a puppet to jump to its session's terminal; double-click it to read its card, when its agent made a plan or works on a ticket.
 ---
 --- Agent hooks append one line per event to `~/.deskmates/events`; this Spoon reads it. This file is the
 --- Spoon's public surface and its wiring; the parts (events, model, render, stage, terminals, ui and one
@@ -213,9 +213,16 @@ end
 
 --- Deskmates:click(key)
 --- Method
---- A click on a session's puppet: its card when its session has a plan or facts to show, else its window.
+--- A click on a session's puppet goes to its terminal; the second click of a double click opens its card when its
+--- session has a plan or facts to show (the terminal is already in front, the card opens beside it).
 function obj:click(key)
-  local plan, meta, version = self:cardContent(key)
+  local now = hs.timer.secondsSinceEpoch()
+  local last = self.lastClick
+  local isDouble = last and last.key == key and now - last.at <= hs.eventtap.doubleClickInterval()
+  -- A third click starts again: it goes to the terminal, as a first one.
+  self.lastClick = not isDouble and { key = key, at = now } or nil
+  local plan, meta, version
+  if isDouble then plan, meta, version = self:cardContent(key) end
   if meta then
     self.cardVersion = version
     self.planCard:show(key, plan, meta)
@@ -316,7 +323,7 @@ function obj:mouseUp(key)
   end
   if not press or press.isDrag or press.key ~= key then return end
   -- Bringing a terminal forward can take a moment (iTerm's AppleScript); not inside the mouse's handling.
-  -- A session with a plan opens its card instead (obj:click).
+  -- A double click opens the session's card (obj:click).
   hs.timer.doAfter(0, function() self:click(key) end)
 end
 

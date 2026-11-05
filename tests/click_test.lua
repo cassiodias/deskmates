@@ -27,6 +27,15 @@ local function anchor() return P.stage.anchor.x .. "," .. P.stage.anchor.y end
 -- depend on it). The mouse tap the press starts may come too late to see the release of a quick click.
 local function press() canvas.onMouse(canvas, "mouseDown", nil, 9999, -9999) end
 local function release() canvas.onMouse(canvas, "mouseUp", nil, 9999, -9999) end
+-- Cassio (5 Nov): one click goes to the terminal, always; a second click within the double-click interval opens
+-- the card. Clicks in the tests come a second apart unless they mean a double click.
+local function click() press() release() end
+local function doubleClick()
+  stub.advance(1)
+  click()
+  stub.advance(0.1)
+  click()
+end
 local function running()
   local n = 0
   for _, tap in ipairs(stub.taps) do if tap.running then n = n + 1 end end
@@ -115,18 +124,30 @@ planFile:close()
 write("PreToolUse|tab1||TodoWrite|||app|iTerm.app|plan|/dev/ttys001|claude|")
 stub.advance(0.2)
 f = P.stage.puppets.tab1.canvas:frame()
+local before_views = #stub.webviews
+stub.advance(1)
 stub.selected = nil
-press()
-release()
+click()
+stub.advance(0.2)
+check("one click on a puppet with a plan goes to its terminal", stub.selected == "/dev/ttys001")
+check("one click opens no card", #stub.webviews == before_views)
+stub.advance(1)
+click()
+stub.advance(0.2)
+check("two clicks a second apart are two single clicks: no card", #stub.webviews == before_views)
+stub.selected = nil
+doubleClick()
 stub.advance(0.2)
 local card = stub.webviews[#stub.webviews]
-check("a click on a puppet with a plan opens its card", card ~= nil and card.shown)
+check("a double click on a puppet with a plan opens its card", card ~= nil and card.shown)
+check("its first click went to the terminal", stub.selected == "/dev/ttys001")
+stub.selected = nil
 -- Live: looking up the card's window took 1.5 s, and a card left inactive behind the terminal lost its first
 -- click and hid itself a second later. Hammerspoon is made the active app instead.
 check("the card makes Hammerspoon the active app", (stub.activated or 0) >= 1)
 check("the card never looks up its window", (stub.windowLookups or 0) == 0)
 check("the card shows the plan", card and card.html_:find("Fixed the typo.", 1, true) ~= nil)
-check("the card's click selects no tab", stub.selected == nil)
+check("the second click selects no tab again", stub.selected == nil)
 check("the card sits on the screen", card and card.frame_.x >= 0 and card.frame_.y >= 0
   and card.frame_.x + card.frame_.w <= 1440 and card.frame_.y + card.frame_.h <= 900)
 card.content.callback({ body = "focus" })
@@ -140,8 +161,7 @@ card.content.callback({ body = "close" })
 stub.advance(0.2)
 check("Close still closes it", not card.shown and card.deleted)
 
-press()
-release()
+doubleClick()
 stub.advance(0.2)
 local second = stub.webviews[#stub.webviews]
 second.content.callback({ body = "close" })
@@ -151,8 +171,7 @@ check("and deletes it after", second.deleted)
 
 -- The card can be resized, and the next one opens at the size it was left.
 local function openCard()
-  press()
-  release()
+  doubleClick()
   stub.advance(0.2)
   return stub.webviews[#stub.webviews]
 end
@@ -206,10 +225,9 @@ write("PreToolUse|tab1||TodoWrite|||app|iTerm.app|plan|/dev/ttys001|claude|")
 stub.advance(0.2)
 local views = #stub.webviews
 stub.selected = nil
-press()
-release()
+doubleClick()
 stub.advance(0.2)
-check("an empty plan: the click selects the tab", stub.selected == "/dev/ttys001")
+check("an empty plan: a double click selects the tab", stub.selected == "/dev/ttys001")
 check("an empty plan: no card", #stub.webviews == views)
 
 -- Facts: a session with facts opens the card too, with its ticket; a facts line refreshes an open card.
@@ -230,9 +248,9 @@ write("PreToolUse|tab1||Skill||my-developer|app|iTerm.app|facts|/dev/ttys001|cla
 stub.advance(0.2)
 stub.selected = nil
 local factsCard = openCard()
-check("facts only: a click opens the card", factsCard and factsCard.shown and #stub.webviews == views + 1)
+check("facts only: a double click opens the card", factsCard and factsCard.shown and #stub.webviews == views + 1)
 check("facts only: with the ticket", factsCard.html_:find("ABC-12", 1, true) ~= nil)
-check("facts only: no tab selected", stub.selected == nil)
+check("facts only: its first click selected the tab", stub.selected == "/dev/ttys001")
 writeFacts("Built and committed.")
 write("Stop|tab1||||Built and committed.|app|iTerm.app|facts|/dev/ttys001|claude|")
 stub.advance(0.2)
@@ -266,10 +284,9 @@ write("Stop|tab1||||Done.|app|iTerm.app|facts|/dev/ttys001|claude|")
 stub.advance(0.2)
 views = #stub.webviews
 stub.selected = nil
-press()
-release()
+doubleClick()
 stub.advance(0.2)
-check("junk facts and no plan: the click selects the tab", stub.selected == "/dev/ttys001" and #stub.webviews == views)
+check("junk facts and no plan: a double click selects the tab", stub.selected == "/dev/ttys001" and #stub.webviews == views)
 os.execute("rm -rf '" .. plansDir .. "' '" .. factsDir .. "'")
 
 os.remove(eventsFile)
