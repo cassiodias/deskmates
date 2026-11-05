@@ -55,7 +55,7 @@ Deskmates.spoon/
     stage/                    the puppet windows and their bubbles
     terminals/                bringing a session's terminal forward; one look at what runs (liveness.lua)
     ui/menu.lua               the menu bar menu
-    ui/plancard.lua           the card a click opens: the session on top, the plan or the timeline below
+    ui/plancard.lua           the card a double click opens: the session on top, the plan or the timeline below
     ui/sessioncard.lua        the card's session part: ticket, Jira badge, phase strip, NOW and the timeline
     ui/planblocks.lua         the plan card's blocks: markdown read into blocks, and the blocks lifted from it
 tests/                        run.sh runs them all
