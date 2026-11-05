@@ -54,7 +54,8 @@ Deskmates.spoon/
     harnesses/                the Spoon side of each agent, and the registry
     render/                   pixels, text, sprites (the creatures), and scenes/ (one file per animation)
     stage/                    the puppet windows and their bubbles
-    terminals/                bringing a session's terminal forward; one look at what runs (liveness.lua)
+    terminals/                bringing a session's terminal forward; one look at what runs (liveness.lua);
+                              reading a session's repo with git for its card (git.lua)
     ui/menu.lua               the menu bar menu
     ui/plancard.lua           the card a double click opens: the session on top, the plan or the timeline below
     ui/sessioncard.lua        the card's session part: ticket, Jira badge, phase strip, NOW and the timeline
@@ -83,7 +84,7 @@ tests/run.sh
   for Hammerspoon and compare every frame with `tests/snapshots/`. If you changed a drawing on purpose, record
   it again with `UPDATE=1 lua5.4 tests/scenario_test.lua` and check the diff.
 - `sessions_test.lua` runs the session model with a fake agent; `liveness_test.lua` checks when puppets leave,
-  with iTerm not running; `status_test.lua` checks the status line and the card's text; `plancard_test.lua` checks the card's page, `sessioncard_test.lua` and `facts_test.lua` its session part and the facts file it reads, and `planblocks_test.lua` what it lifts from a plan's markdown (file maps, endpoints) and what it leaves as text; `actual_test.lua` the plan's file map against git's changes; `settings_test.lua`
+  with iTerm not running; `status_test.lua` checks the status line and the card's text; `plancard_test.lua` checks the card's page, `sessioncard_test.lua` and `facts_test.lua` its session part and the facts file it reads, and `planblocks_test.lua` what it lifts from a plan's markdown (file maps, endpoints) and what it leaves as text; `actual_test.lua` the plan's file map against git's changes; `git_test.lua` the git commands a card runs, in order, and what it says when git cannot answer; `settings_test.lua`
   checks the saved settings carry over from the old name.
 - `harness_contract_test.lua` checks every harness and every creature (see "What the tests check for you").
 - `puppet_lib.sh` checks the hook library's helpers on their own (what they keep and drop, cutting text,

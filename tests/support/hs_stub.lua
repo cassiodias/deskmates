@@ -74,6 +74,26 @@ local function webview(frame, _, content)
   return v
 end
 
+-- Programs the Spoon starts are kept in stub.tasks as { path, args, env, started, terminated }; a test ends one
+-- with stub.finishTask(i, code, stdout, stderr), which calls its callback as Hammerspoon would (even once it
+-- was terminated).
+stub.tasks = {}
+local function task(path, fn, args)
+  local t = { path = path, fn = fn, args = args or {}, env = nil, started = false, terminated = false }
+  function t:setEnvironment(env) self.env = env return self end
+  function t:start() self.started = true return self end
+  function t:terminate() self.terminated = true return self end
+  function t:isRunning() return self.started and not self.terminated and not self.finished end
+  stub.tasks[#stub.tasks + 1] = t
+  return t
+end
+function stub.finishTask(i, code, stdout, stderr)
+  local t = stub.tasks[i]
+  if not t then return end   -- never started: the test's count checks say so
+  t.finished = true
+  if t.fn then t.fn(code, stdout, stderr) end
+end
+
 local screen = { x = 0, y = 0, w = 1440, h = 900 }
 local mainScreen = { frame = function() return screen end, name = function() return "Built-in" end }
 
@@ -163,6 +183,7 @@ hs = {
       return tap
     end,
   },
+  task = { new = task },
   processInfo = { processID = 4242 },
   dialog = { textPrompt = function() return "Cancel", "" end },
   -- hs.focus makes Hammerspoon the active app; counted.
