@@ -160,6 +160,21 @@ if [ -n "$found_jq" ]; then
   expect "the phase from phaseFrom, the ticket from from" "$(got r3 '[.current, .tickets["ABC-12"].phase]')" '["ABC-12","dev"]'
   expect "phaseFrom with no phase word: none" "$(note r4 '{"kind":"skill","text":"commit","from":"commit fix the review comments","phaseFrom":"commit","moves":true}' 10)" 1
 
+  # A lane ends: a subagent's stop (its description names the phase), or a plan approved.
+  note e1 '{"kind":"subagent","text":"Implement ABC-12 via my-developer","from":"Implement ABC-12 via my-developer","moves":true}' 10 > /dev/null
+  expect "an end writes" "$(note e1 '{"kind":"done","text":"Applied the two edits.","from":"Implement ABC-12 via my-developer","phaseFrom":"Implement ABC-12 via my-developer","ends":true,"moves":false}' 20)" 0
+  expect "the lane's end" "$(got e1 '.tickets["ABC-12"] | [.phase, .ends.dev.at, .ends.dev.outcome]')" '["dev",20,"Applied the two edits."]'
+  expect "a done line in that lane" "$(got e1 '.timeline[0] | [.kind, .text, .phase, .ticket]')" '["done","Applied the two edits.","dev","ABC-12"]'
+  note e1 '{"kind":"done","text":"Two findings.","from":"QA ABC-12 review","phaseFrom":"QA ABC-12 review","ends":true,"verdict":"CHANGES_REQUESTED","moves":false}' 30 > /dev/null
+  expect "an end with no start starts it then, with its verdict" "$(got e1 '.tickets["ABC-12"] | [.phases.review, .ends.review.at, .ends.review.verdict, .phase]')" '[30,30,"CHANGES_REQUESTED","dev"]'
+  note e1 '{"kind":"subagent","text":"Implement ABC-12 fixes","from":"Implement ABC-12 fixes","moves":true}' 40 > /dev/null
+  expect "starting the lane again reopens it" "$(got e1 '.tickets["ABC-12"] | [(.ends | has("dev")), (.ends | has("review"))]')" '[false,true]'
+  expect "an end naming no phase: nothing" "$(note e1 '{"kind":"done","text":"Found it.","from":"Explore the code","phaseFrom":"Explore the code","ends":true,"moves":false}' 50)" 1
+  expect "an end with no facts yet: nothing" "$(note e2 '{"kind":"done","text":"Plan approved","from":"","phaseFrom":"plan","ends":true,"moves":false}' 10)" 1
+  note e3 '{"kind":"skill","text":"my-developer","from":"my-developer ABC-12","moves":true}' 10 > /dev/null
+  note e3 '{"kind":"done","text":"Plan approved","from":"","phaseFrom":"plan","ends":true,"moves":false}' 20 > /dev/null
+  expect "a plan approved ends Plan under current" "$(got e3 '.tickets["ABC-12"] | [.phases.plan, .ends.plan.outcome, .phase]')" '[20,"Plan approved","dev"]'
+
   # The cut: 30 lines, 10 tickets, never current.
   note n9 '{"kind":"skill","text":"my-developer","from":"my-developer ABC-12","moves":true}' 1 > /dev/null
   for i in $(seq 2 32); do note n9 "{\"kind\":\"reply\",\"text\":\"line $i\",\"from\":\"line $i\",\"moves\":false}" "$i" > /dev/null; done

@@ -1,0 +1,44 @@
+{
+  "current": "ABC-12",
+  "tickets": {
+    "ABC-12": {
+      "seen": 0,
+      "phase": "dev",
+      "phaseAt": 0,
+      "phases": {
+        "dev": 0,
+        "review": 0
+      },
+      "ends": {
+        "review": {
+          "at": 0,
+          "outcome": "Verdict: CHANGES_REQUESTED (0 blocker, 2 major)",
+          "verdict": "CHANGES_REQUESTED"
+        }
+      }
+    }
+  },
+  "timeline": [
+    {
+      "at": 0,
+      "ticket": "ABC-12",
+      "kind": "done",
+      "text": "Verdict: CHANGES_REQUESTED (0 blocker, 2 major)",
+      "phase": "review"
+    },
+    {
+      "at": 0,
+      "ticket": "ABC-12",
+      "kind": "skill",
+      "text": "my-developer",
+      "phase": "dev"
+    },
+    {
+      "at": 0,
+      "ticket": "ABC-12",
+      "kind": "phase",
+      "text": "dev",
+      "phase": "dev"
+    }
+  ]
+}

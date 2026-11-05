@@ -1,0 +1,13 @@
+{
+  "session_id": "s1",
+  "cwd": "/Users/dev/workspace/my-app",
+  "transcript_path": "harnesses/claude/fixtures/transcript/s1.jsonl",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "ExitPlanMode",
+  "tool_input": {
+    "plan": "# Plan"
+  },
+  "tool_response": {
+    "plan": "# Plan"
+  }
+}

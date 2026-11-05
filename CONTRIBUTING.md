@@ -270,7 +270,8 @@ When the agent's events do not line up with the table (`harnesses/cursor/transla
   `{kind, text, from, moves, ticket?, jira?}` (`kind` is the timeline line: `skill`, `subagent`, `jira`, `tests`,
   `reply`, or null; `from` the text tickets like `ABC-12` and phase words are looked for in; `phaseFrom`, when
   given, the only text phase words count in (a skill's name, not its arguments); `moves` whether its ticket
-  becomes the current one: a reply or a test run never starts facts), or null for none. The rules (ticket shape, phase words, limits) live in
+  becomes the current one: a reply or a test run never starts facts; `ends: true` with kind `done` ends the lane its
+  phase words name, with an optional `verdict` the agent wrote), or null for none. The rules (ticket shape, phase words, limits) live in
   `FACTS_DEFS`, so every agent's facts read alike. Write the line with the flag `facts` when it returns 0 (a test
   line keeps `test`), and `facts_delete` on `SessionEnd`. Claude's translator is the example.
 

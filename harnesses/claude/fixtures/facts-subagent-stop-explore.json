@@ -1,0 +1,11 @@
+{
+  "session_id": "s1",
+  "cwd": "/Users/dev/workspace/my-app",
+  "transcript_path": "harnesses/claude/fixtures/transcript/s1.jsonl",
+  "hook_event_name": "SubagentStop",
+  "agent_id": "x1",
+  "agent_type": "general-purpose",
+  "agent_transcript_path": "/tmp/a.jsonl",
+  "stop_hook_active": false,
+  "last_assistant_message": "Found it."
+}

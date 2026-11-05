@@ -64,6 +64,13 @@ check("load: a ticket that is not a table dropped", odd and odd.tickets["ABC-13"
 check("load: entries without a time dropped", odd and #odd.timeline == 1 and odd.timeline[1].text == "kept")
 check("load: current naming no ticket dropped", odd and odd.current == nil)
 
+local ended = facts.load(file("ends.json", [[{"current": "ABC-12", "tickets": {"ABC-12": {"phase": "review", "seen": 5,
+  "phases": {"dev": 1, "review": 3}, "ends": {"dev": {"at": 2, "outcome": "Applied."}, "review": {"at": 4, "outcome": "Two findings.",
+  "verdict": "CHANGES_REQUESTED"}, "plan": {"outcome": "no time"}, "qa": {"at": 1, "outcome": "not a lane"}}}}, "timeline": []}]]))
+local ends = ended and ended.tickets["ABC-12"].ends
+check("load: a lane's end", ends and ends.dev.at == 2 and ends.dev.outcome == "Applied." and ends.dev.verdict == nil)
+check("load: its verdict", ends and ends.review.verdict == "CHANGES_REQUESTED")
+check("load: an end without a time, or of no lane, dropped", ends and ends.plan == nil and ends.qa == nil)
 check("path: a session's file", facts.path(dir, "s1") == dir .. "/s1.json")
 check("path: refuses a path out", facts.path(dir, "../x") == nil and facts.path(dir, "..") == nil)
 

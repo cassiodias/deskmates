@@ -27,6 +27,7 @@ local function label(e)
   if e.kind == "jira" then return "Jira" end
   if e.kind == "tests" then return e.text == "failed" and "✗ tests" or "✓ tests" end
   if e.kind == "reply" then return "" end
+  if e.kind == "done" then return "✓ " .. (e.phase or "") end
   return e.phase or ""
 end
 
@@ -36,7 +37,11 @@ local function ticketView(key, t, timeline, now, isWorking)
   for _, p in ipairs(PHASES) do
     local entered = t.phases and t.phases[p]
     local step = { phase = p, time = clock(entered) }
-    if p == t.phase then
+    local ended = t.ends and t.ends[p]
+    if ended then
+      -- The lane finished: ✓, its span, and the verdict the agent wrote, if any.
+      step.state, step.ended, step.verdict = "done", clock(ended.at), ended.verdict
+    elseif p == t.phase then
       step.state = "current"
       -- Counted from the time shown; once the agent's turn is over, it ends at the last thing that happened.
       local from = entered or t.phaseAt
@@ -104,7 +109,8 @@ function sessioncard.html(v)
     for _, s in ipairs(t.strip) do
       strip[#strip + 1] = '<button class="phase ' .. s.state .. '" data-phase="' .. s.phase .. '"><span class="dot"></span>'
         .. NAMES[s.phase] .. "<small>" .. (s.time or "") .. (s.took and " · " .. escape(s.took) or "")
-        .. (s.ended and " → " .. s.ended or "") .. "</small></button>"
+        .. (s.ended and " → " .. s.ended or "") .. (s.state == "done" and " ✓" or "") .. "</small>"
+        .. (s.verdict and '<span class="verdict">' .. escape(s.verdict) .. "</span>" or "") .. "</button>"
     end
     head[#head + 1] = '<div class="strip">' .. table.concat(strip) .. "</div>"
     if t.now then head[#head + 1] = '<p class="now"><span class="label">NOW</span> ' .. escape(t.now) .. "</p>" end
@@ -138,6 +144,9 @@ sessioncard.CSS = table.concat({
   ".phase.current { border-top-color: var(--accent); font-weight: 600; }",
   ".phase.current .dot { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }",
   ".phase.on { background: var(--faint); border-radius: 4px; }",
+  ".phase.done { border-top-color: var(--accent); } .phase.done .dot { background: var(--accent); border-color: var(--accent); }",
+  ".verdict { font-size: 10px; font-weight: 700; border-radius: 4px; padding: 1px 5px; color: var(--accent);",
+  " background: color-mix(in srgb, var(--accent) 15%, transparent); }",
   ".now { margin: 6px 0 0; } .now .label { display: inline; margin-right: 4px; color: var(--accent); opacity: 1; }",
   ".timeline { list-style: none; padding: 0; margin: 8px 0; }",
   ".timeline li { display: grid; grid-template-columns: 44px 64px 1fr; gap: 8px; padding: 3px 0;",

@@ -1,5 +1,5 @@
 -- A session's facts, as the hooks write them (hook/facts-lib.sh): one file per session,
---   { "current": "ABC-12", "tickets": { "ABC-12": { "phase", "phaseAt", "phases", "jira", "seen" } },
+--   { "current": "ABC-12", "tickets": { "ABC-12": { "phase", "phaseAt", "phases", "ends", "jira", "seen" } },
 --     "timeline": [ { "at", "ticket", "kind", "text", "phase" } ], "updatedAt": … }
 -- read here with every field checked: a bad field, ticket or entry is dropped on its own; a file that is not
 -- facts is nil. It knows no agent, and no Hammerspoon.
@@ -23,6 +23,15 @@ local function ticket(t)
     phases = {} }
   if type(t.phases) == "table" then
     for _, p in ipairs(PHASES) do out.phases[p] = num(t.phases[p]) end
+  end
+  if type(t.ends) == "table" then
+    for _, p in ipairs(PHASES) do
+      local e = t.ends[p]
+      if type(e) == "table" and num(e.at) then
+        out.ends = out.ends or {}
+        out.ends[p] = { at = e.at, outcome = str(e.outcome), verdict = str(e.verdict) }
+      end
+    end
   end
   if type(t.jira) == "table" and str(t.jira.status) then
     out.jira = { status = t.jira.status, at = num(t.jira.at) }

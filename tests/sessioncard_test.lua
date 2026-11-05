@@ -51,6 +51,25 @@ check("idle: the phase ends at the last thing that happened", idle.time == "10:1
 local idleHead = sessioncard.html(sessioncard.view(again, at(10, 40), false))
 check("idle: drawn as a span", idleHead:find("10:19 → 10:23", 1, true) ~= nil and not idleHead:find(" min", 1, true))
 
+-- Cassio (5 Nov): a lane that finished says so: ✓, its span, and the verdict the agent wrote.
+local done = { current = "ABC-12", tickets = { ["ABC-12"] = { phase = "review", phaseAt = at(10, 22),
+  phases = { plan = at(10, 17), dev = at(10, 20), review = at(10, 19) },
+  ends = { plan = { at = at(10, 18), outcome = "Plan approved" }, dev = { at = at(10, 21), outcome = "Applied the two edits." },
+           review = { at = at(10, 23), outcome = "Nothing blocking.", verdict = "APPROVED" } }, seen = at(10, 23) } },
+  timeline = { { at = at(10, 23), ticket = "ABC-12", kind = "done", text = "Nothing blocking.", phase = "review" } } }
+local dv = sessioncard.view(done, at(10, 30), true).tickets[1]
+check("ended: every lane done", dv.strip[1].state == "done" and dv.strip[2].state == "done" and dv.strip[3].state == "done")
+check("ended: its span", dv.strip[2].time == "10:20" and dv.strip[2].ended == "10:21" and dv.strip[2].took == nil)
+check("ended: the current lane stops counting", dv.strip[3].ended == "10:23" and dv.strip[3].took == nil)
+check("ended: the verdict", dv.strip[3].verdict == "APPROVED" and dv.strip[2].verdict == nil)
+check("ended: the done row", dv.rows[1].label == "✓ review" and dv.rows[1].text == "Nothing blocking.")
+local dh = sessioncard.html(sessioncard.view(done, at(10, 30), true))
+check("ended: drawn done, with ✓ and the verdict", dh:find('class="phase done" data-phase="review"', 1, true) ~= nil
+  and dh:find("✓", 1, true) ~= nil and dh:find('<span class="verdict">APPROVED</span>', 1, true) ~= nil)
+local reopened = { current = "ABC-12", tickets = { ["ABC-12"] = { phase = "dev", phaseAt = at(10, 25), phases = { dev = at(10, 20) },
+  seen = at(10, 25) } }, timeline = {} }
+check("reopened: a lane with no end is current again", sessioncard.view(reopened, at(10, 30), true).tickets[1].strip[2].state == "current")
+
 local function took(seconds)
   local one = { current = "ABC-1", tickets = { ["ABC-1"] = { phase = "dev", phaseAt = 1000, phases = { dev = 1000 }, seen = 1000 } }, timeline = {} }
   return sessioncard.view(one, 1000 + seconds, true).tickets[1].strip[2].took

@@ -1,0 +1,42 @@
+{
+  "current": "ABC-12",
+  "tickets": {
+    "ABC-12": {
+      "seen": 0,
+      "phase": "dev",
+      "phaseAt": 0,
+      "phases": {
+        "dev": 0
+      },
+      "ends": {
+        "dev": {
+          "at": 0,
+          "outcome": "Applied the two edits."
+        }
+      }
+    }
+  },
+  "timeline": [
+    {
+      "at": 0,
+      "ticket": "ABC-12",
+      "kind": "done",
+      "text": "Applied the two edits.",
+      "phase": "dev"
+    },
+    {
+      "at": 0,
+      "ticket": "ABC-12",
+      "kind": "skill",
+      "text": "my-developer",
+      "phase": "dev"
+    },
+    {
+      "at": 0,
+      "ticket": "ABC-12",
+      "kind": "phase",
+      "text": "dev",
+      "phase": "dev"
+    }
+  ]
+}

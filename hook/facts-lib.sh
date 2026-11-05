@@ -61,7 +61,9 @@ def facts_apply($n):
   ($n.from // "" | tostring) as $from
   | (if ($n.ticket | type) == "string" and ($n.ticket | tickets) == [$n.ticket] then $n.ticket
      else ($from | tickets | .[0]) end) as $t
-  | (if $n.kind == "skill" or $n.kind == "subagent" then ($n.phaseFrom // $from | tostring) | phase else null end) as $p
+  | (if $n.kind == "skill" or $n.kind == "subagent" or $n.ends then ($n.phaseFrom // $from | tostring) | phase
+     else null end) as $p
+  | if $n.ends and $p == null then error("no lane to end") else . end
   # A reply or a test run never starts facts: a ticket it names counts once the session has a current ticket.
   | (if $n.moves then (if $t then $t elif $p then (.current // "-") else .current end)
      elif $t and (.tickets[$t] != null or .current != null) then $t
@@ -80,14 +82,23 @@ def facts_apply($n):
     else . end
   | if $n.moves and $target != "-" then .current = $target else . end
   | .tickets[$target] = ((.tickets[$target] // {}) | .seen = $now)
-  | if $p and $p != .tickets[$target].phase then
-      .tickets[$target] |= (.phase = $p | .phaseAt = $now
-        | .phases = ((.phases // {}) | if has($p) then . else .[$p] = $now end))
-      | facts_line($target; "phase"; $p)
+  # A lane ends (it gets its start then too, when that was missed); starting it again reopens it.
+  | if $n.ends then
+      .tickets[$target] |= (.phases = ((.phases // {}) | if has($p) then . else .[$p] = $now end)
+        | .ends = ((.ends // {}) | .[$p] = ({at: $now, outcome: ($n.text // "" | clean)}
+          + (if ($n.verdict | type) == "string" and $n.verdict != "" then {verdict: ($n.verdict | clean)} else {} end))))
+    elif $p then
+      .tickets[$target] |= (if .ends then .ends |= del(.[$p]) else . end)
+      | if $p != .tickets[$target].phase then
+          .tickets[$target] |= (.phase = $p | .phaseAt = $now
+            | .phases = ((.phases // {}) | if has($p) then . else .[$p] = $now end))
+          | facts_line($target; "phase"; $p)
+        else . end
     else . end
   | if ($n.jira | type) == "string" and $n.jira != "" then .tickets[$target].jira = {status: ($n.jira | clean), at: $now}
     else . end
   | if ($n.kind | type) == "string" then facts_line($target; $n.kind; $n.text // "") else . end
+  | if $n.ends then .timeline[0].phase = $p else . end
   | .timeline |= .[0:30]
   | .current as $c
   | (if $c != null and (.tickets | has($c)) then 1 else 0 end) as $kept
@@ -102,7 +113,8 @@ def facts_apply($n):
 # "jira", "tests", "reply", or null for none), text its text, from the text tickets and the phase are looked for
 # in, phaseFrom the text the phase is looked for in when it is not all of from (a skill's name, not its
 # arguments), moves whether its ticket becomes the current one, ticket a key given outright (Jira's), jira a
-# status. A note that does not move (a reply, a test run) never starts facts nor moves a phase that waits.
+# status, ends true when the note ends the lane its phase words name (with verdict, a verdict the agent wrote).
+# A note that does not move (a reply, a test run, an end) never starts facts nor moves a phase that waits.
 # False, and nothing written, for a null note, or one with no ticket to hang it on (a reply in a session with
 # no facts yet), and as facts_update.
 facts_note() {

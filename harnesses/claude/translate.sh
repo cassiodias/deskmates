@@ -113,6 +113,9 @@ case "$event:$tool" in
       | if ($key | tickets) != [$key] then null
         elif ($s | type) == "string" and $s != "" then {kind: "jira", text: $s, jira: $s, ticket: $key, from: "", moves: true}
         else {kind: null, ticket: $key, from: "", moves: true} end' ;;
+  PostToolUse:ExitPlanMode)
+    # You approved the plan: Plan has ended.
+    facts_change '{kind: "done", text: "Plan approved", from: "", phaseFrom: "plan", ends: true, moves: false}' ;;
   PostToolUse:*|PostToolUseFailure:*)
     if [ "$flag" = test ]; then
       result=passed
@@ -121,6 +124,15 @@ case "$event:$tool" in
     fi ;;
   Stop:*)
     [ -n "$text" ] && facts_change '{kind: "reply", text: $reply, from: $reply, moves: false}' --arg reply "$text" ;;
+  SubagentStop:*)
+    # A subagent's end ends the lane its description names: its last message's first sentence, and a verdict
+    # only when it wrote one ("Verdict: CHANGES_REQUESTED").
+    description=$(subagent_description "$(path_field transcript_path)" "$(field agent_id)")
+    [ -n "$description" ] && facts_change '{kind: "done", text: (if $s != "" then $s else "done" end), from: $d,
+      phaseFrom: $d, ends: true, moves: false,
+      verdict: ((.last_assistant_message // "" | tostring
+        | capture("Verdict:\\**\\s*\\**(?<v>[A-Za-z][A-Za-z_-]+)") | .v) // null)}' \
+      --arg d "$description" --arg s "$(first_sentence last_assistant_message)" ;;
 esac
 
 write_event claude "$event" "$session" "$(field agent_id)" "$tool" "$(field agent_type)" "$text" \
