@@ -25,9 +25,13 @@ local function badRevision(stderr)
     or text:find("invalid revision range", 1, true)
 end
 
--- The environment every command gets: hs.task's replaces the whole of it.
-local function environment()
-  return { PATH = os.getenv("PATH"), HOME = os.getenv("HOME"), GIT_OPTIONAL_LOCKS = "0" }
+-- The environment every command run by git at `path` gets (hs.task's replaces the whole of it): git's folder
+-- first on PATH, so git-lfs and the helpers installed beside it are found, then Hammerspoon's PATH.
+local function environment(path)
+  local folder, inherited = path:match("^(.*)/[^/]*$"), os.getenv("PATH")
+  local search = folder and folder ~= "" and folder or nil
+  if inherited and inherited ~= "" then search = search and search .. ":" .. inherited or inherited end
+  return { PATH = search, HOME = os.getenv("HOME"), GIT_OPTIONAL_LOCKS = "0" }
 end
 
 -- Runs, one after another, the commits since `base`, the diff from it, what is not committed and what git does
@@ -57,7 +61,7 @@ function git.read(root, base, done)
       finish(nil, DID_NOT_ANSWER)
     end, full)
     if not running then return finish(nil, DID_NOT_ANSWER) end
-    running:setEnvironment(environment())
+    running:setEnvironment(environment(path))
     if not running:start() then finish(nil, DID_NOT_ANSWER) end
   end
 

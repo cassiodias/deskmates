@@ -59,7 +59,8 @@ check("4: what git does not track", same((stub.tasks[4] or {}).args,
   { "-C", "/build/my-app", "ls-files", "--others", "--exclude-standard", "-z" }))
 for i, task in ipairs(stub.tasks) do
   check("command " .. i .. " never takes the index lock", task.env.GIT_OPTIONAL_LOCKS == "0")
-  check("command " .. i .. " keeps PATH and HOME", task.env.PATH == os.getenv("PATH") and task.env.HOME == os.getenv("HOME"))
+  check("command " .. i .. " has git's folder first on PATH (for git-lfs and helpers beside it), then PATH, and HOME",
+    task.env.PATH == "/opt/homebrew/bin:" .. os.getenv("PATH") and task.env.HOME == os.getenv("HOME"))
 end
 check("done once", #calls == 1)
 check("done with the raw texts", calls[1] and same(calls[1].result,
