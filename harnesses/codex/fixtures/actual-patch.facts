@@ -1,0 +1,38 @@
+{
+  "git": {
+    "base": "@BASE@",
+    "dirtyAtStart": [],
+    "folder": "@REPO@",
+    "prefix": "",
+    "root": "@REPO@",
+    "top": null
+  },
+  "seen": {
+    "docs/my file.md": true,
+    "src/app.js": true,
+    "src/from.js": true,
+    "src/old.js": true,
+    "src/to.js": true
+  },
+  "tickets": {},
+  "timeline": [],
+  "turns": [
+    {
+      "at": 0,
+      "commits": [],
+      "files": [
+        "src/app.js",
+        "docs/my file.md",
+        "src/old.js",
+        "src/from.js",
+        "src/to.js"
+      ],
+      "head": "@BASE@",
+      "tests": {
+        "failed": 0,
+        "passed": 0,
+        "ran": 0
+      }
+    }
+  ]
+}

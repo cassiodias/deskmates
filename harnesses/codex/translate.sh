@@ -3,6 +3,8 @@
 # failed tool arrives as a PostToolUse and an interrupt has no Stop after it.
 
 . "$(dirname "$0")/../../hook/puppet-lib.sh"
+. "$(dirname "$0")/../../hook/plan-lib.sh"
+. "$(dirname "$0")/../../hook/facts-lib.sh"
 puppet_read_payload
 
 # Codex runs hooks from a background process with no terminal: the terminal is the one of the codex process
@@ -21,6 +23,15 @@ exit_code() {
 session_title() {
   [ -f "$HOME/.codex/session_index.jsonl" ] || return 0
   grep "\"id\":\"$1\"" "$HOME/.codex/session_index.jsonl" | tail -n 1 | json_value thread_name
+}
+
+# The paths an apply_patch command ($1, the patch text) names, one per line: the file after each "*** Update File: ",
+# "*** Add File: ", "*** Delete File: " and "*** Move to: " at the start of a line (a move names the old path in
+# its Update line and the new one here), as the patch spells them (relative to the folder Codex ran in, or
+# absolute). Nothing else is read.
+codex_patch_paths() {
+  printf '%s\n' "$1" | sed -n -e 's/^\*\*\* Update File: //p' -e 's/^\*\*\* Add File: //p' \
+    -e 's/^\*\*\* Delete File: //p' -e 's/^\*\*\* Move to: //p'
 }
 
 event=$(field hook_event_name)
@@ -50,6 +61,40 @@ esac
 case "$tool" in collaborationspawn_agent|spawn_agent) text=$(field tool_input.task_name) ;; esac
 flag=""
 [ "$tool" = "Bash" ] && is_test_command "$(payload_value tool_input.command)" && flag="test"
+
+# The session's git facts (hook/facts-lib.sh): its repo, taken at its first event in one; its turns, a prompt
+# opening one and a stop (or an interrupt, which is a stop above) ending it; the paths a patch that went through
+# names; its test runs. A turn's start or end sets the facts flag, unless the line has a test flag already; an
+# edit sets none (the card reads the file when it opens). Codex gives no reliable exit code: a test run counts
+# as ran, never as passed or failed. The helpers set plain globals, none of which this translator reads afterwards.
+cwd=$(path_field cwd)
+turn_change() {
+  "$@" 2>/dev/null && [ "$flag" != test ] && flag="facts"
+}
+# Adds the paths of patch text $1 to the session's facts, each as its own argument (a path may hold spaces).
+patched() {
+  patch_paths=$(codex_patch_paths "$1")
+  [ -n "$patch_paths" ] || return 1
+  old_ifs=$IFS
+  IFS='
+'
+  set -f
+  set -- $patch_paths
+  set +f
+  IFS=$old_ifs
+  facts_edit "$session" "$cwd" "$@" 2>/dev/null
+}
+if [ "$event" = SessionEnd ]; then
+  facts_delete "$session"
+elif [ -n "$cwd" ]; then
+  facts_git_start "$session" "$cwd" 2>/dev/null
+  case "$event:$tool" in
+    UserPromptSubmit:*) turn_change facts_turn_start "$session" ;;
+    Stop:*) turn_change facts_turn_end "$session" ;;
+    PostToolUse:apply_patch) patched "$(payload_value tool_input.command)" ;;
+  esac
+  [ "$flag" = test ] && [ "$event" = PreToolUse ] && facts_turn_test "$session" ran 2>/dev/null
+fi
 
 write_event codex "$event" "$session" "$(field agent_id)" "$tool" "$(field agent_type)" "$text" \
   "$(path_field cwd)" "$flag" "$title"

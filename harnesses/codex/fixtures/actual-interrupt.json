@@ -1,0 +1,5 @@
+{
+  "session_id": "s1",
+  "cwd": "@REPO@",
+  "hook_event_name": "Interrupt"
+}
