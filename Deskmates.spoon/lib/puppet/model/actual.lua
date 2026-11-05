@@ -44,35 +44,51 @@ function actual.parseList(text)
   return fields(text)
 end
 
+-- Whether `path` has a segment no rule can place: `.`, `..`, or an empty one (`a//b`).
+local function hasOddSegment(path)
+  for segment in (path .. "/"):gmatch("([^/]*)/") do
+    if segment == "" or segment == "." or segment == ".." then return true end
+  end
+  return false
+end
+
 -- A plan entry relative to `root`, or nil when no rule can decide it: a glob (`*`, `?`, `[`), a folder (a trailing
--- `/`), or an absolute path outside the root. A `:12-30` suffix and a leading `./` are dropped first.
+-- `/`), an absolute path outside the root (or any absolute path with no root), or a `.`, `..` or empty segment.
+-- A `:12-30` suffix and a leading `./` are dropped first.
 local function relative(entry, root)
   local path = entry:gsub(":[%d][%d%-,]*$", "")
   if path:find("[%*%?%[]") or path:sub(-1) == "/" then return nil end
   if path:sub(1, 1) == "/" then
-    local prefix = root:gsub("/+$", "") .. "/"
+    local base = type(root) == "string" and root:gsub("/+$", "") or ""
+    if base == "" then return nil end
+    local prefix = base .. "/"
     if path:sub(1, #prefix) ~= prefix then return nil end
     path = path:sub(#prefix + 1)
   end
   while path:sub(1, 2) == "./" do path = path:sub(3) end
-  if path == "" then return nil end
+  if path == "" or hasOddSegment(path) then return nil end
   return path
 end
 
 -- What the plan's file maps (planblocks' { kind = "filemap", rows = { { path, … } } }) name, for repo `root`:
--- { checked = { paths relative to the root }, unchecked = { entries as written } }, each sorted, duplicates
--- collapsed.
+-- { checked = { paths relative to the root }, unchecked = { entries as written }, written = { [path] = the first
+-- entry as written that gave it } }, lists sorted, duplicates collapsed.
 function actual.planned(filemaps, root)
-  local checked, unchecked = {}, {}
+  local checked, unchecked, written = {}, {}, {}
   for _, block in ipairs(filemaps or {}) do
     for _, row in ipairs(block.rows or {}) do
       if type(row.path) == "string" then
-        local path = relative(row.path, root or "")
-        if path then checked[path] = true else unchecked[row.path] = true end
+        local path = relative(row.path, root)
+        if path then
+          checked[path] = true
+          written[path] = written[path] or row.path
+        else
+          unchecked[row.path] = true
+        end
       end
     end
   end
-  return { checked = sorted(checked), unchecked = sorted(unchecked) }
+  return { checked = sorted(checked), unchecked = sorted(unchecked), written = written }
 end
 
 -- The paths git says changed, as a set: every diff row's path, a rename's old path too, and every untracked
@@ -103,7 +119,8 @@ end
 -- uncommitted = { paths }, dirtyAtStart = set, seen = set }:
 --   { hasPlan, matched, missing, unchecked, unplanned, changed (sorted lists), notSeen = { [path] = true },
 --     uncommitted = n }.
--- matched: planned and changed; missing: planned, not changed; unplanned: changed, not planned; notSeen: changed
+-- matched: planned and changed; missing: planned, not changed; unplanned: changed, not planned; unchecked: the
+-- entries no rule can decide, and a planned path dirty at start that no hook named (as written); notSeen: changed
 -- paths no hook named. With no plan, or a plan with no file map entry, the plan's lists stay empty.
 function actual.compare(input)
   local dirtyAtStart, seen = input.dirtyAtStart or {}, input.seen or {}
@@ -117,19 +134,22 @@ function actual.compare(input)
   end
   if not out.hasPlan then return out end
 
-  local named = {}
+  local named, unchecked = {}, {}
+  for _, entry in ipairs(planned.unchecked) do unchecked[entry] = true end
   for _, path in ipairs(planned.checked) do
     named[path] = true
     if changed[path] then
       out.matched[#out.matched + 1] = path
-    elseif not (dirtyAtStart[path] and not seen[path]) then
+    elseif dirtyAtStart[path] and not seen[path] then
+      unchecked[(planned.written or {})[path] or path] = true
+    else
       out.missing[#out.missing + 1] = path
     end
   end
   for _, path in ipairs(out.changed) do
     if not named[path] then out.unplanned[#out.unplanned + 1] = path end
   end
-  for _, entry in ipairs(planned.unchecked) do out.unchecked[#out.unchecked + 1] = entry end
+  out.unchecked = sorted(unchecked)
   return out
 end
 
