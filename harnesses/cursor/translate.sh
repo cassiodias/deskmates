@@ -16,9 +16,8 @@ session=$(field session_id)
 tool=$(field tool_name)
 # A turn's prompt, tools, reply and stop share a generation id. What one of its events leaves for another is
 # kept in ~/.deskmates/cursor-<session>.<generation>.<what>; cursor-<session>.turn holds the latest turn's id.
-# (Not called state: facts-lib.sh uses that name for its own.)
 turn=$(field generation_id)
-kept="$PUPPET_DIR/cursor-$session"
+state="$PUPPET_DIR/cursor-$session"
 mkdir -p "$PUPPET_DIR"
 
 # The session's title, as Cursor named it in the chat's meta.json (~/.cursor/chats/<md5 of folder>/<id>/).
@@ -52,7 +51,7 @@ agent_id=""
 agent_type=""
 case "$event" in
   beforeSubmitPrompt)
-    printf '%s' "$turn" > "$kept.turn"
+    printf '%s' "$turn" > "$state.turn"
     event=UserPromptSubmit; text=$(leading_command "$(field prompt)"); title=$(session_title) ;;
   preToolUse) event=PreToolUse ;;
   postToolUse) event=PostToolUse ;;
@@ -61,15 +60,15 @@ case "$event" in
     # Cursor joins the reply's parts without a space ("Listed them.Quick look next", "Which one?the app"): cut
     # there too, at a "?" or "!" right before a letter, or a "." right before a capital.
     reply=$(first_sentence text | sed -e 's/\([[:alnum:]][!?]\)[[:alpha:]].*/\1/' -e 's/\([[:alnum:]]\.\)[A-Z].*/\1/')
-    if [ ! -f "$kept.$turn.stopped" ]; then
+    if [ ! -f "$state.$turn.stopped" ]; then
       # Before its stop: the stop says it.
-      printf '%s' "$reply" > "$kept.$turn.reply"
+      printf '%s' "$reply" > "$state.$turn.reply"
       exit 0
     fi
-    rm -f "$kept.$turn.stopped"
+    rm -f "$state.$turn.stopped"
     # After its stop, which already ended the turn: the reply fills that turn's bubble, unless the next turn
     # has started.
-    [ -f "$kept.turn" ] && [ "$(cat "$kept.turn")" != "$turn" ] && exit 0
+    [ -f "$state.turn" ] && [ "$(cat "$state.turn")" != "$turn" ] && exit 0
     event=Stop; text=$reply; title=$(session_title) ;;
   afterFileEdit)
     # Cursor's own edit event duplicates postToolUse: no line, only the path (its content and edits hold the
@@ -82,23 +81,23 @@ case "$event" in
     track Stop
     case "$(field status)" in
       completed)
-        if [ -f "$kept.$turn.reply" ]; then
-          text=$(cat "$kept.$turn.reply")
-          rm -f "$kept.$turn.reply"
+        if [ -f "$state.$turn.reply" ]; then
+          text=$(cat "$state.$turn.reply")
+          rm -f "$state.$turn.reply"
         else
-          : > "$kept.$turn.stopped"
+          : > "$state.$turn.stopped"
         fi ;;
       aborted)
         # Ctrl-C: an "error" stop follows this one.
-        : > "$kept.$turn.aborted" ;;
+        : > "$state.$turn.aborted" ;;
       *)
-        if [ -f "$kept.$turn.aborted" ]; then
-          rm -f "$kept.$turn.aborted"
+        if [ -f "$state.$turn.aborted" ]; then
+          rm -f "$state.$turn.aborted"
           exit 0
         fi ;;
     esac
     event=Stop; title=$(session_title) ;;
-  sessionEnd) event=SessionEnd; rm -f "$kept".*; facts_delete "$session" ;;
+  sessionEnd) event=SessionEnd; rm -f "$state".*; facts_delete "$session" ;;
   *) exit 0 ;;
 esac
 

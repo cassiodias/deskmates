@@ -10,6 +10,10 @@
 # Only derived facts are kept, never prompts or file contents. Like plans: only while Deskmates runs, only with
 # jq, deleted at SessionEnd and by the Spoon after hours of silence.
 
+# A helper keeps its working variables to itself: every one it sets is named _facts_<name> (or _plan_<name>, in
+# plan-lib.sh), so a translator that sources this may use any other name without a clash. The results it
+# documents stay: DESKMATES_GIT, DESKMATES_GIT_PATH, facts_root and facts_open (tests/facts_lib.sh pins it).
+
 PUPPET_FACTS="$PUPPET_DIR/facts"
 
 # The facts file of session $1; nothing, and false, for an id that could name a path outside the facts folder.
@@ -25,17 +29,17 @@ facts_file() {
 facts_update() {
   deskmates_on || return 1
   [ -n "$PUPPET_JQ" ] || return 1
-  file=$(facts_file "$1") || return 1
-  filter=$2
+  _facts_file=$(facts_file "$1") || return 1
+  _facts_filter=$2
   shift 2
-  deskmates_json_update "$file" '{"tickets":{},"timeline":[]}' \
-    'type == "object" and (.tickets | type) == "object" and (.timeline | type) == "array"' "$filter" "$@"
+  deskmates_json_update "$_facts_file" '{"tickets":{},"timeline":[]}' \
+    'type == "object" and (.tickets | type) == "object" and (.timeline | type) == "array"' "$_facts_filter" "$@"
 }
 
 # Deletes session $1's facts, if it has any.
 facts_delete() {
-  file=$(facts_file "$1") || return 0
-  rm -f "$file"
+  _facts_file=$(facts_file "$1") || return 0
+  rm -f "$_facts_file"
   return 0
 }
 
@@ -118,9 +122,9 @@ def facts_apply($n):
 # False, and nothing written, for a null note, or one with no ticket to hang it on (a reply in a session with
 # no facts yet), and as facts_update.
 facts_note() {
-  session=$1 note=$2
+  _facts_session=$1 _facts_note=$2
   shift 2
-  facts_update "$session" "$FACTS_DEFS ($note) as \$n
+  facts_update "$_facts_session" "$FACTS_DEFS ($_facts_note) as \$n
     | if \$n == null then error(\"no note\") else \$cur | facts_apply(\$n) end" "$@"
 }
 
@@ -154,15 +158,15 @@ deskmates_git() {
 
 # Runs git $1 with the rest as its arguments, never taking an optional lock.
 facts_run_git() {
-  bin=$1
+  _facts_bin=$1
   shift
-  GIT_OPTIONAL_LOCKS=0 "$bin" "$@" 2>/dev/null
+  GIT_OPTIONAL_LOCKS=0 "$_facts_bin" "$@" 2>/dev/null
 }
 
 # Sets git to the git to run, when git facts may be written now: Deskmates runs, jq and git are there.
 facts_git_ready() {
   deskmates_on && [ -n "$PUPPET_JQ" ] && deskmates_git > /dev/null || return 1
-  git=$DESKMATES_GIT
+  _facts_git=$DESKMATES_GIT
 }
 
 # The jq defs of git facts.
@@ -208,62 +212,63 @@ def rel($root; $folder; $prefix; $top):
 # git nothing). A repo with no commit yet gives nothing: the base is taken at the first event after the first
 # commit.
 facts_git_start() {
-  file=$(facts_file "$1") || return 1
-  grep -q '"git":{' "$file" 2>/dev/null && return 1
+  _facts_file=$(facts_file "$1") || return 1
+  grep -q '"git":{' "$_facts_file" 2>/dev/null && return 1
   facts_git_ready || return 1
-  out=$(facts_run_git "$git" -C "$2" rev-parse --show-toplevel --show-prefix HEAD) || return 1
-  case "$out" in *"$FACTS_NL"*"$FACTS_NL"*) ;; *) return 1 ;; esac
-  root=${out%%"$FACTS_NL"*} base=${out##*"$FACTS_NL"}
-  prefix=${out#*"$FACTS_NL"}
-  prefix=${prefix%"$FACTS_NL"*}
+  _facts_out=$(facts_run_git "$_facts_git" -C "$2" rev-parse --show-toplevel --show-prefix HEAD) || return 1
+  case "$_facts_out" in *"$FACTS_NL"*"$FACTS_NL"*) ;; *) return 1 ;; esac
+  _facts_root=${_facts_out%%"$FACTS_NL"*} _facts_base=${_facts_out##*"$FACTS_NL"}
+  _facts_prefix=${_facts_out#*"$FACTS_NL"}
+  _facts_prefix=${_facts_prefix%"$FACTS_NL"*}
   # The root as the folder spells it (the folder minus its prefix), kept only when it is the root for real.
-  top=
-  folder=${2%/} sub=${prefix%/}
-  if [ -n "$sub" ]; then
-    case "$folder" in
-      ?*/"$sub") top=${folder%/"$sub"}
-        [ "$(cd -P -- "$top" 2>/dev/null && pwd -P)" = "$root" ] || top= ;;
+  _facts_top=
+  _facts_folder=${2%/} _facts_sub=${_facts_prefix%/}
+  if [ -n "$_facts_sub" ]; then
+    case "$_facts_folder" in
+      ?*/"$_facts_sub") _facts_top=${_facts_folder%/"$_facts_sub"}
+        [ "$(cd -P -- "$_facts_top" 2>/dev/null && pwd -P)" = "$_facts_root" ] || _facts_top= ;;
     esac
   fi
-  status=$(mktemp) || return 1
-  if facts_run_git "$git" -C "$root" status --porcelain -z --untracked-files=all > "$status"; then
+  _facts_status=$(mktemp) || return 1
+  if facts_run_git "$_facts_git" -C "$_facts_root" status --porcelain -z --untracked-files=all > "$_facts_status"; then
     facts_update "$1" "$FACTS_GIT_DEFS \$cur | if .git then error(\"kept\") else
       .git = {root: \$root, base: \$base, dirtyAtStart: (\$status | porcelain | unique | .[0:500]),
         folder: \$folder, prefix: \$prefix, top: (if \$top == \"\" then null else \$top end)} end" \
-      --arg root "$root" --arg base "$base" --arg folder "$2" --arg prefix "$prefix" --arg top "$top" \
-      --rawfile status "$status"
-    written=$?
+      --arg root "$_facts_root" --arg base "$_facts_base" --arg folder "$2" --arg prefix "$_facts_prefix" \
+      --arg top "$_facts_top" \
+      --rawfile status "$_facts_status"
+    _facts_written=$?
   else
-    written=1
+    _facts_written=1
   fi
-  rm -f "$status"
-  return "$written"
+  rm -f "$_facts_status"
+  return "$_facts_written"
 }
 
 # Reads session $1's git facts into facts_root (its repo's root) and facts_open (the head its open turn started
 # from, empty when no turn is open); false when the session has no git facts.
 facts_git_state() {
-  file=$(facts_file "$1") || return 1
-  grep -q '"git":{' "$file" 2>/dev/null || return 1
-  state=$("$PUPPET_JQ" -r "$FACTS_GIT_DEFS"' (.git.root | strings), (if open_turn then .turns[0].head else "" end)' \
-    "$file" 2>/dev/null) || return 1
-  facts_root=${state%%"$FACTS_NL"*} facts_open=
-  case "$state" in *"$FACTS_NL"*) facts_open=${state#*"$FACTS_NL"} ;; esac
+  _facts_file=$(facts_file "$1") || return 1
+  grep -q '"git":{' "$_facts_file" 2>/dev/null || return 1
+  _facts_state=$("$PUPPET_JQ" -r "$FACTS_GIT_DEFS"' (.git.root | strings), (if open_turn then .turns[0].head else "" end)' \
+    "$_facts_file" 2>/dev/null) || return 1
+  facts_root=${_facts_state%%"$FACTS_NL"*} facts_open=
+  case "$_facts_state" in *"$FACTS_NL"*) facts_open=${_facts_state#*"$FACTS_NL"} ;; esac
   [ -n "$facts_root" ]
 }
 
 # Changes session $1's turns with jq filter $2 (given $cur and $commits: what the open turn committed since it
 # started, as git $3 says), after facts_git_state; more jq arguments may follow.
 facts_turn_change() {
-  session=$1 filter=$2 git=$3
+  _facts_session=$1 _facts_filter=$2 _facts_git=$3
   shift 3
-  log=$(mktemp) || return 1
-  [ -z "$facts_open" ] || facts_run_git "$git" -C "$facts_root" log -z --format='%h%x09%s' -n 20 "$facts_open..HEAD" > "$log"
-  facts_update "$session" "$FACTS_GIT_DEFS (\$log | commits) as \$commits | \$cur | $filter" \
-    --rawfile log "$log" "$@"
-  written=$?
-  rm -f "$log"
-  return "$written"
+  _facts_log=$(mktemp) || return 1
+  [ -z "$facts_open" ] || facts_run_git "$_facts_git" -C "$facts_root" log -z --format='%h%x09%s' -n 20 "$facts_open..HEAD" > "$_facts_log"
+  facts_update "$_facts_session" "$FACTS_GIT_DEFS (\$log | commits) as \$commits | \$cur | $_facts_filter" \
+    --rawfile log "$_facts_log" "$@"
+  _facts_written=$?
+  rm -f "$_facts_log"
+  return "$_facts_written"
 }
 
 # Opens a turn in session $1 from the commit it is at now; a turn still open is ended first, as facts_turn_end
@@ -271,10 +276,10 @@ facts_turn_change() {
 facts_turn_start() {
   facts_git_ready || return 1
   facts_git_state "$1" || return 1
-  head=$(facts_run_git "$git" -C "$facts_root" rev-parse HEAD) || return 1
+  _facts_head=$(facts_run_git "$_facts_git" -C "$facts_root" rev-parse HEAD) || return 1
   facts_turn_change "$1" '(if open_turn then end_turn($commits) else . end)
     | .turns = ([{at: $now, head: $head, files: [], tests: {ran: 0, passed: 0, failed: 0}, commits: []}]
-      + (.turns // []))[0:30]' "$git" --arg head "$head"
+      + (.turns // []))[0:30]' "$_facts_git" --arg head "$_facts_head"
 }
 
 # Ends session $1's open turn: its end, and the commits made since it started (20 at most). Nothing without
@@ -282,14 +287,14 @@ facts_turn_start() {
 facts_turn_end() {
   facts_git_ready || return 1
   facts_git_state "$1" && [ -n "$facts_open" ] || return 1
-  facts_turn_change "$1" 'if open_turn then end_turn($commits) else error("no open turn") end' "$git"
+  facts_turn_change "$1" 'if open_turn then end_turn($commits) else error("no open turn") end' "$_facts_git"
 }
 
 # Counts a test run in session $1's open turn: $2 is ran, passed or failed. Nothing without an open turn.
 facts_turn_test() {
   case "$2" in ran|passed|failed) ;; *) return 1 ;; esac
-  file=$(facts_file "$1") || return 1
-  grep -q '"turns":\[{' "$file" 2>/dev/null || return 1
+  _facts_file=$(facts_file "$1") || return 1
+  grep -q '"turns":\[{' "$_facts_file" 2>/dev/null || return 1
   facts_update "$1" "$FACTS_GIT_DEFS \$cur | if open_turn then .turns[0].tests[\$k] += 1
     else error(\"no open turn\") end" --arg k "$2"
 }
@@ -297,31 +302,31 @@ facts_turn_test() {
 # Adds the paths an edit in session $1 named, from its folder $2, to the open turn's files and to the paths
 # seen (500 at most each); a path outside the repo is left out. Nothing when none is left.
 facts_edit() {
-  session=$1 folder=$2
+  _facts_session=$1 _facts_folder=$2
   shift 2
-  file=$(facts_file "$session") || return 1
-  grep -q '"git":{' "$file" 2>/dev/null || return 1
+  _facts_file=$(facts_file "$_facts_session") || return 1
+  grep -q '"git":{' "$_facts_file" 2>/dev/null || return 1
   [ "$#" -gt 0 ] || return 1
   facts_git_ready || return 1
   # The folder's place in the repo: recorded at start for the session's folder (a JSON string with nothing to
   # escape is found as written), else asked of git, when the folder is in the session's repo at all.
-  gtop='' prefix=''
-  case "$folder" in
-    *[\"\\]*) recorded=1 ;;
-    *) grep -qF "\"folder\":\"$folder\"" "$file"; recorded=$? ;;
+  _facts_gtop='' _facts_prefix=''
+  case "$_facts_folder" in
+    *[\"\\]*) _facts_recorded=1 ;;
+    *) grep -qF "\"folder\":\"$_facts_folder\"" "$_facts_file"; _facts_recorded=$? ;;
   esac
-  if [ "$recorded" != 0 ]; then
-    out=$(facts_run_git "$git" -C "$folder" rev-parse --show-toplevel --show-prefix) || out=
-    gtop=${out%%"$FACTS_NL"*}
-    case "$out" in *"$FACTS_NL"*) prefix=${out#*"$FACTS_NL"} ;; esac
+  if [ "$_facts_recorded" != 0 ]; then
+    _facts_out=$(facts_run_git "$_facts_git" -C "$_facts_folder" rev-parse --show-toplevel --show-prefix) || _facts_out=
+    _facts_gtop=${_facts_out%%"$FACTS_NL"*}
+    case "$_facts_out" in *"$FACTS_NL"*) _facts_prefix=${_facts_out#*"$FACTS_NL"} ;; esac
   fi
-  count=$# n=0
-  for path do
-    set -- "$@" --arg "path$n" "$path"
-    n=$((n + 1))
+  _facts_count=$# _facts_n=0
+  for _facts_path do
+    set -- "$@" --arg "path$_facts_n" "$_facts_path"
+    _facts_n=$((_facts_n + 1))
   done
-  shift "$count"
-  facts_update "$session" "$FACTS_GIT_DEFS \$cur | .git.root as \$root
+  shift "$_facts_count"
+  facts_update "$_facts_session" "$FACTS_GIT_DEFS \$cur | .git.root as \$root
     | (\$folder == .git.folder and (.git.prefix | type) == \"string\") as \$own
     | (if \$own then .git.prefix elif \$gtop != \"\" and \$gtop == \$root then \$prefix else null end) as \$pre
     | (if \$own then .git.top else null end) as \$top
@@ -332,7 +337,7 @@ facts_edit() {
     | .seen = reduce \$paths[] as \$p (.seen // {}; if has(\$p) or length >= 500 then . else .[\$p] = true end)
     | if open_turn then .turns[0].files = reduce \$paths[] as \$p (.turns[0].files // [];
         if any(.[]; . == \$p) or length >= 500 then . else . + [\$p] end) else . end" \
-    --arg folder "$folder" --arg gtop "$gtop" --arg prefix "$prefix" "$@"
+    --arg folder "$_facts_folder" --arg gtop "$_facts_gtop" --arg prefix "$_facts_prefix" "$@"
 }
 
 # What an event does to session $1's git facts, for every agent alike: $2 is the session's folder, $3 the

@@ -396,6 +396,42 @@ expect "facts_delete removes the file" "$(ls "$FACTS" | grep -c s8)" 0
 facts_delete ../evil
 expect "facts_delete of a bad id" "$?" 0
 
+# No helper leaves a variable behind: the shell's variables before and after each public helper (run in this
+# shell, as a translator runs them) differ only in the helper-private names (_facts_|_plan_…) and the documented results.
+snap_vars() {
+  set | grep -E '^[A-Za-z_][A-Za-z0-9_]*=' |
+    grep -Ev '^(_|BASH[A-Z_]*|RANDOM|SRANDOM|SECONDS|LINENO|PIPESTATUS|OLDPWD|EPOCH[A-Z]*|snap_[a-z]*)='
+}
+# leaks name command…: runs the command here; nothing, or the names of the variables it changed that it should not.
+leaks() {
+  snap_vars > "$HOME/snap.before"
+  "$@" > /dev/null 2>&1
+  snap_vars > "$HOME/snap.after"
+  cat "$HOME/snap.before" "$HOME/snap.after" | sort | uniq -u | cut -d= -f1 | sort -u |
+    grep -Ev '^(_facts_|_plan_|DESKMATES_GIT|DESKMATES_GIT_PATH|facts_root|facts_open)' | tr '\n' ' '
+}
+if [ -n "$found_jq" ] && command -v git > /dev/null; then
+  lrepo="$HOME/leakrepo"
+  mkdir -p "$lrepo/src"
+  git init -q "$lrepo"
+  echo one > "$lrepo/src/app.js"
+  git -C "$lrepo" add -A
+  git -C "$lrepo" -c user.name=Test -c user.email=test@example.com commit -q -m "First"
+  # What the facts helpers set: facts_root and facts_open (facts_git_state), DESKMATES_GIT (deskmates_git).
+  expect "leak: facts_file" "$(leaks facts_file s20)" ""
+  expect "leak: facts_update" "$(leaks facts_update s20 "$SET")" ""
+  expect "leak: facts_note" "$(leaks facts_note s20 '{kind: "reply", text: "Hi", from: "ABC-12", moves: false}')" ""
+  expect "leak: deskmates_git" "$(leaks deskmates_git)" ""
+  expect "leak: facts_git_start" "$(leaks facts_git_start s21 "$lrepo/src/")" ""
+  expect "leak: facts_git_start, no repo" "$(leaks facts_git_start s22 "$HOME")" ""
+  expect "leak: facts_turn_start" "$(leaks facts_turn_start s21)" ""
+  expect "leak: facts_turn_test" "$(leaks facts_turn_test s21 ran)" ""
+  expect "leak: facts_edit" "$(leaks facts_edit s21 "$lrepo/src/" "$lrepo/src/app.js")" ""
+  expect "leak: facts_turn_end" "$(leaks facts_turn_end s21)" ""
+  expect "leak: facts_track" "$(leaks facts_track s21 "$lrepo/src/" UserPromptSubmit "" yes)" ""
+  expect "leak: facts_delete" "$(leaks facts_delete s21)" ""
+fi
+
 rm -rf "$HOME"
 [ "$failed" = 0 ] && echo "facts-lib: ok"
 exit "$failed"

@@ -103,6 +103,28 @@ expect "plan_delete removes the file" "$(ls "$PLANS" | grep -c s5)" 0
 plan_delete ../evil
 expect "plan_delete of a bad id" "$?" 0
 
+# No helper leaves a variable behind: the shell's variables before and after each public helper (run in this
+# shell, as a translator runs them) differ only in the helper-private names (_plan_…) and the documented results.
+snap_vars() {
+  set | grep -E '^[A-Za-z_][A-Za-z0-9_]*=' |
+    grep -Ev '^(_|BASH[A-Z_]*|RANDOM|SRANDOM|SECONDS|LINENO|PIPESTATUS|OLDPWD|EPOCH[A-Z]*|snap_[a-z]*)='
+}
+# leaks name command…: runs the command here; nothing, or the names of the variables it changed that it should not.
+leaks() {
+  snap_vars > "$HOME/snap.before"
+  "$@" > /dev/null 2>&1
+  snap_vars > "$HOME/snap.after"
+  cat "$HOME/snap.before" "$HOME/snap.after" | sort | uniq -u | cut -d= -f1 | sort -u |
+    grep -Ev '^(_plan_|(nothing))' | tr '\n' ' '
+}
+expect "leak: plan_file" "$(leaks plan_file s30)" ""
+expect "leak: deskmates_on" "$(leaks deskmates_on)" ""
+if [ -n "$found_jq" ]; then
+  expect "leak: plan_update" "$(leaks plan_update s30 claude "$ADD_STEP")" ""
+  expect "leak: deskmates_json_update" "$(leaks deskmates_json_update "$PLANS/s31.json" '{}' 'type == "object"' '$cur')" ""
+fi
+expect "leak: plan_delete" "$(leaks plan_delete s30)" ""
+
 rm -rf "$HOME"
 [ "$failed" = 0 ] && echo "plan-lib: ok"
 exit "$failed"
