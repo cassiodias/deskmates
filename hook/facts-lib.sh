@@ -123,3 +123,180 @@ facts_note() {
   facts_update "$session" "$FACTS_DEFS ($note) as \$n
     | if \$n == null then error(\"no note\") else \$cur | facts_apply(\$n) end" "$@"
 }
+
+# Git facts: the repo a session works in, its turns and the paths its agent edited, kept beside the tickets:
+#   "git":   { "root": "/abs/repo", "base": "<sha at the first event>", "dirtyAtStart": ["src/app.js"] },
+#   "seen":  { "src/app.js": true },
+#   "turns": [ { "at": …, "endAt": …, "head": "<sha at its start>", "files": ["src/app.js"],
+#                "tests": { "ran": 2, "passed": 1, "failed": 1 }, "commits": [ { "hash": "a1b2c3d", "subject": "…" } ] } ]
+# Turns newest first; the open one has no endAt. Paths are relative to the root, normalised. Every git call is
+# made with GIT_OPTIONAL_LOCKS=0, so it never takes the index.lock the agent's own git needs. Each helper is
+# true when it wrote, false (and nothing written) when Deskmates is off, there is no jq or git, the folder is
+# no repo, or there was nothing to write.
+
+FACTS_NL='
+'
+
+# The git to run: nothing, and false, when there is none, or it is Apple's shim with no developer tools
+# behind it (running it would open an install dialog).
+deskmates_git() {
+  git=$(command -v git) || return 1
+  if [ "$git" = /usr/bin/git ] && ! xcode-select -p > /dev/null 2>&1; then return 1; fi
+  printf '%s\n' "$git"
+}
+
+# Runs git $1 with the rest as its arguments, never taking an optional lock.
+facts_run_git() {
+  bin=$1
+  shift
+  GIT_OPTIONAL_LOCKS=0 "$bin" "$@" 2>/dev/null
+}
+
+# The git to run when session $1 may get git facts now: Deskmates runs, jq and git are there.
+facts_git_ready() {
+  deskmates_on && [ -n "$PUPPET_JQ" ] || return 1
+  deskmates_git
+}
+
+# The jq defs of git facts.
+#   nul_list:  NUL-separated git output as a list of its parts, the empty ones left out.
+#   porcelain: `git status --porcelain -z` output as its paths; a rename or copy gives both.
+#   commits:   `git log -z --format='%h%x09%s'` output as [{hash, subject}], subjects of 120 characters at most.
+#   open_turn: true when the newest turn is still open.
+#   end_turn($commits): the newest turn ended now with those commits.
+#   rel($root; $folder; $prefix): a path an edit names, relative to the root and normalised; null when it is
+#              outside the root ($prefix null: the folder is not in that repo, so only paths under the root count).
+FACTS_GIT_DEFS='
+def nul_list: split("\u0000") | map(select(. != ""));
+def porcelain: split("\u0000") | reduce .[] as $e ({out: [], orig: false};
+  if .orig then .out += [$e] | .orig = false
+  elif ($e | length) > 3 then .out += [$e[3:]] | .orig = ($e[0:2] | test("[RC]"))
+  else . end) | .out;
+def commits: nul_list | map(index("\t") as $i | select($i != null)
+  | {hash: .[0:$i], subject: (.[$i + 1:] | gsub("[[:cntrl:]]"; "") | .[0:120])});
+def open_turn: (.turns // [])[0] | . != null and (has("endAt") | not);
+def end_turn($commits): .turns[0] += {endAt: $now, commits: $commits};
+def rel($root; $folder; $prefix):
+  ($folder | rtrimstr("/")) as $f
+  | (if startswith($root + "/") then .[($root | length) + 1:]
+     elif $prefix == null then null
+     elif $f != "" and startswith($f + "/") then $prefix + .[($f | length) + 1:]
+     elif startswith("/") then null
+     else $prefix + . end)
+  | if . == null then null else
+      reduce split("/")[] as $s ([];
+        if . == null then null
+        elif $s == "" or $s == "." then .
+        elif $s == ".." then (if length == 0 then null else .[0:-1] end)
+        else . + [$s] end)
+      | if . == null or length == 0 then null else join("/") end
+    end;
+'
+
+# Records session $1's repo, once: its root, the commit it starts from (base) and the paths already changed or
+# untracked in folder $2 then (500 at most). A repo with no commit yet gives nothing: the base is taken at the
+# first event after the first commit.
+facts_git_start() {
+  file=$(facts_file "$1") || return 1
+  grep -q '"git":{' "$file" 2>/dev/null && return 1
+  git=$(facts_git_ready) || return 1
+  out=$(facts_run_git "$git" -C "$2" rev-parse --show-toplevel HEAD) || return 1
+  case "$out" in *"$FACTS_NL"*) ;; *) return 1 ;; esac
+  root=${out%%"$FACTS_NL"*} base=${out##*"$FACTS_NL"}
+  status=$(mktemp) || return 1
+  if facts_run_git "$git" -C "$root" status --porcelain -z --untracked-files=all > "$status"; then
+    facts_update "$1" "$FACTS_GIT_DEFS \$cur | if .git then error(\"kept\") else
+      .git = {root: \$root, base: \$base, dirtyAtStart: (\$status | porcelain | unique | .[0:500])} end" \
+      --arg root "$root" --arg base "$base" --rawfile status "$status"
+    written=$?
+  else
+    written=1
+  fi
+  rm -f "$status"
+  return "$written"
+}
+
+# Reads session $1's git facts into facts_root (its repo's root) and facts_open (the head its open turn started
+# from, empty when no turn is open); false when the session has no git facts.
+facts_git_state() {
+  file=$(facts_file "$1") || return 1
+  grep -q '"git":{' "$file" 2>/dev/null || return 1
+  state=$("$PUPPET_JQ" -r "$FACTS_GIT_DEFS"' (.git.root | strings), (if open_turn then .turns[0].head else "" end)' \
+    "$file" 2>/dev/null) || return 1
+  facts_root=${state%%"$FACTS_NL"*} facts_open=
+  case "$state" in *"$FACTS_NL"*) facts_open=${state#*"$FACTS_NL"} ;; esac
+  [ -n "$facts_root" ]
+}
+
+# Changes session $1's turns with jq filter $2 (given $cur and $commits: what the open turn committed since it
+# started, as git $3 says), after facts_git_state; more jq arguments may follow.
+facts_turn_change() {
+  session=$1 filter=$2 git=$3
+  shift 3
+  log=$(mktemp) || return 1
+  [ -z "$facts_open" ] || facts_run_git "$git" -C "$facts_root" log -z --format='%h%x09%s' -n 20 "$facts_open..HEAD" > "$log"
+  facts_update "$session" "$FACTS_GIT_DEFS (\$log | commits) as \$commits | \$cur | $filter" \
+    --rawfile log "$log" "$@"
+  written=$?
+  rm -f "$log"
+  return "$written"
+}
+
+# Opens a turn in session $1 from the commit it is at now; a turn still open is ended first, as facts_turn_end
+# would. The newest 30 turns are kept.
+facts_turn_start() {
+  git=$(facts_git_ready) || return 1
+  facts_git_state "$1" || return 1
+  head=$(facts_run_git "$git" -C "$facts_root" rev-parse HEAD) || return 1
+  facts_turn_change "$1" '(if open_turn then end_turn($commits) else . end)
+    | .turns = ([{at: $now, head: $head, files: [], tests: {ran: 0, passed: 0, failed: 0}, commits: []}]
+      + (.turns // []))[0:30]' "$git" --arg head "$head"
+}
+
+# Ends session $1's open turn: its end, and the commits made since it started (20 at most). Nothing without
+# an open turn.
+facts_turn_end() {
+  git=$(facts_git_ready) || return 1
+  facts_git_state "$1" && [ -n "$facts_open" ] || return 1
+  facts_turn_change "$1" 'if open_turn then end_turn($commits) else error("no open turn") end' "$git"
+}
+
+# Counts a test run in session $1's open turn: $2 is ran, passed or failed. Nothing without an open turn.
+facts_turn_test() {
+  case "$2" in ran|passed|failed) ;; *) return 1 ;; esac
+  file=$(facts_file "$1") || return 1
+  grep -q '"turns":\[{' "$file" 2>/dev/null || return 1
+  facts_update "$1" "$FACTS_GIT_DEFS \$cur | if open_turn then .turns[0].tests[\$k] += 1
+    else error(\"no open turn\") end" --arg k "$2"
+}
+
+# Adds the paths an edit in session $1 named, from its folder $2, to the open turn's files and to the paths
+# seen (500 at most each); a path outside the repo is left out. Nothing when none is left.
+facts_edit() {
+  session=$1 folder=$2
+  shift 2
+  file=$(facts_file "$session") || return 1
+  grep -q '"git":{' "$file" 2>/dev/null || return 1
+  [ "$#" -gt 0 ] || return 1
+  git=$(facts_git_ready) || return 1
+  # The folder's place in the repo, when it is in the session's repo at all.
+  out=$(facts_run_git "$git" -C "$folder" rev-parse --show-toplevel --show-prefix) || out=
+  top=${out%%"$FACTS_NL"*} prefix=
+  case "$out" in *"$FACTS_NL"*) prefix=${out#*"$FACTS_NL"} ;; esac
+  count=$# n=0
+  for path do
+    set -- "$@" --arg "path$n" "$path"
+    n=$((n + 1))
+  done
+  shift "$count"
+  facts_update "$session" "$FACTS_GIT_DEFS \$cur | .git.root as \$root
+    | (if \$top != \"\" and \$top == \$root then \$prefix else null end) as \$pre
+    | [\$ARGS.named | to_entries[] | select(.key | test(\"^path[0-9]+\$\"))] | sort_by(.key[4:] | tonumber)
+    | map(.value | rel(\$root; \$folder; \$pre) | select(. != null)) as \$paths
+    | if \$paths == [] or (\$root | type) != \"string\" then error(\"nothing to add\") else . end
+    | \$cur
+    | .seen = reduce \$paths[] as \$p (.seen // {}; if has(\$p) or length >= 500 then . else .[\$p] = true end)
+    | if open_turn then .turns[0].files = reduce \$paths[] as \$p (.turns[0].files // [];
+        if any(.[]; . == \$p) or length >= 500 then . else . + [\$p] end) else . end" \
+    --arg folder "$folder" --arg top "$top" --arg prefix "$prefix" "$@"
+}

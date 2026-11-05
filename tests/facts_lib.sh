@@ -184,6 +184,139 @@ if [ -n "$found_jq" ]; then
   expect "cut keeps current" "$(got n10 '[(.tickets | length), .current, (.tickets | has("ABC-1")), (.tickets | has("ABC-2"))]')" '[10,"ABC-1",true,false]'
 fi
 
+# Git facts (facts_git_start, facts_turn_*, facts_edit): on a repo made here, never the user's git config.
+if [ -n "$found_jq" ] && command -v git > /dev/null; then
+  GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+  export GIT_CONFIG_GLOBAL GIT_CONFIG_NOSYSTEM
+  # git on repo $1 with an identity of its own.
+  tgit() { r=$1; shift; git -C "$r" -c user.name=Test -c user.email=test@example.com "$@"; }
+  repo="$HOME/repo"
+  mkdir -p "$repo/src" "$repo/docs"
+  git init -q "$repo"
+  echo one > "$repo/src/app.js"
+  echo one > "$repo/src/my file.js"
+  echo one > "$repo/docs/ção.md"
+  tgit "$repo" add -A
+  tgit "$repo" commit -q -m "First"
+  first=$(git -C "$repo" rev-parse HEAD)
+  echo two > "$repo/src/app.js"
+  echo note > "$repo/notes.txt"
+
+  # The base: once per session, with what was dirty then.
+  expect "the base writes" "$(facts_git_start g1 "$repo"; echo "|$?")" "|0"
+  expect "root and base" "$(got g1 '.git | [.root, .base]')" "[\"$(cd "$repo" && pwd -P)\",\"$first\"]"
+  expect "dirty at start" "$(got g1 '.git.dirtyAtStart | sort')" '["notes.txt","src/app.js"]'
+  expect "a file with git only is valid facts" "$(got g1 '[.tickets, .timeline]')" '[{},[]]'
+  echo three > "$repo/src/my file.js"
+  tgit "$repo" commit -q -m "Second" -- "src/my file.js"
+  expect "the base again writes nothing" "$(facts_git_start g1 "$repo"; echo "|$?")" "|1"
+  expect "the first base kept" "$(got g1 .git.base)" "\"$first\""
+  second=$(git -C "$repo" rev-parse HEAD)
+
+  # No repo, or a repo with no commit yet: no facts.
+  mkdir -p "$HOME/plain" "$HOME/empty"
+  git init -q "$HOME/empty"
+  expect "a folder that is no repo writes nothing" "$(facts_git_start g2 "$HOME/plain"; echo "|$?")" "|1"
+  expect "a repo with no commit writes nothing" "$(facts_git_start g3 "$HOME/empty"; echo "|$?")" "|1"
+  expect "no file for them" "$(ls "$FACTS" | grep -c 'g[23]')" 0
+
+  # A turn: its files, tests and commits.
+  expect "a turn starts" "$(PUPPET_NOW=100 facts_turn_start g1; echo "|$?")" "|0"
+  expect "the open turn" "$(got g1 '.turns | [length, .[0].at, .[0].head, (.[0] | has("endAt")), .[0].files, .[0].tests, .[0].commits]')" \
+    "[1,100,\"$second\",false,[],{\"ran\":0,\"passed\":0,\"failed\":0},[]]"
+  expect "an absolute path writes" "$(facts_edit g1 "$repo" "$repo/src/app.js"; echo "|$?")" "|0"
+  facts_edit g1 "$repo" "./src/../src/my file.js" "/etc/hosts" "src/app.js"
+  expect "a path outside the repo only writes nothing" "$(facts_edit g1 "$repo" /etc/hosts "../x"; echo "|$?")" "|1"
+  expect "the turn's files" "$(got g1 '.turns[0].files')" '["src/app.js","src/my file.js"]'
+  expect "the paths seen" "$(got g1 '.seen')" '{"src/app.js":true,"src/my file.js":true}'
+  facts_turn_test g1 ran
+  facts_turn_test g1 ran
+  facts_turn_test g1 passed
+  expect "a test count writes" "$(facts_turn_test g1 failed; echo "|$?")" "|0"
+  expect "no such count writes nothing" "$(facts_turn_test g1 skipped; echo "|$?")" "|1"
+  expect "the turn's tests" "$(got g1 '.turns[0].tests')" '{"ran":2,"passed":1,"failed":1}'
+  echo four > "$repo/src/app.js"
+  tgit "$repo" commit -q -m "Fix the typo" -- src/app.js
+  expect "a turn ends" "$(PUPPET_NOW=200 facts_turn_end g1; echo "|$?")" "|0"
+  expect "its end and commits" "$(got g1 '.turns[0] | [.endAt, (.commits | map(.subject)), (.commits[0].hash | length)]')" \
+    '[200,["Fix the typo"],7]'
+  expect "the commit's hash" "$(got g1 '.turns[0].commits[0].hash')" "\"$(git -C "$repo" rev-parse --short=7 HEAD)\""
+  expect "no open turn: an end writes nothing" "$(facts_turn_end g1; echo "|$?")" "|1"
+  expect "no open turn: a test count writes nothing" "$(facts_turn_test g1 ran; echo "|$?")" "|1"
+  facts_edit g1 "$repo" "docs/ção.md"
+  expect "no open turn: an edit is only seen" "$(got g1 '[.turns[0].files, (.seen | keys)]')" \
+    '[["src/app.js","src/my file.js"],["docs/ção.md","src/app.js","src/my file.js"]]'
+
+  # A new turn closes the one still open, as its end would.
+  PUPPET_NOW=300 facts_turn_start g1
+  echo five > "$repo/src/app.js"
+  tgit "$repo" commit -q -m "Second fix" -- src/app.js
+  PUPPET_NOW=400 facts_turn_start g1
+  expect "the open turn closed by the next" "$(got g1 '.turns | [length, .[0].at, (.[0] | has("endAt")), .[1].endAt, (.[1].commits | map(.subject))]')" \
+    '[3,400,false,400,["Second fix"]]'
+
+  # A session started in a subfolder: its relative paths are the subfolder's.
+  facts_git_start g4 "$repo/src"
+  facts_turn_start g4
+  facts_edit g4 "$repo/src" app.js "$repo/src/my file.js" ../notes.txt
+  expect "relative to the subfolder" "$(got g4 '.turns[0].files')" '["src/app.js","src/my file.js","notes.txt"]'
+
+  # A folder spelled through a symlink: its paths still land relative to the root.
+  ln -s repo "$HOME/alias"
+  facts_git_start g5 "$HOME/alias"
+  facts_turn_start g5
+  facts_edit g5 "$HOME/alias" "$HOME/alias/src/app.js"
+  expect "through a symlink" "$(got g5 '.turns[0].files')" '["src/app.js"]'
+
+  # The cuts: 30 turns, subjects of 120 characters.
+  facts_git_start g6 "$repo"
+  for i in $(seq 1 31); do PUPPET_NOW=$i facts_turn_start g6; done
+  expect "a 31st turn drops the oldest" "$(got g6 '.turns | [length, .[0].at, .[29].at]')" '[30,31,2]'
+  facts_git_start g7 "$repo"
+  facts_turn_start g7
+  long=$(printf 's%.0s' $(seq 1 200))
+  tgit "$repo" commit -q --allow-empty -m "$long"
+  facts_turn_end g7
+  expect "a subject of 200 characters cut to 120" "$(got g7 '.turns[0].commits[0].subject | length')" 120
+
+  # A rename gives both paths at start.
+  tgit "$repo" mv "docs/ção.md" docs/new.md
+  facts_git_start g8 "$repo"
+  expect "a rename, both paths" "$(got g8 '.git.dirtyAtStart | sort')" '["docs/new.md","docs/ção.md","notes.txt"]'
+  tgit "$repo" mv docs/new.md "docs/ção.md"
+
+  # Every git call is made with GIT_OPTIONAL_LOCKS=0: it never takes the agent's index.lock.
+  mkdir -p "$HOME/fakebin"
+  printf '#!/bin/sh\necho "${GIT_OPTIONAL_LOCKS-unset}" >> "%s"\nexec %s "$@"\n' "$HOME/locks" "$(command -v git)" \
+    > "$HOME/fakebin/git"
+  chmod +x "$HOME/fakebin/git"
+  (
+    PATH="$HOME/fakebin:$PATH"
+    facts_git_start g9 "$repo"
+    facts_turn_start g9
+    facts_edit g9 "$repo" src/app.js
+    facts_turn_test g9 ran
+    facts_turn_end g9
+    facts_turn_start g9
+  )
+  expect "the fake git was used" "$(got g9 '.turns | length')" 2
+  expect "every git call without optional locks" "$(sort -u "$HOME/locks")" 0
+  expect "no index.lock left" "$(ls "$repo/.git" | grep -c index.lock)" 0
+
+  # Without git, or with Deskmates off: nothing.
+  mkdir -p "$HOME/nogit"
+  for t in grep mkdir mktemp mv rm rmdir date cat head sleep; do ln -s "$(command -v "$t")" "$HOME/nogit/$t"; done
+  expect "no git: no git" "$(PATH="$HOME/nogit" deskmates_git; echo "|$?")" "|1"
+  expect "no git writes nothing" "$(PATH="$HOME/nogit" facts_git_start g10 "$repo"; echo "|$?")" "|1"
+  expect "no git, no file" "$(ls "$FACTS" | grep -c g10)" 0
+  expect "a git found" "$(deskmates_git)" "$(command -v git)"
+  rm "$HOME/.deskmates/on"
+  expect "Deskmates off writes nothing" "$(facts_git_start g11 "$repo"; echo "|$?")" "|1"
+  expect "Deskmates off: no turn" "$(facts_turn_start g1; echo "|$?")" "|1"
+  expect "Deskmates off: no file" "$(ls "$FACTS" | grep -c g11)" 0
+  echo "$$" > "$HOME/.deskmates/on"
+fi
+
 # Without jq there are no facts.
 expect "no jq writes nothing" "$(PUPPET_JQ= facts_update s7 "$SET"; echo "|$?")" "|1"
 expect "no file without jq" "$(ls "$FACTS" 2>/dev/null | grep -c s7)" 0
