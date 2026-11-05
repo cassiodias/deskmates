@@ -274,6 +274,15 @@ if [ -n "$found_jq" ] && command -v git > /dev/null; then
   facts_turn_start g12
   facts_edit g12 "$HOME/alias/src" "$HOME/alias/docs/ção.md" "$HOME/alias/src/app.js"
   expect "beside a subfolder spelled through a symlink" "$(got g12 '.turns[0].files')" '["docs/ção.md","src/app.js"]'
+  expect "the root's other spelling, checked" "$(got g12 .git.top)" "\"$HOME/alias\""
+  # A symlink straight at the subfolder, named like it: its parent is not the repo, so a path there is refused.
+  mkdir -p "$HOME/proj"
+  ln -s "$repo/src" "$HOME/proj/src"
+  facts_git_start g13 "$HOME/proj/src"
+  facts_turn_start g13
+  facts_edit g13 "$HOME/proj/src" "$HOME/proj/x.md" "$HOME/proj/src/app.js"
+  expect "no other spelling of the root" "$(got g13 .git.top)" null
+  expect "a path beside it, outside the repo, dropped" "$(got g13 '.turns[0].files')" '["src/app.js"]'
 
   # The cuts: 30 turns, subjects of 120 characters.
   facts_git_start g6 "$repo"

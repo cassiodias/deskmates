@@ -126,7 +126,8 @@ facts_note() {
 
 # Git facts: the repo a session works in, its turns and the paths its agent edited, kept beside the tickets:
 #   "git":   { "root": "/abs/repo", "base": "<sha at the first event>", "dirtyAtStart": ["src/app.js"],
-#              "folder": "<the session's folder, as given>", "prefix": "<its place in the repo: src/, or empty>" },
+#              "folder": "<the session's folder, as given>", "prefix": "<its place in the repo: src/, or empty>",
+#              "top": "<the root as the folder spells it (/tmp/alias for /tmp/alias/src), when checked; else null>" },
 #   "seen":  { "src/app.js": true },
 #   "turns": [ { "at": …, "endAt": …, "head": "<sha at its start>", "files": ["src/app.js"],
 #                "tests": { "ran": 2, "passed": 1, "failed": 1 }, "commits": [ { "hash": "a1b2c3d", "subject": "…" } ] } ]
@@ -170,10 +171,10 @@ facts_git_ready() {
 #   commits:   `git log -z --format='%h%x09%s'` output as [{hash, subject}], subjects of 120 characters at most.
 #   open_turn: true when the newest turn is still open.
 #   end_turn($commits): the newest turn ended now with those commits.
-#   rel($root; $folder; $prefix): a path an edit names, relative to the root and normalised; null when it is
-#              outside the root ($prefix null: the folder is not in that repo, so only paths under the root count).
-#              A folder ending in its prefix spells the root too (/tmp/alias/src with src/: /tmp/alias), so a
-#              path beside a subfolder reached through a symlink still lands in the repo.
+#   rel($root; $folder; $prefix; $top): a path an edit names, relative to the root and normalised; null when it
+#              is outside the root ($prefix null: the folder is not in that repo, so only paths under the root
+#              count). $top, when not null, is another spelling of the root, checked at start: a path beside a
+#              subfolder reached through a symlink still lands in the repo.
 FACTS_GIT_DEFS='
 def nul_list: split("\u0000") | map(select(. != ""));
 def porcelain: split("\u0000") | reduce .[] as $e ({out: [], orig: false};
@@ -184,14 +185,12 @@ def commits: nul_list | map(index("\t") as $i | select($i != null)
   | {hash: .[0:$i], subject: (.[$i + 1:] | gsub("[[:cntrl:]]"; "") | .[0:120])});
 def open_turn: (.turns // [])[0] | . != null and (has("endAt") | not);
 def end_turn($commits): .turns[0] += {endAt: $now, commits: $commits};
-def rel($root; $folder; $prefix):
+def rel($root; $folder; $prefix; $top):
   ($folder | rtrimstr("/")) as $f
-  | (if $prefix != null and $prefix != "" and ($f + "/" | endswith("/" + $prefix))
-     then ($f + "/") | .[0:length - ($prefix | length)] else null end) as $top
   | (if startswith($root + "/") then .[($root | length) + 1:]
      elif $prefix == null then null
      elif $f != "" and startswith($f + "/") then $prefix + .[($f | length) + 1:]
-     elif $top != null and startswith($top) then .[($top | length):]
+     elif ($top | type) == "string" and $top != "" and startswith($top + "/") then .[($top | length) + 1:]
      elif startswith("/") then null
      else $prefix + . end)
   | if . == null then null else
@@ -217,12 +216,22 @@ facts_git_start() {
   root=${out%%"$FACTS_NL"*} base=${out##*"$FACTS_NL"}
   prefix=${out#*"$FACTS_NL"}
   prefix=${prefix%"$FACTS_NL"*}
+  # The root as the folder spells it (the folder minus its prefix), kept only when it is the root for real.
+  top=
+  folder=${2%/} sub=${prefix%/}
+  if [ -n "$sub" ]; then
+    case "$folder" in
+      ?*/"$sub") top=${folder%/"$sub"}
+        [ "$(cd -P -- "$top" 2>/dev/null && pwd -P)" = "$root" ] || top= ;;
+    esac
+  fi
   status=$(mktemp) || return 1
   if facts_run_git "$git" -C "$root" status --porcelain -z --untracked-files=all > "$status"; then
     facts_update "$1" "$FACTS_GIT_DEFS \$cur | if .git then error(\"kept\") else
       .git = {root: \$root, base: \$base, dirtyAtStart: (\$status | porcelain | unique | .[0:500]),
-        folder: \$folder, prefix: \$prefix} end" \
-      --arg root "$root" --arg base "$base" --arg folder "$2" --arg prefix "$prefix" --rawfile status "$status"
+        folder: \$folder, prefix: \$prefix, top: (if \$top == \"\" then null else \$top end)} end" \
+      --arg root "$root" --arg base "$base" --arg folder "$2" --arg prefix "$prefix" --arg top "$top" \
+      --rawfile status "$status"
     written=$?
   else
     written=1
@@ -296,14 +305,14 @@ facts_edit() {
   facts_git_ready || return 1
   # The folder's place in the repo: recorded at start for the session's folder (a JSON string with nothing to
   # escape is found as written), else asked of git, when the folder is in the session's repo at all.
-  top='' prefix=''
+  gtop='' prefix=''
   case "$folder" in
     *[\"\\]*) recorded=1 ;;
     *) grep -qF "\"folder\":\"$folder\"" "$file"; recorded=$? ;;
   esac
   if [ "$recorded" != 0 ]; then
     out=$(facts_run_git "$git" -C "$folder" rev-parse --show-toplevel --show-prefix) || out=
-    top=${out%%"$FACTS_NL"*}
+    gtop=${out%%"$FACTS_NL"*}
     case "$out" in *"$FACTS_NL"*) prefix=${out#*"$FACTS_NL"} ;; esac
   fi
   count=$# n=0
@@ -313,14 +322,15 @@ facts_edit() {
   done
   shift "$count"
   facts_update "$session" "$FACTS_GIT_DEFS \$cur | .git.root as \$root
-    | (if \$folder == .git.folder and (.git.prefix | type) == \"string\" then .git.prefix
-       elif \$top != \"\" and \$top == \$root then \$prefix else null end) as \$pre
+    | (\$folder == .git.folder and (.git.prefix | type) == \"string\") as \$own
+    | (if \$own then .git.prefix elif \$gtop != \"\" and \$gtop == \$root then \$prefix else null end) as \$pre
+    | (if \$own then .git.top else null end) as \$top
     | [\$ARGS.named | to_entries[] | select(.key | test(\"^path[0-9]+\$\"))] | sort_by(.key[4:] | tonumber)
-    | map(.value | rel(\$root; \$folder; \$pre) | select(. != null)) as \$paths
+    | map(.value | rel(\$root; \$folder; \$pre; \$top) | select(. != null)) as \$paths
     | if \$paths == [] or (\$root | type) != \"string\" then error(\"nothing to add\") else . end
     | \$cur
     | .seen = reduce \$paths[] as \$p (.seen // {}; if has(\$p) or length >= 500 then . else .[\$p] = true end)
     | if open_turn then .turns[0].files = reduce \$paths[] as \$p (.turns[0].files // [];
         if any(.[]; . == \$p) or length >= 500 then . else . + [\$p] end) else . end" \
-    --arg folder "$folder" --arg top "$top" --arg prefix "$prefix" "$@"
+    --arg folder "$folder" --arg gtop "$gtop" --arg prefix "$prefix" "$@"
 }
