@@ -1,0 +1,2 @@
+{ "current": "CON-1", "tickets": { "CON-1": { "seen": 0 } },
+  "timeline": [ { "at": 0, "ticket": "CON-1", "kind": "skill", "text": "my-skill", "phase": null } ] }

@@ -91,7 +91,12 @@ facts_change() {
 case "$event:$tool" in
   PreToolUse:Skill)
     facts_change '(.tool_input.skill // "" | tostring) as $s | if $s == "" then null
-      else {kind: "skill", text: $s, from: ($s + " " + (.tool_input.args // "" | tostring)), moves: true} end' ;;
+      else {kind: "skill", text: $s, from: ($s + " " + (.tool_input.args // "" | tostring)), phaseFrom: $s,
+        moves: true} end' ;;
+  UserPromptSubmit:*)
+    # A /command typed by the user runs a skill too: the ticket from what follows it, the phase from its name.
+    [ -n "$text" ] && facts_change '{kind: "skill", text: $c, from: (.prompt // "" | tostring | .[0:300]),
+      phaseFrom: $c, moves: true}' --arg c "${text#/}" ;;
   PreToolUse:Agent|PreToolUse:Task)
     facts_change '(.tool_input.description // "" | tostring) as $d | if $d == "" then null
       else {kind: "subagent", text: $d, from: $d, moves: true} end' ;;

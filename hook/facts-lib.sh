@@ -61,13 +61,14 @@ def facts_apply($n):
   ($n.from // "" | tostring) as $from
   | (if ($n.ticket | type) == "string" and ($n.ticket | tickets) == [$n.ticket] then $n.ticket
      else ($from | tickets | .[0]) end) as $t
-  | (if $n.kind == "skill" or $n.kind == "subagent" then $from | phase else null end) as $p
-  | (if $t then $t
-     elif $n.moves then (if $p then (.current // "-") else .current end)
+  | (if $n.kind == "skill" or $n.kind == "subagent" then ($n.phaseFrom // $from | tostring) | phase else null end) as $p
+  # A reply or a test run never starts facts: a ticket it names counts once the session has a current ticket.
+  | (if $n.moves then (if $t then $t elif $p then (.current // "-") else .current end)
+     elif $t and (.tickets[$t] != null or .current != null) then $t
      else (.current // (if .tickets["-"] then "-" else null end)) end) as $target
   | if $target == null then error("nothing to hang it on") else . end
   # A phase that waited for a ticket moves to the first one that appears.
-  | if $target != "-" and .tickets["-"] then
+  | if $n.moves and $target != "-" and .tickets["-"] then
       .tickets["-"] as $w
       | .tickets[$target] = ((.tickets[$target] // {}) as $x | $x + ({phase: ($x.phase // $w.phase),
           phaseAt: ($x.phaseAt // $w.phaseAt),
@@ -99,7 +100,9 @@ def facts_apply($n):
 # Applies the note jq filter $2 makes from the payload to session $1's facts (more jq arguments may follow). A
 # note is { kind, text, from, moves, ticket?, jira? }: kind is the timeline line's kind ("skill", "subagent",
 # "jira", "tests", "reply", or null for none), text its text, from the text tickets and the phase are looked for
-# in, moves whether its ticket becomes the current one, ticket a key given outright (Jira's), jira a status.
+# in, phaseFrom the text the phase is looked for in when it is not all of from (a skill's name, not its
+# arguments), moves whether its ticket becomes the current one, ticket a key given outright (Jira's), jira a
+# status. A note that does not move (a reply, a test run) never starts facts nor moves a phase that waits.
 # False, and nothing written, for a null note, or one with no ticket to hang it on (a reply in a session with
 # no facts yet), and as facts_update.
 facts_note() {

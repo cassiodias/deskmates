@@ -113,8 +113,12 @@ function obj:handle(line)
   if self.replayFrom then return end
   -- The card open on this session shows the change at once.
   if (event.flag == "plan" or event.flag == "facts" or event.flag == "test") and self.planCard.key == event.session then
-    local plan, meta = self:cardContent(event.session)
-    if meta then self.planCard:update(event.session, plan, meta) end
+    local plan, meta, version = self:cardContent(event.session)
+    -- Only a change: a new page loses the reader's place.
+    if meta and (version == nil or version ~= self.cardVersion) then
+      self.cardVersion = version
+      self.planCard:update(event.session, plan, meta)
+    end
   end
   for _, intent in ipairs(intents) do self:say(intent.key, intent.text, intent.seconds) end
 end
@@ -190,23 +194,30 @@ function obj:focus(key)
   if s then harnesses.get(s.harness).focus(s, self.terminals) end
 end
 
--- What session `key`'s card shows: its plan (nil when it has none to show) and the card's meta, with the session's
--- facts; nil when there is neither a plan nor facts.
+-- What session `key`'s card shows: its plan (nil when it has none to show), the card's meta, with the session's
+-- facts, and which version of the two files it shows (nil when a file does not say); nil when there is neither
+-- a plan nor facts.
 function obj:cardContent(key)
   local s, puppet = self.sessions.all[key], self.stage.puppets[key]
   if not (s and puppet) then return nil end
   local plan = plans.hasContent(s.plan) and s.plan or nil
   local session = facts.hasContent(s.facts) and sessioncard.view(s.facts, os.time()) or nil
   if not plan and not session then return nil end
-  return plan, { title = (s.title and s.title ~= "") and s.title or s.tag, color = puppet.color, session = session }
+  local version
+  if (not plan or plan.updatedAt) and (not session or s.facts.updatedAt) then
+    version = tostring(plan and plan.updatedAt) .. "|" .. tostring(session and s.facts.updatedAt)
+  end
+  return plan, { title = (s.title and s.title ~= "") and s.title or s.tag, color = puppet.color, session = session },
+    version
 end
 
 --- Deskmates:click(key)
 --- Method
 --- A click on a session's puppet: its card when its session has a plan or facts to show, else its window.
 function obj:click(key)
-  local plan, meta = self:cardContent(key)
+  local plan, meta, version = self:cardContent(key)
   if meta then
+    self.cardVersion = version
     self.planCard:show(key, plan, meta)
   else
     self:focus(key)

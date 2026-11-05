@@ -202,9 +202,11 @@ local factsDir = os.tmpname()
 os.remove(factsDir)
 os.execute("mkdir -p '" .. factsDir .. "'")
 P.factsDir = factsDir
+local factsWritten = 0
 local function writeFacts(reply)
+  factsWritten = factsWritten + 1
   local file = io.open(factsDir .. "/tab1.json", "w")
-  file:write('{"current": "ABC-12", "tickets": {"ABC-12": {"phase": "dev", "phaseAt": 1, "phases": {"dev": 1}, "seen": 2}},'
+  file:write('{"updatedAt": ' .. factsWritten .. ', "current": "ABC-12", "tickets": {"ABC-12": {"phase": "dev", "phaseAt": 1, "phases": {"dev": 1}, "seen": 2}},'
     .. ' "timeline": [{"at": 2, "ticket": "ABC-12", "kind": "reply", "text": "' .. reply .. '", "phase": "dev"}]}')
   file:close()
 end
@@ -221,6 +223,11 @@ write("Stop|tab1||||Built and committed.|app|iTerm.app|facts|/dev/ttys001|claude
 stub.advance(0.2)
 check("a facts line refreshes the open card", factsCard.html_:find("Built and committed.", 1, true) ~= nil
   and #stub.webviews == views + 1 and factsCard.shown)
+factsCard.html_ = "unchanged"
+write("PreToolUse|tab1||Bash|||app|iTerm.app|test|/dev/ttys001|claude|")
+write("PostToolUse|tab1||Bash|||app|iTerm.app|test|/dev/ttys001|claude|")
+stub.advance(0.2)
+check("a line that changed nothing leaves the open card as it was (its scroll too)", factsCard.html_ == "unchanged")
 closeCard(factsCard)
 
 planFile = io.open(plansDir .. "/tab1.json", "w")

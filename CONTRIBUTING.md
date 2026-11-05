@@ -268,8 +268,9 @@ When the agent's events do not line up with the table (`harnesses/cursor/transla
 - **Facts** (optional): what the session works on, for the card. Source `hook/facts-lib.sh` and, on an event that
   names something, call `facts_note <session> '<jq filter>'`: the filter makes a note from the payload,
   `{kind, text, from, moves, ticket?, jira?}` (`kind` is the timeline line: `skill`, `subagent`, `jira`, `tests`,
-  `reply`, or null; `from` the text tickets like `ABC-12` and phase words are looked for in; `moves` whether its
-  ticket becomes the current one), or null for none. The rules (ticket shape, phase words, limits) live in
+  `reply`, or null; `from` the text tickets like `ABC-12` and phase words are looked for in; `phaseFrom`, when
+  given, the only text phase words count in (a skill's name, not its arguments); `moves` whether its ticket
+  becomes the current one: a reply or a test run never starts facts), or null for none. The rules (ticket shape, phase words, limits) live in
   `FACTS_DEFS`, so every agent's facts read alike. Write the line with the flag `facts` when it returns 0 (a test
   line keeps `test`), and `facts_delete` on `SessionEnd`. Claude's translator is the example.
 

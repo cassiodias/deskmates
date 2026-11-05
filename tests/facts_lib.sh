@@ -150,6 +150,16 @@ if [ -n "$found_jq" ]; then
   note n8 '{"kind":"tests","text":"failed","from":"","moves":false}' 20 > /dev/null
   expect "a test run's line" "$(got n8 '.timeline[0] | [.ticket, .kind, .text, .phase]')" '["ABC-12","tests","failed","dev"]'
 
+  # Review fixes: a reply never starts facts, nor moves a waiting phase; the phase comes from phaseFrom.
+  expect "a reply naming an unknown ticket, no facts: nothing" "$(note r1 '{"kind":"reply","text":"Upgraded to GPT-4.","from":"Upgraded to GPT-4.","moves":false}' 10)" 1
+  expect "and no file" "$(ls "$FACTS" | grep -c r1)" 0
+  note r2 '{"kind":"skill","text":"my-developer","from":"my-developer","moves":true}' 10 > /dev/null
+  note r2 '{"kind":"reply","text":"ABC-34 looks related.","from":"ABC-34 looks related.","moves":false}' 20 > /dev/null
+  expect "a reply naming a ticket leaves a waiting phase where it is" "$(got r2 '[(.tickets | keys), .timeline[0].ticket]')" '[["-"],"-"]'
+  note r3 '{"kind":"skill","text":"my-developer","from":"my-developer ABC-12, then write tests","phaseFrom":"my-developer","moves":true}' 10 > /dev/null
+  expect "the phase from phaseFrom, the ticket from from" "$(got r3 '[.current, .tickets["ABC-12"].phase]')" '["ABC-12","dev"]'
+  expect "phaseFrom with no phase word: none" "$(note r4 '{"kind":"skill","text":"commit","from":"commit fix the review comments","phaseFrom":"commit","moves":true}' 10)" 1
+
   # The cut: 30 lines, 10 tickets, never current.
   note n9 '{"kind":"skill","text":"my-developer","from":"my-developer ABC-12","moves":true}' 1 > /dev/null
   for i in $(seq 2 32); do note n9 "{\"kind\":\"reply\",\"text\":\"line $i\",\"from\":\"line $i\",\"moves\":false}" "$i" > /dev/null; done
