@@ -135,7 +135,7 @@ facts_note() {
 #   "seen":  { "src/app.js": true },
 #   "turns": [ { "at": …, "endAt": …, "head": "<sha at its start>", "files": ["src/app.js"],
 #                "tests": { "ran": 2, "passed": 1, "failed": 1 }, "commits": [ { "hash": "a1b2c3d", "subject": "…" } ] } ]
-# Turns newest first; the open one has no endAt. Paths are relative to the root, normalised. Every git call is
+# Turns newest first; one with no endAt is open (the newest) or was stopped before its end. Paths are relative to the root, normalised. Every git call is
 # made with GIT_OPTIONAL_LOCKS=0, so it never takes the index.lock the agent's own git needs. Each helper is
 # true when it wrote, false (and nothing written) when Deskmates is off, there is no jq or git, the folder is
 # no repo, or there was nothing to write.
@@ -271,15 +271,15 @@ facts_turn_change() {
   return "$_facts_written"
 }
 
-# Opens a turn in session $1 from the commit it is at now; a turn still open is ended first, as facts_turn_end
-# would. The newest 30 turns are kept.
+# Opens a turn in session $1 from the commit it is at now. A turn still open stays as it is, with no end and no
+# commits: it was stopped (Esc runs no Stop hook), so when it ended is not known, nor which commits since are
+# its own. The newest 30 turns are kept.
 facts_turn_start() {
   facts_git_ready || return 1
   facts_git_state "$1" || return 1
   _facts_head=$(facts_run_git "$_facts_git" -C "$facts_root" rev-parse HEAD) || return 1
-  facts_turn_change "$1" '(if open_turn then end_turn($commits) else . end)
-    | .turns = ([{at: $now, head: $head, files: [], tests: {ran: 0, passed: 0, failed: 0}, commits: []}]
-      + (.turns // []))[0:30]' "$_facts_git" --arg head "$_facts_head"
+  facts_update "$1" '$cur | .turns = ([{at: $now, head: $head, files: [], tests: {ran: 0, passed: 0, failed: 0},
+    commits: []}] + (.turns // []))[0:30]' --arg head "$_facts_head"
 }
 
 # Ends session $1's open turn: its end, and the commits made since it started (20 at most). Nothing without

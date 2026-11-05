@@ -247,13 +247,15 @@ if [ -n "$found_jq" ] && command -v git > /dev/null; then
   expect "no open turn: an edit is only seen" "$(got g1 '[.turns[0].files, (.seen | keys)]')" \
     '[["src/app.js","src/my file.js"],["docs/ção.md","src/app.js","src/my file.js"]]'
 
-  # A new turn closes the one still open, as its end would.
+  # A turn still open when the next prompt comes was stopped (Esc runs no Stop hook): it keeps no end and no
+  # commits, since neither is known (a commit since may be the user's own).
   PUPPET_NOW=300 facts_turn_start g1
   echo five > "$repo/src/app.js"
   tgit "$repo" commit -q -m "Second fix" -- src/app.js
   PUPPET_NOW=400 facts_turn_start g1
-  expect "the open turn closed by the next" "$(got g1 '.turns | [length, .[0].at, (.[0] | has("endAt")), .[1].endAt, (.[1].commits | map(.subject))]')" \
-    '[3,400,false,400,["Second fix"]]'
+  expect "the open turn left by the next: no end, no commits" \
+    "$(got g1 '.turns | [length, .[0].at, (.[0] | has("endAt")), .[1].at, (.[1] | has("endAt")), .[1].commits]')" \
+    '[3,400,false,300,false,[]]'
 
   # A session started in a subfolder: its relative paths are the subfolder's.
   facts_git_start g4 "$repo/src"

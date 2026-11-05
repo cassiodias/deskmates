@@ -135,6 +135,17 @@ local left = {
 }
 local lv = workcard.view(factsWith(left), GIT, PLAN, true)
 check("working: only the newest open turn is running", lv and lv.turns[1].took == "running" and lv.turns[2].took == nil)
+-- A turn stopped with Esc (no Stop hook) is left open when the next prompt comes, with no end and no commits:
+-- it shows its start only, no length and no commits.
+local stopped = workcard.view(factsWith({
+  { at = at(14, 5), files = {}, tests = { ran = 0, passed = 0, failed = 0 }, commits = {} },
+  { at = at(13, 50), files = { "src/app.js" }, tests = { ran = 0, passed = 0, failed = 0 }, commits = {} },
+}), GIT, PLAN, true)
+check("stopped: its start, no length, no commits", stopped and stopped.turns[2].time == "13:50"
+  and stopped.turns[2].took == nil and #stopped.turns[2].commits == 0)
+check("stopped: drawn with an empty length and no commits", has(workcard.html(stopped),
+  '<span class="time">13:50</span><span class="took"></span><details class="files"><summary>1 file</summary><ul>'
+  .. "<li><code>src/app.js</code></li></ul></details></li>"))
 
 check("no turns: no turns block", not has(workcard.html(workcard.view(factsWith(), GIT, PLAN, false)), 'class="turns"'))
 
