@@ -340,6 +340,36 @@ if [ -n "$found_jq" ] && command -v git > /dev/null; then
     [ "$failed" = 0 ]
   ) || failed=1
 
+  # facts_track: one event's work on the facts, and whether its line should carry the facts flag.
+  facts_track t1 "$repo" UserPromptSubmit "" no
+  expect "a prompt: the facts flag" "$(facts_track t1 "$repo" UserPromptSubmit "" no; echo "|$?")" "|0"
+  expect "a prompt with a test flag: no facts flag" "$(facts_track t1 "$repo" UserPromptSubmit test no; echo "|$?")" "|1"
+  expect "a prompt with a plan flag: no facts flag" "$(facts_track t1 "$repo" UserPromptSubmit plan no; echo "|$?")" "|1"
+  expect "a prompt opened turns" "$(got t1 '.turns | length')" 4
+  expect "a tool event: no facts flag" "$(facts_track t1 "$repo" PreToolUse "" no; echo "|$?")" "|1"
+  facts_track t1 "$repo" PreToolUse test no
+  facts_track t1 "$repo" PreToolUse test yes
+  expect "a test run counts ran, trusted or not" "$(got t1 '.turns[0].tests')" '{"ran":2,"passed":0,"failed":0}'
+  facts_track t1 "$repo" PostToolUse test no
+  facts_track t1 "$repo" PostToolUseFailure test no
+  expect "no exit codes: nothing else counted" "$(got t1 '.turns[0].tests')" '{"ran":2,"passed":0,"failed":0}'
+  facts_track t1 "$repo" PostToolUse "" yes
+  facts_track t1 "$repo" PostToolUseFailure "" yes
+  expect "no test flag: nothing counted" "$(got t1 '.turns[0].tests')" '{"ran":2,"passed":0,"failed":0}'
+  facts_track t1 "$repo" PostToolUse test yes
+  facts_track t1 "$repo" PostToolUseFailure test yes
+  facts_track t1 "$repo" PostToolUseFailure test yes
+  expect "trusted exit codes: passed and failed counted" "$(got t1 '.turns[0].tests')" '{"ran":2,"passed":1,"failed":2}'
+  expect "a stop: the facts flag" "$(facts_track t1 "$repo" Stop "" no; echo "|$?")" "|0"
+  expect "the turn ended" "$(got t1 '.turns[0] | has("endAt")')" true
+  expect "a stop with a test flag: no facts flag" "$(facts_track t1 "$repo" Stop test no; echo "|$?")" "|1"
+  expect "a stop with no open turn writes nothing: no flag" "$(facts_track t1 "$repo" Stop "" no; echo "|$?")" "|1"
+  expect "a session end does nothing" "$(facts_track t2 "$repo" SessionEnd "" no; echo "|$?")" "|1"
+  expect "a session end: no file" "$(ls "$FACTS" | grep -c '^t2')" 0
+  expect "an empty folder does nothing" "$(facts_track t3 "" UserPromptSubmit "" no; echo "|$?")" "|1"
+  expect "an empty folder: no file" "$(ls "$FACTS" | grep -c '^t3')" 0
+  expect "an event it does not know: no flag" "$(facts_track t1 "$repo" Notification "" no; echo "|$?")" "|1"
+
   # Without git, or with Deskmates off: nothing.
   mkdir -p "$HOME/nogit"
   for t in grep mkdir mktemp mv rm rmdir date cat head sleep; do ln -s "$(command -v "$t")" "$HOME/nogit/$t"; done

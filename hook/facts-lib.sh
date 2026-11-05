@@ -334,3 +334,24 @@ facts_edit() {
         if any(.[]; . == \$p) or length >= 500 then . else . + [\$p] end) else . end" \
     --arg folder "$folder" --arg gtop "$gtop" --arg prefix "$prefix" "$@"
 }
+
+# What an event does to session $1's git facts, for every agent alike: $2 is the session's folder, $3 the
+# event (Claude Code's names), $4 the line's flag so far (test, plan or nothing), $5 whether the agent's exit
+# codes can be trusted (yes or no). Takes the session's git base at its first event in a repo, starts a turn on
+# UserPromptSubmit and ends it on Stop; with the test flag, counts ran on PreToolUse and, only when exit codes
+# are trusted, passed on PostToolUse and failed on PostToolUseFailure. Nothing for SessionEnd or an empty folder.
+# Gives back 0 when a turn started or ended and the line has no test or plan flag (it should carry the facts
+# flag), else 1; the caller sets the flag. Edits are the agent's to name (facts_edit).
+facts_track() {
+  [ -n "$2" ] && [ "$3" != SessionEnd ] || return 1
+  facts_git_start "$1" "$2" 2>/dev/null
+  case "$3" in
+    UserPromptSubmit) facts_turn_start "$1" 2>/dev/null || return 1 ;;
+    Stop) facts_turn_end "$1" 2>/dev/null || return 1 ;;
+    PreToolUse) [ "$4" = test ] && facts_turn_test "$1" ran 2>/dev/null; return 1 ;;
+    PostToolUse) [ "$4" = test ] && [ "$5" = yes ] && facts_turn_test "$1" passed 2>/dev/null; return 1 ;;
+    PostToolUseFailure) [ "$4" = test ] && [ "$5" = yes ] && facts_turn_test "$1" failed 2>/dev/null; return 1 ;;
+    *) return 1 ;;
+  esac
+  [ "$4" != test ] && [ "$4" != plan ]
+}

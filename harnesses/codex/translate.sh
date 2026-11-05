@@ -62,15 +62,11 @@ case "$tool" in collaborationspawn_agent|spawn_agent) text=$(field tool_input.ta
 flag=""
 [ "$tool" = "Bash" ] && is_test_command "$(payload_value tool_input.command)" && flag="test"
 
-# The session's git facts (hook/facts-lib.sh): its repo, taken at its first event in one; its turns, a prompt
-# opening one and a stop (or an interrupt, which is a stop above) ending it; the paths a patch that went through
-# names; its test runs. A turn's start or end sets the facts flag, unless the line has a test flag already; an
-# edit sets none (the card reads the file when it opens). Codex gives no reliable exit code: a test run counts
-# as ran, never as passed or failed. The helpers set plain globals, none of which this translator reads afterwards.
+# The session's git facts (hook/facts-lib.sh): facts_track handles the repo, the turns (an Interrupt is a Stop
+# above) and the test runs for every agent; here only what is Codex's: the paths a patch that went through names.
+# Codex gives no reliable exit code, so a test run counts as ran, never as passed or failed. A turn's start or end
+# sets the facts flag (facts_track says when); an edit sets none (the card reads the file when it opens).
 cwd=$(path_field cwd)
-turn_change() {
-  "$@" 2>/dev/null && [ "$flag" != test ] && flag="facts"
-}
 # Adds the paths of patch text $1 to the session's facts, each as its own argument (a path may hold spaces).
 patched() {
   patch_paths=$(codex_patch_paths "$1")
@@ -86,14 +82,9 @@ patched() {
 }
 if [ "$event" = SessionEnd ]; then
   facts_delete "$session"
-elif [ -n "$cwd" ]; then
-  facts_git_start "$session" "$cwd" 2>/dev/null
-  case "$event:$tool" in
-    UserPromptSubmit:*) turn_change facts_turn_start "$session" ;;
-    Stop:*) turn_change facts_turn_end "$session" ;;
-    PostToolUse:apply_patch) patched "$(payload_value tool_input.command)" ;;
-  esac
-  [ "$flag" = test ] && [ "$event" = PreToolUse ] && facts_turn_test "$session" ran 2>/dev/null
+else
+  facts_track "$session" "$cwd" "$event" "$flag" no && flag="facts"
+  [ -n "$cwd" ] && [ "$event:$tool" = PostToolUse:apply_patch ] && patched "$(payload_value tool_input.command)"
 fi
 
 write_event codex "$event" "$session" "$(field agent_id)" "$tool" "$(field agent_type)" "$text" \
