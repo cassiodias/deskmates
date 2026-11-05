@@ -1,0 +1,1 @@
+{"hook_event_name":"beforeSubmitPrompt","session_id":"s1","generation_id":"g1","workspace_roots":["@REPO@"],"prompt":"fix the typo in the readme"}

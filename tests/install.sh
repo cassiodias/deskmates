@@ -140,7 +140,7 @@ check "cursor detect: ~/.cursor" 'PATH=/usr/bin:/bin "$cursor/detect.sh"'
 h="$HOME/.cursor/hooks.json"
 check "cursor fresh: config path" '[ "$("$cursor/config.sh")" = "$h" ]'
 check "cursor fresh: version 1" '[ "$(jq .version "$h")" = 1 ]'
-check "cursor fresh: 7 events" '[ "$(jq ".hooks | length" "$h")" = 7 ]'
+check "cursor fresh: 8 events" '[ "$(jq ".hooks | length" "$h")" = 8 ]'
 check "cursor fresh: no sessionStart (the translator drops it)" '[ "$(jq ".hooks | has(\"sessionStart\")" "$h")" = false ]'
 check "cursor fresh: every command is ours, home spelled out" \
   '[ "$(jq -r "[.hooks[][].command] | unique | join(\" \")" "$h")" = "$HOME/.deskmates/src/harnesses/cursor/translate.sh" ]'

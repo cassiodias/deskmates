@@ -1,0 +1,1 @@
+{"hook_event_name":"afterFileEdit","session_id":"s1","generation_id":"g1","workspace_roots":["@REPO@"],"file_path":"@REPO@/src/app.js","content":"TOP-SECRET-BODY","edits":[{"old_string":"SECRET-OLD","new_string":"SECRET-NEW"}]}

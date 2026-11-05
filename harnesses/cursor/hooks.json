@@ -5,6 +5,7 @@
     "preToolUse": [{ "command": "~/.deskmates/src/harnesses/cursor/translate.sh" }],
     "postToolUse": [{ "command": "~/.deskmates/src/harnesses/cursor/translate.sh" }],
     "postToolUseFailure": [{ "command": "~/.deskmates/src/harnesses/cursor/translate.sh" }],
+    "afterFileEdit": [{ "command": "~/.deskmates/src/harnesses/cursor/translate.sh" }],
     "afterAgentResponse": [{ "command": "~/.deskmates/src/harnesses/cursor/translate.sh" }],
     "stop": [{ "command": "~/.deskmates/src/harnesses/cursor/translate.sh" }],
     "sessionEnd": [{ "command": "~/.deskmates/src/harnesses/cursor/translate.sh" }]

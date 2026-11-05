@@ -1,0 +1,1 @@
+{"hook_event_name":"preToolUse","session_id":"s1","generation_id":"g1","workspace_roots":["@REPO@"],"tool_name":"Shell","tool_input":{"command":"npm test"},"tool_use_id":"u1"}

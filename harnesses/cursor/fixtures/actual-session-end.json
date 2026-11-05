@@ -1,0 +1,1 @@
+{"hook_event_name":"sessionEnd","session_id":"s1","generation_id":"g1","workspace_roots":["@REPO@"],"reason":"completed","final_status":"completed","duration_ms":1000,"is_background_agent":false}

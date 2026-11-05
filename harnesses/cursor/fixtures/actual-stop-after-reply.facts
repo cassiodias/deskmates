@@ -1,0 +1,26 @@
+{
+  "git": {
+    "base": "@BASE@",
+    "dirtyAtStart": [],
+    "folder": "@REPO@",
+    "prefix": "",
+    "root": "@REPO@",
+    "top": null
+  },
+  "tickets": {},
+  "timeline": [],
+  "turns": [
+    {
+      "at": 0,
+      "commits": [],
+      "endAt": 0,
+      "files": [],
+      "head": "@BASE@",
+      "tests": {
+        "failed": 0,
+        "passed": 0,
+        "ran": 0
+      }
+    }
+  ]
+}
