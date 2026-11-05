@@ -135,6 +135,36 @@ case "$event:$tool" in
       --arg d "$description" --arg s "$(first_sentence last_assistant_message)" ;;
 esac
 
+# The session's git facts (hook/facts-lib.sh): its repo, taken at its first event in one; its turns, a prompt
+# opening one and a stop ending it; the paths Claude Code's edit tools name; its test runs. A subagent's events
+# count in the session's open turn. A turn's start or end sets the facts flag, unless the line has a test or
+# plan flag already; an edit sets none (the card reads the file when it opens). The helpers set plain globals,
+# none of which this translator reads afterwards (they only rewrite session with the same value).
+cwd=$(path_field cwd)
+turn_change() {
+  "$@" 2>/dev/null && [ "$flag" != test ] && [ "$flag" != plan ] && flag="facts"
+}
+# Adds the path an edit names to the session's facts.
+edited() {
+  [ -n "$1" ] && facts_edit "$session" "$cwd" "$1" 2>/dev/null
+}
+if [ -n "$cwd" ] && [ "$event" != SessionEnd ]; then
+  facts_git_start "$session" "$cwd" 2>/dev/null
+  case "$event:$tool" in
+    UserPromptSubmit:*) turn_change facts_turn_start "$session" ;;
+    Stop:*) turn_change facts_turn_end "$session" ;;
+    PostToolUse:Edit|PostToolUse:Write|PostToolUse:MultiEdit) edited "$(path_field tool_input.file_path)" ;;
+    PostToolUse:NotebookEdit) edited "$(path_field tool_input.notebook_path)" ;;
+  esac
+  if [ "$flag" = test ]; then
+    case "$event" in
+      PreToolUse) facts_turn_test "$session" ran 2>/dev/null ;;
+      PostToolUse) facts_turn_test "$session" passed 2>/dev/null ;;
+      PostToolUseFailure) facts_turn_test "$session" failed 2>/dev/null ;;
+    esac
+  fi
+fi
+
 write_event claude "$event" "$session" "$(field agent_id)" "$tool" "$(field agent_type)" "$text" \
   "$(path_field cwd)" "$flag" "$title"
 exit 0

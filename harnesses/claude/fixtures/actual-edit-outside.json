@@ -1,0 +1,10 @@
+{
+  "session_id": "s1",
+  "cwd": "@REPO@",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Write",
+  "tool_input": {
+    "file_path": "/Users/dev/notes/todo.md",
+    "content": "Fixed the typo."
+  }
+}

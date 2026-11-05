@@ -1,0 +1,30 @@
+{
+  "git": {
+    "base": "@BASE@",
+    "dirtyAtStart": [],
+    "folder": "@REPO@",
+    "prefix": "",
+    "root": "@REPO@",
+    "top": null
+  },
+  "seen": {
+    "notes/my notebook.ipynb": true
+  },
+  "tickets": {},
+  "timeline": [],
+  "turns": [
+    {
+      "at": 0,
+      "commits": [],
+      "files": [
+        "notes/my notebook.ipynb"
+      ],
+      "head": "@BASE@",
+      "tests": {
+        "failed": 0,
+        "passed": 0,
+        "ran": 0
+      }
+    }
+  ]
+}

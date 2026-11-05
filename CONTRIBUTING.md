@@ -169,7 +169,9 @@ For a plan (step 3): `NAME.plan` is the plan file the jq pass must leave (`updat
 means none may be left; without jq there is no plan, so the line without the `plan` flag goes in
 `NAME.nojq.line`. `@HOME@` in a payload is the case's home, for a file the agent names (Claude's plan file).
 Facts work the same way: `NAME.facts` is the facts file the jq pass must leave, an empty one means none, and
-without jq none are written.
+without jq none are written. A case in a repo lists its files in `NAME.repo`, one path per line: they are
+committed in a fresh repo, and `@REPO@` (its folder) and `@BASE@` (its commit) in the payload and in
+`NAME.home/` stand for it, as they do in the `NAME.facts` compared.
 
 A translator that keeps something between events (step 3) gets one fixture per step, with the state it starts
 from in `NAME.home/.deskmates/`. To check the steps chained in the orders you saw, add a script like

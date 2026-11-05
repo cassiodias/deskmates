@@ -4,6 +4,28 @@
 # with plutil alone (macOS 13 and 14 without jq).
 cd "$(dirname "$0")/.." || exit 1
 failed=0
+
+# Makes a repo at <home $1>/repo with the paths listed in file $2 committed, and prints its folder as git spells
+# it (the real path: mktemp's folders sit behind a symlink).
+repo_with() {
+  mkdir -p "$1/repo" && (cd -P "$1/repo" && pwd -P) || return 1
+  while IFS= read -r path; do
+    mkdir -p "$1/repo/$(dirname "$path")" && echo "$path" > "$1/repo/$path"
+  done < "$2"
+  HOME=$1 GIT_CONFIG_NOSYSTEM=1 git -C "$1/repo" init -q &&
+    HOME=$1 GIT_CONFIG_NOSYSTEM=1 git -C "$1/repo" add -A &&
+    HOME=$1 GIT_CONFIG_NOSYSTEM=1 git -C "$1/repo" -c user.email=t@t -c user.name=t commit -q -m "Start"
+}
+
+# Stdin with @REPO@ and @BASE@ filled in from the case's repo and base, and back (unfill), for the facts
+# compared; as it is when the case has no repo.
+fill() {
+  if [ -n "$repo" ]; then sed -e "s|@REPO@|$repo|g" -e "s|@BASE@|$base|g"; else cat; fi
+}
+unfill() {
+  if [ -n "$repo" ]; then sed -e "s|$repo|@REPO@|g" -e "s|$base|@BASE@|g"; else cat; fi
+}
+
 # The jq the hooks would find (hook/puppet-lib.sh); without one, only the plutil pass runs, and it says so.
 unset PUPPET_JQ
 found_jq=$(HOME=/nonexistent sh -c '. hook/puppet-lib.sh; printf "%s" "$PUPPET_JQ"')
@@ -24,10 +46,20 @@ for parser in $parsers; do
     work=$(mktemp -d)
     # <name>.home holds files the case needs in its home (like Codex's session index).
     [ -d "${payload%.json}.home" ] && cp -R "${payload%.json}.home/." "$work/"
+    # <name>.repo lists the paths (one per line) of a repo made at <home>/repo with them committed: @REPO@ is
+    # its folder (as git spells it) and @BASE@ its commit, in the payload and in the files of <name>.home.
+    repo="" base=""
+    if [ -e "${payload%.json}.repo" ]; then
+      repo=$(repo_with "$work" "${payload%.json}.repo") && base=$(git -C "$repo" rev-parse HEAD) ||
+        { echo "harness $name: no repo made"; failed=1; }
+      grep -rlF --exclude-dir=.git -e @REPO@ -e @BASE@ "$work" | while IFS= read -r file; do
+        fill < "$file" > "$file.filled" && mv "$file.filled" "$file"
+      done
+    fi
     # Deskmates runs: its marker names a live process (this runner).
     mkdir -p "$work/.deskmates" && echo "$$" > "$work/.deskmates/on"
     # @HOME@ in a payload is the case's home (a path the agent names there, like a plan file).
-    sed "s|@HOME@|$work|g" "$payload" > "$work.payload"
+    sed "s|@HOME@|$work|g" "$payload" | fill > "$work.payload"
     # LC_ALL=C: hooks may run from a background process, with no locale.
     stdout=$(LC_ALL=C HOME="$work" PUPPET_NOW=0 PUPPET_TTY=/dev/ttys009 TERM_PROGRAM=iTerm.app \
       "harnesses/$harness/translate.sh" < "$work.payload")
@@ -85,7 +117,7 @@ for parser in $parsers; do
         failed=1
       fi
     elif [ "$parser" = jq ] && [ -e "$expected_facts" ]; then
-      got_facts=$("$found_jq" -S 'del(.updatedAt)' "$work/.deskmates/facts/"*.json 2>/dev/null)
+      got_facts=$("$found_jq" -S 'del(.updatedAt)' "$work/.deskmates/facts/"*.json 2>/dev/null | unfill)
       if [ "$facts" != "$(ls "$work/.deskmates/facts/" 2>/dev/null | head -n 1)" ] ||
         [ "$got_facts" != "$("$found_jq" -S . "$expected_facts")" ]; then
         echo "harness $name left the facts"
@@ -98,7 +130,7 @@ for parser in $parsers; do
       echo "harness $name wrote facts without jq: '$facts'"
       failed=1
     elif [ "$parser" = plutil ] && [ -n "$facts" ] &&
-      ! cmp -s "$work/.deskmates/facts/$facts" "${payload%.json}.home/.deskmates/facts/$facts"; then
+      ! fill < "${payload%.json}.home/.deskmates/facts/$facts" | cmp -s - "$work/.deskmates/facts/$facts"; then
       echo "harness $name changed facts without jq"
       failed=1
     elif [ "$parser" = jq ] && [ ! -e "$expected_facts" ] && [ -n "$facts" ] && [ "$facts" != "$facts_started" ]; then
