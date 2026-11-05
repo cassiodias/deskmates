@@ -284,9 +284,11 @@ puppet_tty() {
   cache="$PUPPET_DIR/tty-$1"
   tty=$(terminal_of $$)
   pid=$(ps -o ppid= -p $$ | tr -d ' ')
-  # A daemon's session has the tab's terminal or none: its ancestors only lead to the worker's pty.
-  [ -n "$tty" ] && is_daemon_pty "$tty" && tty=$(daemon_owner_tty) && pid=""
-  if [ -z "$tty" ] && [ -n "$1" ] && [ -f "$cache" ]; then
+  # A daemon's session has the tab's terminal or none: its ancestors only lead to the worker's pty, and a terminal
+  # remembered for it may be that pty (which still runs claude while the idle worker lives) or a tab its claude left.
+  daemon=""
+  [ -n "$tty" ] && is_daemon_pty "$tty" && daemon=1 && tty=$(daemon_owner_tty) && pid=""
+  if [ -z "$tty" ] && [ -z "$daemon" ] && [ -n "$1" ] && [ -f "$cache" ]; then
     tty=$(cat "$cache")
     terminal_runs "$tty" "${PUPPET_PROGRAM:-}" || tty=""
   fi

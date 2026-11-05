@@ -199,6 +199,12 @@ expect "a daemon's session: the terminal of the claude that started the daemon" 
 expect "and remembered" "$(cat "$PUPPET_DIR/tty-d1")" /dev/ttys002
 rm -f "$PUPPET_DIR/tty-d1"
 expect "a daemon whose claude is gone: no terminal, never the worker's" "$(fake_tree gone; puppet_tty d2)" ""
+# Live (5 Nov): a z-kb puppet stayed for good. Its claude was gone, and the terminal remembered for the session (the
+# worker's pty, from before the daemon was understood) still ran the idle worker, which ps names claude.
+printf '%s' /dev/ttys001 > "$PUPPET_DIR/tty-d4"
+expect "a daemon whose claude is gone: not the worker's pty remembered for it" "$(fake_tree gone; puppet_tty d4)" ""
+printf '%s' /dev/ttys002 > "$PUPPET_DIR/tty-d5"
+expect "a daemon whose claude is gone: not a tab remembered for it either" "$(fake_tree gone; puppet_tty d5)" ""
 expect "a plain tab: its own terminal" "$(fake_tree plain; puppet_tty d3)" /dev/ttys002
 
 rm -rf "$HOME"
