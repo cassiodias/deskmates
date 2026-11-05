@@ -66,7 +66,7 @@ local function actualView(f, gitState, plan)
 
   local maps = filemaps(plan)
   local c = actual.compare({
-    planned = maps and actual.planned(maps, f.git.root) or nil,
+    planned = maps and actual.planned(maps, f.git.root, f.git.prefix) or nil,
     diff = actual.parseDiff(gitState.diff),
     untracked = actual.parseList(gitState.untracked),
     uncommitted = actual.parseList(gitState.uncommitted),

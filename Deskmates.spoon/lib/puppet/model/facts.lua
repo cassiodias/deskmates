@@ -1,7 +1,7 @@
 -- A session's facts, as the hooks write them (hook/facts-lib.sh): one file per session,
 --   { "current": "ABC-12", "tickets": { "ABC-12": { "phase", "phaseAt", "phases", "ends", "jira", "seen" } },
 --     "timeline": [ { "at", "ticket", "kind", "text", "phase" } ], "updatedAt": …,
---     "git": { "root", "base", "dirtyAtStart": [ path ] }, "seen": { path: true },
+--     "git": { "root", "base", "prefix", "dirtyAtStart": [ path ] }, "seen": { path: true },
 --     "turns": [ { "at", "endAt", "files": [ path ], "tests": { "ran", "passed", "failed" },
 --                  "commits": [ { "hash", "subject" } ] } ] }
 -- read here with every field checked: a bad field, ticket or entry is dropped on its own; a file that is not
@@ -61,10 +61,20 @@ local function ticket(t)
   return out
 end
 
--- The git block, checked: { root, base, dirtyAtStart = set }; nil unless root and base are right.
+-- The session folder's place in the repo, as git's `--show-prefix` gives it ("src/", "packages/web/"): `v` when it
+-- is "" or segments each ending in "/", none of them empty, "." or ".."; else "" (the root).
+local function prefix(v)
+  if type(v) ~= "string" or v:sub(-1) ~= "/" then return "" end
+  for segment in v:gmatch("([^/]*)/") do
+    if segment == "" or segment == "." or segment == ".." then return "" end
+  end
+  return v
+end
+
+-- The git block, checked: { root, base, prefix, dirtyAtStart = set }; nil unless root and base are right.
 local function git(g)
   if type(g) ~= "table" or not str(g.root) or not isHash(g.base) then return nil end
-  return { root = g.root, base = g.base, dirtyAtStart = pathSet(g.dirtyAtStart) }
+  return { root = g.root, base = g.base, prefix = prefix(g.prefix), dirtyAtStart = pathSet(g.dirtyAtStart) }
 end
 
 -- The `seen` paths as a set; only an entry that is `true` counts.

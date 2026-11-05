@@ -68,6 +68,27 @@ check("planned: . and .. segments and empty segments unchecked, as written",
   same(actual.planned({ filemap(".", "../x.js", "src/../src/app.js", "src//app.js", ROOT .. "/../other/x.js") }, ROOT),
     { checked = {}, unchecked = { ".", "../x.js", "/Users/me/my-app/../other/x.js", "src/../src/app.js", "src//app.js" },
       written = {} }))
+-- A session started in a subfolder: its plan's relative entries are the subfolder's, as the hooks read its paths.
+local SUB = "packages/web/"
+check("planned: in a subfolder, a relative entry starts at the subfolder",
+  same(actual.planned({ filemap("src/app.js", "./src/b.js:3") }, ROOT, SUB),
+    { checked = { "packages/web/src/app.js", "packages/web/src/b.js" }, unchecked = {},
+      written = { ["packages/web/src/app.js"] = "src/app.js", ["packages/web/src/b.js"] = "./src/b.js:3" } }))
+check("planned: in a subfolder, an absolute entry is still the root's",
+  same(actual.planned({ filemap(ROOT .. "/src/app.js", "/etc/hosts") }, ROOT, SUB),
+    { checked = { "src/app.js" }, unchecked = { "/etc/hosts" }, written = { ["src/app.js"] = ROOT .. "/src/app.js" } }))
+check("planned: in a subfolder, globs, folders and .. still unchecked, as written",
+  same(actual.planned({ filemap("src/*.js", "docs/", "../x.js", "src/../app.js") }, ROOT, SUB),
+    { checked = {}, unchecked = { "../x.js", "docs/", "src/*.js", "src/../app.js" }, written = {} }))
+check("planned: an empty prefix is the root",
+  same(actual.planned({ filemap("src/app.js") }, ROOT, ""), actual.planned({ filemap("src/app.js") }, ROOT))
+  and same(actual.planned({ filemap("src/app.js") }, ROOT, "").checked, { "src/app.js" }))
+local sub = actual.compare{ planned = actual.planned({ filemap("src/app.js", "src/gone.js") }, ROOT, SUB),
+  diff = { { status = "M", path = "packages/web/src/app.js" } }, untracked = {}, uncommitted = {}, dirtyAtStart = {},
+  seen = { ["packages/web/src/app.js"] = true } }
+check("compare: in a subfolder, the plan's src/app.js matches git's packages/web/src/app.js",
+  same(sub.matched, { "packages/web/src/app.js" }) and same(sub.missing, { "packages/web/src/gone.js" })
+  and same(sub.unplanned, {}))
 check("planned: with no root every absolute entry is unchecked",
   same(actual.planned({ filemap("/etc/hosts", "src/app.js") }, nil),
     { checked = { "src/app.js" }, unchecked = { "/etc/hosts" }, written = { ["src/app.js"] = "src/app.js" } })

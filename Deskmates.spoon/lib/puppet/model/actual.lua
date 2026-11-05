@@ -1,6 +1,7 @@
 -- Plan vs actual: what the plan's file maps name, against what git says changed since the session's base.
--- The rules are strict: a plan entry and a changed path match only when equal relative to the repo root; an entry
--- no rule can decide (a glob, a folder, a path outside the repo) is shown as written, never matched. It knows no
+-- The rules are strict: a plan entry and a changed path match only when equal relative to the repo root (a relative
+-- entry read from the session's folder, as the hooks read the agent's paths); an entry no rule can decide (a glob,
+-- a folder, a path outside the repo) is shown as written, never matched. It knows no
 -- agent, and no Hammerspoon.
 
 local actual = {}
@@ -54,31 +55,37 @@ end
 
 -- A plan entry relative to `root`, or nil when no rule can decide it: a glob (`*`, `?`, `[`), a folder (a trailing
 -- `/`), an absolute path outside the root (or any absolute path with no root), or a `.`, `..` or empty segment.
--- A `:12-30` suffix and a leading `./` are dropped first.
-local function relative(entry, root)
+-- A relative entry starts at `prefix` (the session folder's place in the repo, "src/", or "" for the root), as
+-- the hooks read the agent's relative paths. A `:12-30` suffix and a leading `./` are dropped first.
+local function relative(entry, root, prefix)
   local path = entry:gsub(":[%d][%d%-,]*$", "")
   if path:find("[%*%?%[]") or path:sub(-1) == "/" then return nil end
   if path:sub(1, 1) == "/" then
     local base = type(root) == "string" and root:gsub("/+$", "") or ""
     if base == "" then return nil end
-    local prefix = base .. "/"
-    if path:sub(1, #prefix) ~= prefix then return nil end
-    path = path:sub(#prefix + 1)
+    local top = base .. "/"
+    if path:sub(1, #top) ~= top then return nil end
+    path = path:sub(#top + 1)
+  else
+    while path:sub(1, 2) == "./" do path = path:sub(3) end
+    if path == "" then return nil end
+    path = (type(prefix) == "string" and prefix or "") .. path
   end
   while path:sub(1, 2) == "./" do path = path:sub(3) end
   if path == "" or hasOddSegment(path) then return nil end
   return path
 end
 
--- What the plan's file maps (planblocks' { kind = "filemap", rows = { { path, … } } }) name, for repo `root`:
--- { checked = { paths relative to the root }, unchecked = { entries as written }, written = { [path] = the first
--- entry as written that gave it } }, lists sorted, duplicates collapsed.
-function actual.planned(filemaps, root)
+-- What the plan's file maps (planblocks' { kind = "filemap", rows = { { path, … } } }) name, for repo `root` and
+-- a session started at `prefix` in it ("src/"; nil or "" for the root): { checked = { paths relative to the root },
+-- unchecked = { entries as written }, written = { [path] = the first entry as written that gave it } }, lists
+-- sorted, duplicates collapsed.
+function actual.planned(filemaps, root, prefix)
   local checked, unchecked, written = {}, {}, {}
   for _, block in ipairs(filemaps or {}) do
     for _, row in ipairs(block.rows or {}) do
       if type(row.path) == "string" then
-        local path = relative(row.path, root)
+        local path = relative(row.path, root, prefix)
         if path then
           checked[path] = true
           written[path] = written[path] or row.path

@@ -116,6 +116,15 @@ check("git: not a table, no git", gitOf('"x"') == nil)
 local dirty = gitOf('{"root": "/r", "base": "abcdef1", "dirtyAtStart": ["a.js", 3, {"x": 1}, "b.js"]}')
 check("git: junk dirty entries dropped alone", dirty and dirty.dirtyAtStart["a.js"] and dirty.dirtyAtStart["b.js"]
   and not dirty.dirtyAtStart[3])
+-- prefix: the session folder's place in the repo, where its relative paths start; "" when it is not one.
+local function prefixOf(v) local g = gitOf('{"root": "/r", "base": "abcdef1", "prefix": ' .. v .. "}") return g and g.prefix end
+check("git: the prefix kept", prefixOf('"packages/web/"') == "packages/web/" and prefixOf('"src/"') == "src/")
+check("git: an empty prefix kept", prefixOf('""') == "")
+check("git: no prefix, or one not a string, is empty", prefixOf("null") == "" and prefixOf("5") == ""
+  and gitOf('{"root": "/r", "base": "abcdef1"}').prefix == "")
+for _, junk in ipairs({ '"src"', '"/src/"', '"./src/"', '"src/../"', '"../x/"', '"src//"', '"/"', '"a/./b/"' }) do
+  check("git: a prefix no rule can place is empty: " .. junk, prefixOf(junk) == "")
+end
 check("git: dirtyAtStart not a list is empty", next(gitOf('{"root": "/r", "base": "abcdef1", "dirtyAtStart": "a.js"}').dirtyAtStart) == nil)
 
 local odd2 = facts.load(file("odd2.json", [[{

@@ -54,6 +54,15 @@ check("lists: changed, not planned, the one no hook named marked", a and #a.list
   and a.lists[3].rows[2].path == "src/new.js" and not a.lists[3].rows[2].unseen)
 check("lists: dirty at start and never named, left out", a and not has(workcard.html(v), "old.txt"))
 
+-- A session started in a subfolder: the plan's relative entries are read from there, as the hooks read its paths.
+local inSub = factsWith()
+inSub.git.prefix = "packages/web/"
+inSub.seen = { ["packages/web/src/app.js"] = true }
+local sv = workcard.view(inSub, { commits = "1", diff = "M\0packages/web/src/app.js\0", uncommitted = "", untracked = "" },
+  PLAN, false)
+check("in a subfolder: the plan's src/app.js is git's packages/web/src/app.js", sv and #sv.actual.lists[1].rows == 1
+  and sv.actual.lists[1].rows[1].path == "packages/web/src/app.js" and #sv.actual.lists[3].rows == 0)
+
 local html = workcard.html(v)
 check("html: the block, its header", has(html, '<section class="actual"><div class="label">PLAN VS ACTUAL</div>')
   and has(html, '<p class="since">since a1b2c3d · 3 commits · 2 uncommitted</p>'))
