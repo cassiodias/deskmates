@@ -251,7 +251,28 @@ terminal_runs() {
     END { exit !found }'
 }
 
-# The terminal the session runs in: the hook's own, else the one remembered for the session while it still runs
+# Claude Code's daemon (`claude daemon run`) runs a session in a worker (`claude bg-spare`) on a pty of its own,
+# which no tab shows. Whether terminal $1 is such a pty: one ps, so a hook in a plain tab pays only that.
+is_daemon_pty() {
+  ps -o command= -t "${1#/dev/}" 2>/dev/null | grep -q -e '--bg-spare'
+}
+
+# The terminal of the claude that started the daemon this hook runs under: the daemon names it in
+# `--spawned-by {…"pid":N}`. Nothing when N no longer runs in a terminal (never the worker's pty).
+daemon_owner_tty() {
+  pid=$$
+  while [ -n "$pid" ] && [ "$pid" -gt 1 ]; do
+    line=$(ps -o ppid=,command= -p "$pid" 2>/dev/null)
+    case "$line" in
+      *" daemon run "*'"pid":'*)
+        terminal_of "$(printf '%s' "$line" | sed -n 's/.*"pid":\([0-9][0-9]*\).*/\1/p')"
+        return 0 ;;
+    esac
+    pid=$(printf '%s' "$line" | awk '{ print $1 }')
+  done
+}
+
+# The terminal the session runs in: the hook's own (the tab's, for a session Claude Code's daemon runs), else the one remembered for the session while it still runs
 # the agent, else the first ancestor process's that has one. A translator names its agent's program with
 # puppet_program; without it, a remembered terminal counts while anything runs in it. An agent that runs its
 # hooks away from its terminal (no ancestor has one) defines puppet_tty_fallback in its translator to print it
@@ -262,11 +283,13 @@ puppet_tty() {
   if [ -n "${PUPPET_TTY+set}" ]; then printf '%s' "$PUPPET_TTY"; return; fi
   cache="$PUPPET_DIR/tty-$1"
   tty=$(terminal_of $$)
+  pid=$(ps -o ppid= -p $$ | tr -d ' ')
+  # A daemon's session has the tab's terminal or none: its ancestors only lead to the worker's pty.
+  [ -n "$tty" ] && is_daemon_pty "$tty" && tty=$(daemon_owner_tty) && pid=""
   if [ -z "$tty" ] && [ -n "$1" ] && [ -f "$cache" ]; then
     tty=$(cat "$cache")
     terminal_runs "$tty" "${PUPPET_PROGRAM:-}" || tty=""
   fi
-  pid=$(ps -o ppid= -p $$ | tr -d ' ')
   while [ -z "$tty" ] && [ -n "$pid" ] && [ "$pid" -gt 1 ]; do
     tty=$(terminal_of "$pid")
     pid=$(ps -o ppid= -p "$pid" | tr -d ' ')

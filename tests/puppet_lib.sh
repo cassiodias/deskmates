@@ -164,6 +164,43 @@ if [ -n "$found_jq" ]; then
   expect "jq: a text up to 4000 characters" "$(payload_value text | wc -c | tr -d ' ')" 4001
 fi
 
+# Claude Code's daemon: a session run by one of its workers (`claude bg-spare`) sends hooks from the worker's own
+# pty, which no tab shows. The daemon names the claude that started it (`--spawned-by {…"pid":N}`): the session's
+# terminal is N's. A fake process tree, by ps: the hook (its own pid) on ttys001, under the worker 500 on ttys001,
+# under the pty host 400, under the daemon 300 started by the claude 200 on ttys002. `owner` says whether the
+# claude 200 still runs (else it has no terminal). In a plain tab (`plain`), the hook's parent is the claude 200.
+fake_tree() {
+  tree_mode=$1
+  hook=$$
+  ps() {
+    case "$*" in
+      *"-t ttys001"*) [ "$tree_mode" = plain ] && echo -zsh || echo "claude bg-spare --bg-spare /tmp/cc/spare/a.claim.sock" ;;
+      *"-t ttys002"*) echo -zsh; echo claude ;;
+      *"tty= -p $hook") [ "$tree_mode" = plain ] && echo ttys002 || echo ttys001 ;;
+      *"tty= -p 500") echo ttys001 ;;
+      *"tty= -p 200") [ "$tree_mode" = gone ] && echo '??' || echo ttys002 ;;
+      *"tty= -p "*) echo '??' ;;
+      *"ppid=,command= -p $hook") [ "$tree_mode" = plain ] && echo "200 /bin/sh translate.sh" || echo "500 /bin/sh translate.sh" ;;
+      *"ppid=,command= -p 500") echo "400 claude bg-spare --bg-spare /tmp/cc/spare/a.claim.sock" ;;
+      *"ppid=,command= -p 400") echo "300 claude bg-pty-host --bg-pty-host /tmp/cc/spare/a.pty.sock 200 50" ;;
+      *"ppid=,command= -p 300") echo '1 /Users/me/.local/bin/claude daemon run --origin transient --spawned-by {"label":"claude","cwd":"/Users/me/my-app","pid":200}' ;;
+      *"ppid= -p $hook") [ "$tree_mode" = plain ] && echo 200 || echo 500 ;;
+      *"ppid= -p 500") echo 400 ;;
+      *"ppid= -p 400") echo 300 ;;
+      *"ppid= -p "*) echo 1 ;;
+      *) echo 1 ;;
+    esac
+  }
+}
+mkdir -p "$HOME/.deskmates"
+PUPPET_DIR="$HOME/.deskmates"
+expect "a daemon's session: the terminal of the claude that started the daemon" \
+  "$(fake_tree daemon; puppet_tty d1)" /dev/ttys002
+expect "and remembered" "$(cat "$PUPPET_DIR/tty-d1")" /dev/ttys002
+rm -f "$PUPPET_DIR/tty-d1"
+expect "a daemon whose claude is gone: no terminal, never the worker's" "$(fake_tree gone; puppet_tty d2)" ""
+expect "a plain tab: its own terminal" "$(fake_tree plain; puppet_tty d3)" /dev/ttys002
+
 rm -rf "$HOME"
 [ "$failed" = 0 ] && echo "puppet-lib: ok"
 exit "$failed"
