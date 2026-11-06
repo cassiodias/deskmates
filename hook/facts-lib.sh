@@ -4,11 +4,16 @@
 #   ~/.deskmates/facts/<session>.json
 #   { "current": "ABC-12",
 #     "tickets": { "ABC-12": { "phase": "dev", "phaseAt": 1730700000, "phases": { "plan": …, "dev": … },
+#                              "ends": { "plan": { "at": …, "outcome": "…", "verdict": "…" } },
+#                              "passes": [ { "phase": "dev", "at": …, "endAt": …, "by": "my-developer", "verdict": "…" } ],
 #                              "jira": { "status": "In Dev", "at": … }, "seen": … } },
 #     "timeline": [ { "at": …, "ticket": "ABC-12", "kind": "reply", "text": "…", "phase": "dev" } ],
 #     "updatedAt": 1730700000 }
-# Only derived facts are kept, never prompts or file contents. Like plans: only while Deskmates runs, only with
-# jq, deleted at SessionEnd and by the Spoon after hours of silence.
+# phases and ends hold one start and one end per lane; passes are the steps in the order they happened, oldest
+# first (the newest 40): a return to Dev after a review is a pass of its own. A pass's by is the skill's name or
+# the subagent's description it started from (80 characters at most, left out when it is only the phase's word);
+# one with no endAt is still open. Only derived facts are kept, never prompts or file contents. Like plans: only
+# while Deskmates runs, only with jq, deleted at SessionEnd and by the Spoon after hours of silence.
 
 # A helper keeps its working variables to itself: every one it sets is named _facts_<name> (or _plan_<name>, in
 # plan-lib.sh), so a translator that sources this may use any other name without a clash. The results it
@@ -79,7 +84,8 @@ def facts_apply($n):
       | .tickets[$target] = ((.tickets[$target] // {}) as $x | $x + ({phase: ($x.phase // $w.phase),
           phaseAt: ($x.phaseAt // $w.phaseAt),
           phases: (($w.phases // {}) as $a | ($x.phases // {}) as $b
-            | reduce (($a + $b) | keys[]) as $k ({}; .[$k] = ([$a[$k], $b[$k]] | map(select(. != null)) | min)))}
+            | reduce (($a + $b) | keys[]) as $k ({}; .[$k] = ([$a[$k], $b[$k]] | map(select(. != null)) | min))),
+          passes: ((($w.passes // []) + ($x.passes // [])) | sort_by(.at) | .[-40:] | if . == [] then null else . end)}
         | with_entries(select(.value != null))))
       | del(.tickets["-"])
       | .timeline |= map(if .ticket == "-" then .ticket = $target else . end)
@@ -98,6 +104,22 @@ def facts_apply($n):
             | .phases = ((.phases // {}) | if has($p) then . else .[$p] = $now end))
           | facts_line($target; "phase"; $p)
         else . end
+    else . end
+  # The steps in the order they happened (passes): a start continues the last pass when it is the same phase,
+  # else closes it and opens one; an end closes the newest open pass of its phase, or is a pass of its own.
+  | if $p then
+      ($n.phaseFrom // $from | clean | .[0:80]) as $by
+      | (if $by == "" or ($by | ascii_downcase | gsub("^\\s+|\\s+$"; "")) == $p then {} else {by: $by} end) as $by
+      | (if $n.ends and ($n.verdict | type) == "string" and $n.verdict != "" then {verdict: ($n.verdict | clean)}
+         else {} end) as $v
+      | .tickets[$target].passes |= ((. // []) | length as $l
+        | if $n.ends then
+            ([to_entries[] | select(.value.phase == $p and (.value | has("endAt") | not)) | .key] | last) as $i
+            | if $i != null then .[$i] += {endAt: $now} + $v else . + [{phase: $p, at: $now, endAt: $now} + $by + $v] end
+          elif $l > 0 and .[$l - 1].phase == $p then .[$l - 1] |= del(.endAt, .verdict)
+          else (if $l > 0 and (.[$l - 1] | has("endAt") | not) then .[$l - 1].endAt = $now else . end)
+            + [{phase: $p, at: $now} + $by] end
+        | .[-40:])
     else . end
   | if ($n.jira | type) == "string" and $n.jira != "" then .tickets[$target].jira = {status: ($n.jira | clean), at: $now}
     else . end

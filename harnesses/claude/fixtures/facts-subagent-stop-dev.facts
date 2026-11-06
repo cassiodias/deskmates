@@ -13,7 +13,15 @@
           "at": 0,
           "outcome": "Applied the two edits."
         }
-      }
+      },
+      "passes": [
+        {
+          "phase": "dev",
+          "at": 0,
+          "endAt": 0,
+          "by": "Implement ABC-12 via my-developer"
+        }
+      ]
     }
   },
   "timeline": [

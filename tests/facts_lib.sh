@@ -175,6 +175,46 @@ if [ -n "$found_jq" ]; then
   note e3 '{"kind":"done","text":"Plan approved","from":"","phaseFrom":"plan","ends":true,"moves":false}' 20 > /dev/null
   expect "a plan approved ends Plan under current" "$(got e3 '.tickets["ABC-12"] | [.phases.plan, .ends.plan.outcome, .phase]')" '[20,"Plan approved","dev"]'
 
+  # Passes: the steps in the order they happened, each with what started it.
+  note p1 '{"kind":"skill","text":"my-developer","from":"my-developer ABC-12","phaseFrom":"my-developer","moves":true}' 10 > /dev/null
+  expect "a first start appends a pass" "$(got p1 '.tickets["ABC-12"].passes')" '[{"phase":"dev","at":10,"by":"my-developer"}]'
+  note p1 '{"kind":"subagent","text":"Implement ABC-12 fixes","from":"Implement ABC-12 fixes","moves":true}' 20 > /dev/null
+  expect "the same phase again continues the pass" "$(got p1 '.tickets["ABC-12"].passes')" '[{"phase":"dev","at":10,"by":"my-developer"}]'
+  note p1 '{"kind":"subagent","text":"QA ABC-12 review","from":"QA ABC-12 review","moves":true}' 30 > /dev/null
+  note p1 '{"kind":"subagent","text":"Implement ABC-12 fixes","from":"Implement ABC-12 fixes","moves":true}' 40 > /dev/null
+  expect "Dev, Review, Dev: three passes, each closed at the next start" "$(got p1 '.tickets["ABC-12"].passes')" \
+    '[{"phase":"dev","at":10,"by":"my-developer","endAt":30},{"phase":"review","at":30,"by":"QA ABC-12 review","endAt":40},{"phase":"dev","at":40,"by":"Implement ABC-12 fixes"}]'
+  expect "the old lanes stay as they were" "$(got p1 '.tickets["ABC-12"] | [.phase, .phases.dev, .phases.review]')" '["dev",10,30]'
+  note p1 '{"kind":"done","text":"Applied.","from":"Implement ABC-12 fixes","phaseFrom":"Implement ABC-12 fixes","ends":true,"verdict":"DONE","moves":false}' 50 > /dev/null
+  expect "an end closes the open pass, with its verdict" "$(got p1 '.tickets["ABC-12"].passes[-1]')" \
+    '{"phase":"dev","at":40,"by":"Implement ABC-12 fixes","endAt":50,"verdict":"DONE"}'
+  note p1 '{"kind":"subagent","text":"Implement ABC-12 more","from":"Implement ABC-12 more","moves":true}' 60 > /dev/null
+  expect "starting the last phase again reopens it" "$(got p1 '[(.tickets["ABC-12"].passes | length), .tickets["ABC-12"].passes[-1]]')" \
+    '[3,{"phase":"dev","at":40,"by":"Implement ABC-12 fixes"}]'
+  note p1 '{"kind":"done","text":"Two findings.","from":"QA ABC-12 review","phaseFrom":"QA ABC-12 review","ends":true,"verdict":"CHANGES_REQUESTED","moves":false}' 70 > /dev/null
+  expect "an end with no open pass: a zero-length pass, the last left open" "$(got p1 '.tickets["ABC-12"].passes[-2:]')" \
+    '[{"phase":"dev","at":40,"by":"Implement ABC-12 fixes"},{"phase":"review","at":70,"endAt":70,"by":"QA ABC-12 review","verdict":"CHANGES_REQUESTED"}]'
+  note p2 '{"kind":"skill","text":"my-developer","from":"my-developer ABC-12","moves":true}' 10 > /dev/null
+  note p2 '{"kind":"done","text":"Plan approved","from":"","phaseFrom":"plan","ends":true,"moves":false}' 20 > /dev/null
+  expect "by is left out when it is just the phase word" "$(got p2 '.tickets["ABC-12"].passes[-1]')" '{"phase":"plan","at":20,"endAt":20}'
+  note p3 '{"kind":"skill","text":"Review","from":" Review ABC-12","phaseFrom":" Review ","moves":true}' 10 > /dev/null
+  expect "by is left out for the phase word in any case" "$(got p3 '.tickets["ABC-12"].passes')" '[{"phase":"review","at":10}]'
+  longby="Implement ABC-12 $(printf 'x%.0s' $(seq 1 100))"
+  note p4 "{\"kind\":\"subagent\",\"text\":\"$longby\",\"from\":\"$longby\",\"moves\":true}" 10 > /dev/null
+  expect "by is cut to 80 characters" "$(got p4 '.tickets["ABC-12"].passes[0].by | length')" 80
+  note p5 '{"kind":"skill","text":"my-developer","from":"my-developer ABC-12","moves":true}' 1 > /dev/null
+  for i in $(seq 2 45); do
+    if [ $((i % 2)) = 0 ]; then w=my-reviewer; else w=my-developer; fi
+    note p5 "{\"kind\":\"skill\",\"text\":\"$w\",\"from\":\"$w\",\"moves\":true}" "$i" > /dev/null
+  done
+  expect "the newest 40 passes kept" "$(got p5 '.tickets["ABC-12"].passes | [length, .[0].at, .[-1].at]')" '[40,6,45]'
+  note p6 '{"kind":"skill","text":"my-planner","from":"my-planner","moves":true}' 10 > /dev/null
+  note p6 '{"kind":"skill","text":"my-developer","from":"my-developer","moves":true}' 20 > /dev/null
+  PUPPET_NOW=15 PUPPET_PAYLOAD='{"k":"ABC-12"}' facts_update p6 '$cur | .tickets["ABC-12"] = {seen: 15, passes: [{phase: "review", at: 15, by: "my-reviewer"}]}'
+  note p6 '{"kind":"subagent","text":"Implement ABC-12","from":"Implement ABC-12","moves":true}' 30 > /dev/null
+  expect "a waiting ticket's passes join the real one's, by time" "$(got p6 '[(.tickets | keys), [.tickets["ABC-12"].passes[] | [.phase, .at, .endAt]]]')" \
+    '[["ABC-12"],[["plan",10,20],["review",15,null],["dev",20,null]]]'
+
   # The cut: 30 lines, 10 tickets, never current.
   note n9 '{"kind":"skill","text":"my-developer","from":"my-developer ABC-12","moves":true}' 1 > /dev/null
   for i in $(seq 2 32); do note n9 "{\"kind\":\"reply\",\"text\":\"line $i\",\"from\":\"line $i\",\"moves\":false}" "$i" > /dev/null; done

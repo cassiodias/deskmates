@@ -1,5 +1,6 @@
 {
-  "tickets": { "-": { "seen": 0, "phase": "review", "phaseAt": 0, "phases": { "review": 0 } } },
+  "tickets": { "-": { "seen": 0, "phase": "review", "phaseAt": 0, "phases": { "review": 0 },
+    "passes": [ { "phase": "review", "at": 0, "by": "Review the parser's edge cases" } ] } },
   "timeline": [
     { "at": 0, "ticket": "-", "kind": "subagent", "text": "Review the parser's edge cases", "phase": "review" },
     { "at": 0, "ticket": "-", "kind": "phase", "text": "review", "phase": "review" }

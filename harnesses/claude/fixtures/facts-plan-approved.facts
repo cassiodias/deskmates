@@ -14,7 +14,14 @@
           "at": 0,
           "outcome": "Plan approved"
         }
-      }
+      },
+      "passes": [
+        {
+          "phase": "plan",
+          "at": 0,
+          "endAt": 0
+        }
+      ]
     }
   },
   "timeline": [

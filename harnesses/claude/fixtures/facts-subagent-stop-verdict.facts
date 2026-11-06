@@ -15,7 +15,16 @@
           "outcome": "Verdict: CHANGES_REQUESTED (0 blocker, 2 major)",
           "verdict": "CHANGES_REQUESTED"
         }
-      }
+      },
+      "passes": [
+        {
+          "phase": "review",
+          "at": 0,
+          "endAt": 0,
+          "by": "QA ABC-12 review",
+          "verdict": "CHANGES_REQUESTED"
+        }
+      ]
     }
   },
   "timeline": [

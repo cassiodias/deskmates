@@ -7,7 +7,14 @@
       "phaseAt": 0,
       "phases": {
         "dev": 0
-      }
+      },
+      "passes": [
+        {
+          "phase": "dev",
+          "at": 0,
+          "by": "my-developer"
+        }
+      ]
     }
   },
   "timeline": [

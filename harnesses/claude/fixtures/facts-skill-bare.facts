@@ -6,7 +6,14 @@
       "phaseAt": 0,
       "phases": {
         "review": 0
-      }
+      },
+      "passes": [
+        {
+          "phase": "review",
+          "at": 0,
+          "by": "my-reviewer"
+        }
+      ]
     }
   },
   "timeline": [
