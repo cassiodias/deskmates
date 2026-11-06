@@ -126,6 +126,10 @@ check("turns html: a row", has(th, '<span class="time">14:05</span><span class="
 check("turns html: the file count opens to the paths", has(th, '<details class="files"><summary>2 files</summary><ul>'
   .. "<li><code>src/app.js</code></li><li><code>src/new.js</code></li></ul></details>"))
 check("turns html: one file", has(th, "<summary>1 file</summary>"))
+-- Cassio (6 Nov): the line that opens to the files stands out, so it is easy to spot; open, the files share its tint.
+check("turns css: the file count is tinted", workcard.CSS:find(".turnlist summary {", 1, true) ~= nil
+  and workcard.CSS:match("%.turnlist summary {[^}]*background") ~= nil)
+check("turns css: open, the files are tinted too", workcard.CSS:match("%.turnlist details%[open%] {[^}]*background") ~= nil)
 check("turns html: no files", has(th, '<span class="files">0 files</span>'))
 check("turns html: tests", has(th, '<span class="tests">ran 2 · ✓ 1 · ✗ 1</span>') and has(th, '<span class="tests">ran 3</span>'))
 check("turns html: commits", has(th, '<span class="commit"><code>a1b2c3d</code> Fix the typo</span>'))

@@ -192,7 +192,12 @@ workcard.CSS = table.concat({
   " border-bottom: 1px solid var(--faint); }",
   ".turnlist .time { font: 12px Menlo, monospace; opacity: 0.6; } .turnlist .took { color: var(--accent); }",
   ".turnlist .tests, .turnlist .commits { grid-column: 3; } .turnlist .commit { display: block; }",
-  ".turnlist summary { cursor: pointer; } .turnlist details li { padding-left: 12px; }",
+  -- The line that opens to the files is tinted, so it is easy to spot; open, its files share the tint.
+  ".turnlist summary { cursor: pointer; display: inline-block; padding: 1px 8px; border-radius: 4px;",
+  " background: color-mix(in srgb, var(--accent) 18%, transparent); }",
+  ".turnlist summary:hover { background: color-mix(in srgb, var(--accent) 30%, transparent); }",
+  ".turnlist details[open] { background: color-mix(in srgb, var(--accent) 8%, transparent); border-radius: 4px;",
+  " padding-bottom: 3px; } .turnlist details li { padding-left: 12px; }",
 })
 
 return workcard
