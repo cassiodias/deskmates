@@ -254,26 +254,32 @@ plancard.SCRIPT = "function send(m){window.webkit.messageHandlers.deskmates.post
   .. "document.getElementById('focus').onclick=function(){send('focus')};"
   .. "document.getElementById('close').onclick=function(){send('close')};"
   .. "document.addEventListener('keydown',function(e){if(e.key==='Escape')send('close')});"
-  .. "document.querySelectorAll('[data-to]').forEach(function(b){b.onclick=function(){"
+  .. "document.querySelectorAll('button[data-to]:not(.phase)').forEach(function(b){b.onclick=function(){"
   .. "var t=document.getElementById(b.getAttribute('data-to'));if(!t)return;t.scrollIntoView({block:'start'});"
   .. "t.classList.remove('here');void t.offsetWidth;t.classList.add('here')}});"
   -- Also: show the ticket chosen (its header and its timeline), hide the others.
   .. "var also=document.querySelector('select.also');if(also)also.onchange=function(){"
   .. "document.querySelectorAll('[data-key]').forEach(function(el){el.hidden=el.getAttribute('data-key')!==also.value})};"
-  -- A phase filters the activity and the turns in place and marks the page (body.lane); a second click clears it.
-  -- A folded panel stays folded: folds are the reader's alone. The panels stay where the reader left them: nothing
-  -- is brought into view, and their scroll position is put back after the rows change. With a plan, Plan clears it and takes the plan's article (what scrolls: the body never does) back to its top.
-  .. "function only(p){document.body.classList.toggle('lane',p!=='');"
-  .. "document.querySelectorAll('.timeline li,.turnlist>li').forEach(function(li){"
-  .. "li.classList.toggle('out',p!==''&&li.getAttribute('data-phase')!==p)})}"
+  -- A step filters the activity and the turns in place and marks the page (body.lane); a second click clears it.
+  -- A row stays when it happened during the step: from its start (data-from) up to the next step's (data-to, none
+  -- for the last); a step not reached yet (no data-from) leaves no row. A folded panel stays folded: folds are the
+  -- reader's alone. The panels stay where the reader left them: nothing is brought into view, and their scroll
+  -- position is put back after the rows change. With a plan, a Plan step not reached yet clears it and takes the
+  -- plan's article (what scrolls: the body never does) back to its top.
+  .. "function only(b){document.body.classList.toggle('lane',!!b);"
+  .. "var f=b&&b.getAttribute('data-from'),t=b&&b.getAttribute('data-to');"
+  .. "document.querySelectorAll('.timeline li,.turnlist>li').forEach(function(li){var a=Number(li.getAttribute('data-at'));"
+  .. "li.classList.toggle('out',!!b&&(f===null||a<Number(f)||(t!==null&&a>=Number(t))))})}"
   .. "document.querySelectorAll('button.phase').forEach(function(b){b.onclick=function(){"
   .. "var p=b.getAttribute('data-phase'),plan=document.getElementById('plan'),"
   .. "on=b.classList.contains('on'),"
   .. "panels=document.querySelector('.panels'),top=panels?panels.scrollTop:0;"
-  .. "document.querySelectorAll('button.phase').forEach(function(x){x.classList.remove('on')});only('');"
-  .. "if(plan&&p==='plan'){var art=plan.querySelector('article');if(art)art.scrollTop=0;return}"
-  .. "if(!on){b.classList.add('on');only(p)}"
+  .. "document.querySelectorAll('button.phase').forEach(function(x){x.classList.remove('on')});only(null);"
+  .. "if(plan&&p==='plan'&&!b.hasAttribute('data-from')){var art=plan.querySelector('article');if(art)art.scrollTop=0;return}"
+  .. "if(!on){b.classList.add('on');only(b)}"
   .. "if(panels)panels.scrollTop=top}});"
+  -- The strip scrolls sideways when the steps do not fit: it opens at its end, on the newest step.
+  .. "document.querySelectorAll('.strip').forEach(function(s){s.scrollLeft=s.scrollWidth});"
   -- A panel folded or opened: the Spoon keeps it so for the next drawing of this session's card. A panel drawn
   -- open fires toggle on load too: only a change from the state drawn is told, so a redraw sends nothing.
   .. "document.querySelectorAll('details.panel').forEach(function(d){var was=d.open;d.addEventListener('toggle',"

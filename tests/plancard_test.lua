@@ -203,6 +203,60 @@ check("script: only a user's fold is told", has(plancard.SCRIPT, "var was=d.open
 -- The body never scrolls: Plan takes the plan's article (the part that scrolls) back to its top.
 check("script: Plan scrolls the plan's article to its top", has(plancard.SCRIPT, "plan.querySelector('article')")
   and has(plancard.SCRIPT, ".scrollTop=0") and not has(plancard.SCRIPT, "plan.scrollIntoView"))
+-- Live (6 Nov): Dev, Review, Dev again: a click on Dev mixed both Dev passes. A step filters by its own span now.
+check("script: a step filters by time, not by phase", has(phaseClick, "data-from") and has(plancard.SCRIPT, "data-at")
+  and not has(plancard.SCRIPT, "getAttribute('data-phase')!==p"))
+check("script: the contents' jumps leave the steps alone", has(plancard.SCRIPT, "'button[data-to]:not(.phase)'"))
+check("script: each strip shows its newest step", has(plancard.SCRIPT, "scrollLeft=s.scrollWidth"))
+-- The script itself, run with node when this Mac has it: it parses, and a step click keeps the rows of its span.
+local node = io.popen("command -v node 2>/dev/null"):read("l")
+if node and node ~= "" then
+  local function run(js)
+    local path = os.tmpname()
+    local h = io.open(path, "w")
+    h:write(js)
+    h:close()
+    local pipe = io.popen("'" .. node .. "' '" .. path .. "' 2>&1; echo \"|$?\"")
+    local out = pipe:read("a")
+    pipe:close()
+    local checked = io.popen("'" .. node .. "' --check '" .. path .. "' 2>&1; echo \"|$?\""):read("a")
+    os.remove(path)
+    return out, checked
+  end
+  local DOM = [[
+function cl(){var s={};return{add:function(c){s[c]=1},remove:function(c){delete s[c]},contains:function(c){return !!s[c]},
+  toggle:function(c,f){if(f===undefined)f=!s[c];if(f)s[c]=1;else delete s[c];return f}}}
+function el(attrs){return{attrs:attrs||{},classList:cl(),getAttribute:function(n){return n in this.attrs?this.attrs[n]:null},
+  hasAttribute:function(n){return n in this.attrs},scrollTop:0,scrollLeft:0,scrollWidth:500}}
+var steps=[el({'data-phase':'plan'}),el({'data-phase':'dev','data-from':'10','data-to':'30'}),
+  el({'data-phase':'review','data-from':'30','data-to':'40'}),el({'data-phase':'dev','data-from':'40'})];
+steps.forEach(function(s){s.classList.add('phase')});
+var rows=[5,10,29,30,39,40,99].map(function(a){return el({'data-at':String(a)})});
+var turns=[12,45].map(function(a){return el({'data-at':String(a)})});
+var strip=el(),panels=el(),article=el(),plan=el();plan.querySelector=function(){return article};
+var ids={focus:el(),close:el(),plan:plan};
+var document={body:el(),getElementById:function(i){return ids[i]||null},addEventListener:function(){},
+  querySelector:function(q){return q==='.panels'?panels:null},
+  querySelectorAll:function(q){return q==='button.phase'?steps:q==='.timeline li,.turnlist>li'?rows.concat(turns)
+    :q==='.strip'?[strip]:[]}};
+var window={webkit:{messageHandlers:{deskmates:{postMessage:function(){}}}}};
+function kept(){return rows.concat(turns).filter(function(r){return !r.classList.contains('out')})
+  .map(function(r){return r.attrs['data-at']}).join(',')}
+]]
+  local out, checked = run(DOM .. plancard.SCRIPT .. [[
+;var log=[];log.push(strip.scrollLeft);
+panels.scrollTop=70;steps[1].onclick();log.push(kept(),document.body.classList.contains('lane'),panels.scrollTop);
+steps[3].onclick();log.push(kept());
+steps[2].onclick();log.push(kept());
+steps[2].onclick();log.push(kept(),document.body.classList.contains('lane'));
+article.scrollTop=50;steps[0].onclick();log.push(kept(),article.scrollTop);
+ids.plan=null;steps[0].onclick();log.push(kept(),document.body.classList.contains('lane'));
+console.log(log.join('/'))]])
+  check("script: node parses it", checked == "|0\n")
+  check("script: a step keeps the rows from its start to the next one's, an ahead step none", out
+    == "500/10,29,12/true/70/40,99,45/30,39/5,10,29,30,39,40,99,12,45/false/5,10,29,30,39,40,99,12,45/0/"
+    .. "/true\n|0\n")
+end
 check("script: a fold tells the Spoon", has(plancard.SCRIPT, "details.panel")
   and has(plancard.SCRIPT, "send('fold:'+d.getAttribute('data-panel')+':'+(d.open?'open':'closed'))"))
 
