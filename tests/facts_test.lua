@@ -108,6 +108,54 @@ check("passes from old facts: an end before the start is not its end", eps and #
 local none = facts.load(file("nopass.json", [[{"tickets": {"ABC-12": {"seen": 1, "ends": {"dev": {"at": 4}}}}, "timeline": []}]]))
 check("passes: none for a ticket with no lane started", none and #none.tickets["ABC-12"].passes == 0)
 
+-- Live (6 Nov): facts written before passes, a session that went Dev and Review yesterday and again today. One
+-- pass per lane, sorted by its first start, made Review run from yesterday to now: the Review step held today's
+-- Dev lines. The timeline (its newest 30 lines) tells what happened today; the lanes' starts before it, the rest.
+local function day(d, h, m) return os.time({ year = 2026, month = 11, day = d, hour = h, min = m, sec = 0 }) end
+local lines, oldest = {}, {}
+local function line(at, kind, text, phase) oldest[#oldest + 1] = { at = at, kind = kind, text = text, phase = phase } end
+line(day(6, 14, 20), "subagent", "Implement ABC-12", "dev")
+line(day(6, 14, 30), "done", "done", "dev")
+line(day(6, 14, 31), "subagent", "Implement ABC-12 fixes", "dev")
+for m = 32, 52 do line(day(6, 14, m), "reply", "Fixed one more test.", "dev") end
+line(day(6, 14, 54), "subagent", "Implement the last fix", "dev")
+line(day(6, 14, 55), "done", "done", "dev")
+line(day(6, 14, 56), "phase", "review", "review")
+line(day(6, 14, 56), "subagent", "Review phase steps diff", "review")
+line(day(6, 14, 58), "reply", "Two findings, both fixed.", "review")
+line(day(6, 14, 59), "done", "Approved.", "review")
+for i = #oldest, 1, -1 do
+  local l = oldest[i]
+  lines[#lines + 1] = string.format('{"at": %d, "ticket": "ABC-12", "kind": "%s", "text": "%s", "phase": "%s"}',
+    l.at, l.kind, l.text, l.phase)
+end
+local real = facts.load(file("yesterday.json", string.format([[{"current": "ABC-12", "tickets": {"ABC-12": {
+  "phase": "review", "seen": %d, "phases": {"dev": %d, "review": %d},
+  "ends": {"dev": {"at": %d}, "review": {"at": %d, "outcome": "Approved.", "verdict": "APPROVED"}}}},
+  "timeline": [%s]}]], day(6, 14, 59), day(5, 15, 31), day(5, 15, 37), day(6, 14, 55), day(6, 14, 59),
+  table.concat(lines, ","))))
+local rps = real and real.tickets["ABC-12"].passes or {}
+check("passes from old facts: the fixture is 30 lines", #lines == 30)
+check("passes from old facts: yesterday's lanes before the timeline, each up to the next start", #rps == 4
+  and rps[1].phase == "dev" and rps[1].at == day(5, 15, 31) and rps[1].endAt == day(5, 15, 37)
+  and rps[2].phase == "review" and rps[2].at == day(5, 15, 37) and rps[2].endAt == day(6, 14, 20))
+check("passes from old facts: today's Dev from its first line to its last end", rps[3] and rps[3].phase == "dev"
+  and rps[3].at == day(6, 14, 20) and rps[3].endAt == day(6, 14, 55) and rps[3].by == "Implement ABC-12")
+check("passes from old facts: today's Review from its start, with the lane's verdict", rps[4] and rps[4].phase == "review"
+  and rps[4].at == day(6, 14, 56) and rps[4].endAt == day(6, 14, 59) and rps[4].verdict == "APPROVED"
+  and rps[4].by == "Review phase steps diff")
+-- An end whose start is not in the timeline is a step of no length; a start after it closes nothing.
+local missed = facts.load(file("missed.json", string.format([[{"tickets": {"ABC-12": {"phase": "dev",
+  "phases": {"review": %d, "dev": %d}}}, "timeline": [
+  {"at": %d, "ticket": "ABC-12", "kind": "skill", "text": "my-developer", "phase": "dev"},
+  {"at": %d, "ticket": "ABC-12", "kind": "done", "text": "done", "phase": "review"},
+  {"at": %d, "ticket": "ABC-34", "kind": "phase", "text": "plan", "phase": "plan"}]}]],
+  day(6, 9, 0), day(6, 9, 5), day(6, 9, 5), day(6, 9, 0), day(6, 8, 0))))
+local mps = missed and missed.tickets["ABC-12"].passes or {}
+check("passes from old facts: an end with no start is a step of its own; another ticket's lines are not this one's",
+  #mps == 2 and mps[1].phase == "review" and mps[1].at == day(6, 9, 0) and mps[1].endAt == day(6, 9, 0)
+  and mps[2].phase == "dev" and mps[2].at == day(6, 9, 5) and mps[2].endAt == nil and mps[2].by == "my-developer")
+
 -- git, seen and turns: the session's edits as the hooks record them.
 local full = facts.load(file("git.json", [[{
   "git": { "root": "/work/my-app", "base": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678", "dirtyAtStart": ["src/a.js", "docs/ção.md"],

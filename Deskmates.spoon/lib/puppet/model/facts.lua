@@ -6,8 +6,9 @@
 --     "turns": [ { "at", "endAt", "files": [ path ], "tests": { "ran", "passed", "failed" },
 --                  "commits": [ { "hash", "subject" } ] } ] }
 -- read here with every field checked: a bad field, ticket or entry is dropped on its own; a file that is not
--- facts is nil. A ticket's passes (its steps, oldest first) come from its lanes' starts and ends when the file
--- has none (written before passes were kept). It knows no agent, and no Hammerspoon.
+-- facts is nil. A ticket's passes (its steps, oldest first) are worked out when the file has none (written before
+-- passes were kept): from its timeline lines, by the hooks' rules, and before the oldest line from its lanes' starts.
+-- It knows no agent, and no Hammerspoon.
 
 local plans = require("puppet.model.plans")
 
@@ -41,41 +42,100 @@ end
 -- The facts file of a session in folder `dir`; nil for an id that could name a path outside it.
 facts.path = plans.path
 
+-- Sorts list `out` by start (at); entries that start in the same second keep the order they were made in.
+local function byStart(out)
+  for i, p in ipairs(out) do p.n = i end
+  table.sort(out, function(a, b) if a.at ~= b.at then return a.at < b.at end return a.n < b.n end)
+  for _, p in ipairs(out) do p.n = nil end
+  return out
+end
+
 -- The steps in the order they happened, checked: each pass with a phase and a start, its end, what started it
 -- and its verdict when they are right; junk dropped alone. Sorted by start.
 local function passes(list)
   local out = {}
   for _, p in ipairs(type(list) == "table" and list or {}) do
     if type(p) == "table" and IS_PHASE[p.phase] and num(p.at) then
-      out[#out + 1] = { phase = p.phase, at = p.at, endAt = num(p.endAt), by = str(p.by), verdict = str(p.verdict),
-        n = #out }
+      out[#out + 1] = { phase = p.phase, at = p.at, endAt = num(p.endAt), by = str(p.by), verdict = str(p.verdict) }
     end
   end
-  -- Passes that start in the same second keep the order they were written in.
-  table.sort(out, function(a, b) if a.at ~= b.at then return a.at < b.at end return a.n < b.n end)
-  for _, p in ipairs(out) do p.n = nil end
-  return out
+  return byStart(out)
 end
 
 -- The steps of facts written before passes, from ticket `t`'s lanes (checked): one per lane started, by its
 -- start; its end and verdict from the lane's end when that is not before the start.
-local function derivedPasses(t)
+local function lanePasses(t)
   local out = {}
   for _, p in ipairs(PHASES) do
     local at = t.phases[p]
     if at then
       local e = t.ends and t.ends[p]
       local ended = e and e.at >= at
-      out[#out + 1] = { phase = p, at = at, endAt = ended and e.at or nil, verdict = ended and e.verdict or nil,
-        n = #out }
+      out[#out + 1] = { phase = p, at = at, endAt = ended and e.at or nil, verdict = ended and e.verdict or nil }
     end
   end
-  table.sort(out, function(a, b) if a.at ~= b.at then return a.at < b.at end return a.n < b.n end)
-  for _, p in ipairs(out) do p.n = nil end
-  return out
+  return byStart(out)
 end
 
-local function ticket(t)
+-- What started a step, as the hooks keep it: nil when empty or only the phase's word; 80 characters at most.
+local function startedBy(text, phase)
+  local by = text:sub(1, 80)
+  if by == "" or by:lower():match("^%s*(.-)%s*$") == phase then return nil end
+  return by
+end
+
+-- The steps of facts written before passes, for ticket `t` and its timeline lines `lines` (oldest first), by the
+-- hooks' own rules: a lane started (a "phase" line), or a skill or subagent of another phase than the open step's,
+-- starts a step, closing the open one (the same phase as the last step continues it); a "done" line closes the
+-- newest open step of its phase, or is a step of no length. Before the oldest line, the lanes started earlier give
+-- a step each, up to the next one's start. With no lines, the lanes alone.
+local function derivedPasses(t, lines)
+  if #lines == 0 then return lanePasses(t) end
+  local out = {}
+  local function last() return out[#out] end
+  local function start(phase, at, by)
+    local l = last()
+    if l and l.phase == phase then
+      l.endAt, l.verdict = nil, nil
+      l.by = l.by or by
+      return
+    end
+    if l and not l.endAt then l.endAt = at end
+    out[#out + 1] = { phase = phase, at = at, by = by }
+  end
+  for _, e in ipairs(lines) do
+    if e.kind == "phase" and IS_PHASE[e.text] then
+      start(e.text, e.at)
+    elseif (e.kind == "skill" or e.kind == "subagent") and e.phase then
+      local l = last()
+      if l and not l.endAt and l.phase == e.phase then
+        -- The skill or subagent that came with the lane's start is what started the step.
+        if not l.by and l.at == e.at then l.by = startedBy(e.text, e.phase) end
+      else
+        start(e.phase, e.at, startedBy(e.text, e.phase))
+      end
+    elseif e.kind == "done" and e.phase then
+      local open
+      for i = #out, 1, -1 do
+        if out[i].phase == e.phase and not out[i].endAt then open = out[i] break end
+      end
+      local lane = t.ends and t.ends[e.phase]
+      local verdict = lane and lane.at == e.at and lane.verdict or nil
+      if open then open.endAt, open.verdict = e.at, verdict
+      else out[#out + 1] = { phase = e.phase, at = e.at, endAt = e.at, verdict = verdict } end
+    end
+  end
+  local before = {}
+  for _, p in ipairs(lanePasses(t)) do
+    if p.at < lines[1].at then before[#before + 1] = { phase = p.phase, at = p.at } end
+  end
+  if #out == 0 then return lanePasses(t) end
+  for i, p in ipairs(before) do p.endAt = (before[i + 1] or out[1]).at end
+  table.move(out, 1, #out, #before + 1, before)
+  return before
+end
+
+local function ticket(t, lines)
   if type(t) ~= "table" then return nil end
   local out = { phase = IS_PHASE[t.phase] and t.phase or nil, phaseAt = num(t.phaseAt), seen = num(t.seen) or 0,
     phases = {} }
@@ -95,7 +155,7 @@ local function ticket(t)
     out.jira = { status = t.jira.status, at = num(t.jira.at) }
   end
   out.passes = passes(t.passes)
-  if #out.passes == 0 then out.passes = derivedPasses(out) end
+  if #out.passes == 0 then out.passes = derivedPasses(out, lines) end
   return out
 end
 
@@ -164,16 +224,24 @@ function facts.load(path)
   for _, t in ipairs(type(data.turns) == "table" and data.turns or {}) do
     f.turns[#f.turns + 1] = turn(t)
   end
-  for key, t in pairs(type(data.tickets) == "table" and data.tickets or {}) do
-    if type(key) == "string" then f.tickets[key] = ticket(t) end
-  end
-  if str(data.current) and f.tickets[data.current] then f.current = data.current end
   for _, e in ipairs(type(data.timeline) == "table" and data.timeline or {}) do
     if type(e) == "table" and num(e.at) and str(e.ticket) and str(e.kind) and str(e.text) then
       f.timeline[#f.timeline + 1] = { at = e.at, ticket = e.ticket, kind = e.kind, text = e.text,
         phase = IS_PHASE[e.phase] and e.phase or nil }
     end
   end
+  for key, t in pairs(type(data.tickets) == "table" and data.tickets or {}) do
+    if type(key) == "string" then
+      -- The ticket's lines, oldest first (the file keeps the newest first; lines of the same second, in order).
+      local lines = {}
+      for i = #f.timeline, 1, -1 do
+        if f.timeline[i].ticket == key then lines[#lines + 1] = f.timeline[i] end
+      end
+      byStart(lines)
+      f.tickets[key] = ticket(t, lines)
+    end
+  end
+  if str(data.current) and f.tickets[data.current] then f.current = data.current end
   return f
 end
 
