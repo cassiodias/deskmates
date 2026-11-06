@@ -284,6 +284,42 @@ stub.advance(0.2)
 check("a line that changed nothing leaves the open card as it was (its scroll too)", factsCard.html_ == "unchanged")
 closeCard(factsCard)
 
+-- Cassio (6 Nov): the card opens on the step happening now; a step the reader picks (or none) is drawn picked again
+-- when the card is drawn again; a step gone since, or a junk message, gives the step happening now.
+local function writeSteps(n)
+  factsWritten = factsWritten + 1
+  local file = io.open(factsDir .. "/tab1.json", "w")
+  file:write('{"updatedAt": ' .. factsWritten .. ', "current": "ABC-12", "tickets": {"ABC-12": {"phase": "dev", "phaseAt": 2, '
+    .. '"seen": 3, "passes": [{"phase": "plan", "at": 1, "endAt": 2}, {"phase": "dev", "at": 2}]}}, "timeline": [{"at": 3, '
+    .. '"ticket": "ABC-12", "kind": "reply", "text": "Step ' .. n .. '.", "phase": "dev"}]}')
+  file:close()
+  write("Stop|tab1||||Done.|app|iTerm.app|facts|/dev/ttys001|claude|")
+  stub.advance(0.2)
+end
+local DEV_ON, PLAN_ON = 'class="phase current on" data-phase="dev"', 'class="phase done on" data-phase="plan"'
+writeSteps(1)
+local stepCard = openCard()
+check("steps: the step happening now is picked", stepCard.html_:find(DEV_ON, 1, true) ~= nil)
+stepCard.content.callback({ body = "step:1" })
+writeSteps(2)
+check("steps: the reader's step drawn picked again", stepCard.html_:find("Step 2.", 1, true) ~= nil
+  and stepCard.html_:find(PLAN_ON, 1, true) ~= nil and not stepCard.html_:find(DEV_ON, 1, true))
+for _, junk in ipairs({ "step:2x", "step:-2", "step: 2", "step:", "step:None", 42 }) do
+  stepCard.content.callback({ body = junk })
+end
+writeSteps(3)
+check("steps: junk messages change nothing", stepCard.html_:find("Step 3.", 1, true) ~= nil
+  and stepCard.html_:find(PLAN_ON, 1, true) ~= nil)
+stepCard.content.callback({ body = "step:none" })
+writeSteps(4)
+check("steps: none picked stays none", stepCard.html_:find("Step 4.", 1, true) ~= nil
+  and not stepCard.html_:find(PLAN_ON, 1, true) and not stepCard.html_:find(DEV_ON, 1, true))
+stepCard.content.callback({ body = "step:99" })
+writeSteps(5)
+check("steps: a step gone since gives the step happening now", stepCard.html_:find("Step 5.", 1, true) ~= nil
+  and stepCard.html_:find(DEV_ON, 1, true) ~= nil)
+closeCard(stepCard)
+
 planFile = io.open(plansDir .. "/tab1.json", "w")
 planFile:write('{"steps": [{"id": "1", "title": "Write the failing test", "status": "active"}]}')
 planFile:close()
@@ -378,12 +414,12 @@ check("git's answer fills the card", gitCard.html_:find("1 commit, 1 not committ
 local draws = 0
 local html = gitCard.html
 gitCard.html = function(self, page) draws = draws + 1 return html(self, page) end
-writeGitFacts(2, '[{"at": 1400, "commits": [], "endAt": 1500, "files": [], "head": "' .. BASE .. '", "tests": '
+writeGitFacts(2, '[{"at": 1400, "commits": [], "endAt": 1500, "files": ["src/b.js"], "head": "' .. BASE .. '", "tests": '
   .. '{"failed": 0, "passed": 0, "ran": 0}}, ' .. TURN1 .. "]")
 tasks = #stub.tasks
 write("Stop|git1||||Done.|my-app|iTerm.app|facts|/dev/ttys009|claude|")
 stub.advance(0.2)
-check("a facts line redraws with the git answer kept", draws == 1 and gitCard.html_:find("No files edited.", 1, true) ~= nil
+check("a facts line redraws with the git answer kept", draws == 1 and gitCard.html_:find("<code>src/b.js</code>", 1, true) ~= nil
   and gitCard.html_:find("1 commit, 1 not committed.", 1, true) ~= nil)
 check("a facts line reads git again", #stub.tasks == tasks + 1 and stub.tasks[tasks + 1].args[3] == "rev-list")
 draws = 0
@@ -406,10 +442,10 @@ answer(newer, { "3\n", "M\0src/app.js\0", "", "" })
 answer(older, ANSWER)
 check("an older read answering last is dropped", gitCard.html_:find("3 commits, 0 not committed.", 1, true) ~= nil)
 -- A panel folded on the page stays folded when the card is drawn again; junk fold messages change nothing.
-local TURNS_OPEN, TURNS_FOLDED = '<details class="panel turns" data-panel="turns" open>', '<details class="panel turns" data-panel="turns">'
+local TURNS_OPEN, TURNS_FOLDED = '<details class="panel story" data-panel="story" open>', '<details class="panel story" data-panel="story">'
 check("panels open at first", gitCard.html_:find(TURNS_OPEN, 1, true) ~= nil)
-gitCard.content.callback({ body = "fold:turns:closed" })
-for _, junk in ipairs({ "fold:actual:shut", "fold:plan:closed", "fold:actual:closed:x", "fold:ACTUAL:closed", 42 }) do
+gitCard.content.callback({ body = "fold:story:closed" })
+for _, junk in ipairs({ "fold:turns:closed", "fold:actual:shut", "fold:plan:closed", "fold:actual:closed:x", "fold:ACTUAL:closed", 42 }) do
   gitCard.content.callback({ body = junk })
 end
 tasks = #stub.tasks
@@ -419,13 +455,13 @@ answer(tasks, { "4\n", "M\0src/app.js\0", "", "" })
 check("a folded panel stays folded on a redraw", gitCard.html_:find("4 commits, 0 not committed.", 1, true) ~= nil
   and gitCard.html_:find(TURNS_FOLDED, 1, true) ~= nil and not gitCard.html_:find(TURNS_OPEN, 1, true))
 check("junk fold messages fold nothing", gitCard.html_:find('<details class="panel actual" data-panel="actual" open>', 1, true) ~= nil)
-gitCard.content.callback({ body = "fold:turns:open" })
+gitCard.content.callback({ body = "fold:story:open" })
 tasks = #stub.tasks
 write("PostToolUse|git1||Bash|||my-app|iTerm.app|test|/dev/ttys009|claude|")
 stub.advance(0.2)
 answer(tasks, { "5\n", "M\0src/app.js\0", "", "" })
 check("opened again, drawn open", gitCard.html_:find(TURNS_OPEN, 1, true) ~= nil)
-gitCard.content.callback({ body = "fold:turns:closed" })
+gitCard.content.callback({ body = "fold:story:closed" })
 closeCard(gitCard)
 
 -- git fails, is too slow, or lost the base: one line in the block, the turns still there.

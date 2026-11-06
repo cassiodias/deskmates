@@ -33,6 +33,7 @@ local newTerminals = require("puppet.terminals.focus")
 local menuItems = require("puppet.ui.menu")
 local plancard = require("puppet.ui.plancard")
 local sessioncard = require("puppet.ui.sessioncard")
+local story = require("puppet.ui.story")
 local workcard = require("puppet.ui.workcard")
 local bubble = require("puppet.stage.bubble")
 
@@ -210,15 +211,17 @@ local function gitVersion(state)
 end
 
 -- What session `key`'s card shows: its plan (nil when it has none to show), the card's meta, with the session's
--- facts and, in a git repo, plan vs actual and its turns (meta.work), and which version of the files and of git's
+-- facts, in a git repo plan vs actual (meta.work), and the story of both (meta.story), and which version of the files and of git's
 -- answer it shows (nil when a file does not say); nil when there is no plan, no facts and no git.
 function obj:cardContent(key)
   local s, puppet = self.sessions.all[key], self.stage.puppets[key]
   if not (s and puppet) then return nil end
   local plan = plans.hasContent(s.plan) and s.plan or nil
-  local session = facts.hasContent(s.facts) and sessioncard.view(s.facts, os.time(), s.isWorking) or nil
+  local now = os.time()
+  local session = facts.hasContent(s.facts) and sessioncard.view(s.facts, now, s.isWorking) or nil
   local state = self:gitState(key)
   local work = workcard.view(s.facts, state, s.plan, s.isWorking)
+  local told = story.view(session, work, now)
   if not plan and not session and not work then return nil end
   local version
   if (not plan or plan.updatedAt) and (not (session or work) or s.facts.updatedAt) then
@@ -226,7 +229,7 @@ function obj:cardContent(key)
       .. (work and "|" .. tostring(s.isWorking) .. "|" .. gitVersion(state) or "")
   end
   return plan, { title = (s.title and s.title ~= "") and s.title or s.tag, color = puppet.color, session = session,
-    work = work and workcard.html(work) }, version
+    work = work and workcard.html(work), story = told and story.html(told) }, version
 end
 
 -- Shows the card open on session `key` again, only when what it shows changed: a new page loses the reader's

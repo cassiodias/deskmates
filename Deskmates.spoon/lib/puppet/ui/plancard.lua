@@ -6,6 +6,7 @@
 local planblocks = require("puppet.ui.planblocks")
 local panel = require("puppet.ui.panel")
 local sessioncard = require("puppet.ui.sessioncard")
+local story = require("puppet.ui.story")
 local workcard = require("puppet.ui.workcard")
 
 local plancard = {}
@@ -128,15 +129,16 @@ local function split(markdown)
 end
 
 -- The whole page for `plan` (model/plans.lua's shape, or nil); meta.title names the session, meta.color is its
--- puppet's, meta.session (sessioncard.view, or nil) what the session is working on: its header on top. Under it the
--- panels: meta.work (workcard.html, or nil, the git blocks), then the session's activity; they fill the card when
--- no plan follows, else they scroll in 45% of it and the plan comes below. `folded` ({ [panel id] = true }, or
--- nil): the panels drawn closed.
-function plancard.html(plan, meta, folded)
+-- puppet's. On top what changed (meta.work, workcard.html, or nil): the session's result, whatever the step
+-- picked, scrolling in a third of the card when open. Then the header for meta.session (sessioncard.view, or nil),
+-- what the session is working on, with the step `step` keeps picked (sessioncard.pick: a step's start, "none", or
+-- nil for the default). Then the story (meta.story, story.html, or nil): it fills the card when no plan follows,
+-- else it scrolls in 45% of it and the plan comes below. `folded` ({ [panel id] = true }, or nil): the panels
+-- drawn closed.
+function plancard.html(plan, meta, folded, step)
   local nonce = string.format("%08x%08x", math.random(0, 0x7fffffff), math.random(0, 0x7fffffff))
   local color = (meta.color or ""):match("^#%x%x%x%x%x%x$") or "#888888"
-  local session, timeline
-  if meta.session then session, timeline = sessioncard.html(meta.session) end
+  local session = meta.session and sessioncard.html(meta.session, step)
   local hasPlan = plan ~= nil
   plan = plan or { steps = {} }
   local steps = plan.steps or {}
@@ -145,10 +147,10 @@ function plancard.html(plan, meta, folded)
   local title, summary, article, sections = split(plan.markdown)
 
   local body = {}
+  if meta.work then body[#body + 1] = '<div class="result">' .. meta.work .. "</div>" end
   if session then body[#body + 1] = "<header>" .. session .. "</header>" end
-  if meta.work or timeline then
-    body[#body + 1] = '<div class="panels' .. (hasPlan and " capped" or "") .. '">' .. (meta.work or "") .. (timeline or "")
-      .. "</div>"
+  if meta.story then
+    body[#body + 1] = '<div class="panels' .. (hasPlan and " capped" or "") .. '">' .. meta.story .. "</div>"
   end
   if hasPlan then
     body[#body + 1] = '<header><div class="label">PLAN</div><h1 class="title">' .. escape(title or meta.title or "Plan") .. "</h1>"
@@ -237,7 +239,9 @@ function plancard.html(plan, meta, folded)
     "[hidden] { display: none !important; }",
     sessioncard.CSS,
     workcard.CSS,
+    story.CSS,
     panel.CSS,
+    ".result { flex: none; max-height: 35vh; overflow: auto; padding: 10px 14px 0; }",
     "footer { display: flex; gap: 8px; justify-content: flex-end; padding: 8px 14px; border-top: 1px solid var(--faint); }",
     "footer button { font: inherit; padding: 4px 12px; }",
     "#focus { background: var(--accent); color: white; border: 0; border-radius: 5px; }",
@@ -257,31 +261,36 @@ plancard.SCRIPT = "function send(m){window.webkit.messageHandlers.deskmates.post
   .. "document.querySelectorAll('button[data-to]:not(.phase)').forEach(function(b){b.onclick=function(){"
   .. "var t=document.getElementById(b.getAttribute('data-to'));if(!t)return;t.scrollIntoView({block:'start'});"
   .. "t.classList.remove('here');void t.offsetWidth;t.classList.add('here')}});"
-  -- Also: show the ticket chosen (its header and its timeline), hide the others. A strip hidden at load had no
-  -- width to scroll: the one shown now opens on its newest step.
+  -- Also: show the ticket chosen (its header and its story), hide the others, and filter by the step picked on
+  -- its strip. A strip hidden at load had no width to scroll: the one shown now opens on its newest step.
   .. "var also=document.querySelector('select.also');if(also)also.onchange=function(){"
   .. "document.querySelectorAll('[data-key]').forEach(function(el){el.hidden=el.getAttribute('data-key')!==also.value});"
-  .. "document.querySelectorAll('.ticket:not([hidden]) .strip').forEach(function(s){s.scrollLeft=s.scrollWidth})};"
-  -- A step filters the activity and the turns in place and marks the page (body.lane); a second click clears it.
-  -- A row stays when it happened during the step: from its start (data-from) up to the next step's (data-to, none
-  -- for the last); a step not reached yet (no data-from) leaves no row. A folded panel stays folded: folds are the
-  -- reader's alone. The panels stay where the reader left them: nothing is brought into view, and their scroll
-  -- position is put back after the rows change. With a plan, a Plan step not reached yet clears it and takes the
-  -- plan's article (what scrolls: the body never does) back to its top.
+  .. "document.querySelectorAll('.ticket:not([hidden]) .strip').forEach(function(s){s.scrollLeft=s.scrollWidth});picked()};"
+  -- A step filters the story in place and marks the page (body.lane); a second click clears it. A row stays when
+  -- it happened during the step: from its start (data-from) up to the next step's (data-to, none for the last); a
+  -- step not reached yet (no data-from) leaves no row. A folded panel stays folded: folds are the reader's alone.
+  -- The panels stay where the reader left them: nothing is brought into view, and their scroll position is put
+  -- back after the rows change. With a plan, a Plan step not reached yet clears it and takes the plan's article
+  -- (what scrolls: the body never does) back to its top. The Spoon is told the step picked (its start, or none),
+  -- to draw it picked again next time.
   .. "function only(b){document.body.classList.toggle('lane',!!b);"
   .. "var f=b&&b.getAttribute('data-from'),t=b&&b.getAttribute('data-to');"
-  .. "document.querySelectorAll('.timeline li,.turnlist>li').forEach(function(li){var a=Number(li.getAttribute('data-at'));"
+  .. "document.querySelectorAll('.storylist>li').forEach(function(li){var a=Number(li.getAttribute('data-at'));"
   .. "li.classList.toggle('out',!!b&&(f===null||a<Number(f)||(t!==null&&a>=Number(t))))})}"
+  .. "function picked(){only(document.querySelector('.ticket:not([hidden]) button.phase.on'))}"
   .. "document.querySelectorAll('button.phase').forEach(function(b){b.onclick=function(){"
-  .. "var p=b.getAttribute('data-phase'),plan=document.getElementById('plan'),"
+  .. "var p=b.getAttribute('data-phase'),f=b.getAttribute('data-from'),plan=document.getElementById('plan'),"
   .. "on=b.classList.contains('on'),"
   .. "panels=document.querySelector('.panels'),top=panels?panels.scrollTop:0;"
-  .. "document.querySelectorAll('button.phase').forEach(function(x){x.classList.remove('on')});only(null);"
-  .. "if(plan&&p==='plan'&&!b.hasAttribute('data-from')){var art=plan.querySelector('article');if(art)art.scrollTop=0;return}"
+  .. "b.parentNode.querySelectorAll('button.phase').forEach(function(x){x.classList.remove('on')});only(null);"
+  .. "if(plan&&p==='plan'&&f===null){send('step:none');var art=plan.querySelector('article');if(art)art.scrollTop=0;return}"
   .. "if(!on){b.classList.add('on');only(b)}"
+  .. "if(!on&&f!==null)send('step:'+f);else send('step:none');"
   .. "if(panels)panels.scrollTop=top}});"
   -- The strip scrolls sideways when the steps do not fit: it opens at its end, on the newest step.
   .. "document.querySelectorAll('.strip').forEach(function(s){s.scrollLeft=s.scrollWidth});"
+  -- The card opens with the story filtered to the step drawn picked (the one happening now, or the reader's).
+  .. "picked();"
   -- A panel folded or opened: the Spoon keeps it so for the next drawing of this session's card. A panel drawn
   -- open fires toggle on load too: only a change from the state drawn is told, so a redraw sends nothing.
   .. "document.querySelectorAll('details.panel').forEach(function(d){var was=d.open;d.addEventListener('toggle',"
@@ -314,9 +323,9 @@ end
 function PlanCard:show(key, plan, meta)
   self:hide()
   self.key = key
-  -- The folds belong to the session shown: kept while its card is drawn again (and opened again), dropped when
-  -- another session's card opens.
-  if self.foldKey ~= key then self.folded, self.foldKey = {}, key end
+  -- The folds and the step picked belong to the session shown: kept while its card is drawn again (and opened
+  -- again), dropped when another session's card opens.
+  if self.foldKey ~= key then self.folded, self.step, self.foldKey = {}, nil, key end
   local content = hs.webview.usercontent.new("deskmates")
   content:setCallback(function(message)
     if message.body == "focus" then
@@ -324,9 +333,11 @@ function PlanCard:show(key, plan, meta)
       if shown then self.focusTimer = hs.timer.doAfter(0, function() self.onFocus(shown) end) end
     elseif message.body == "close" then
       self:hide()
-    else
+    elseif self.key == key then
       local id, isFolded = panel.message(message.body)
-      if id and self.key == key then self.folded[id] = isFolded or nil end
+      if id then self.folded[id] = isFolded or nil end
+      local step = sessioncard.stepMessage(message.body)
+      if step then self.step = step end
     end
   end)
   local size = plancard.fitSize(self.loadSize and self.loadSize())
@@ -357,7 +368,7 @@ function PlanCard:show(key, plan, meta)
       self.saveSize(plancard.fitSize({ w = state.w - chromeW, h = state.h - chromeH }))
     end
   end)
-  view:html(plancard.html(plan, meta, self.folded))
+  view:html(plancard.html(plan, meta, self.folded, self.step))
   view:show()
   -- Hammerspoon becomes the active app, so the card is the key window: an inactive card loses its first click.
   -- (view:hswindow() would find the window, but it asks macOS about every app's windows: 1.5 s.)
@@ -381,7 +392,7 @@ end
 -- Shows a newer page in the card of session `key`, in the same window; nothing when the card shows another
 -- session, or none.
 function PlanCard:update(key, plan, meta)
-  if self.view and self.key == key then self.view:html(plancard.html(plan, meta, self.folded)) end
+  if self.view and self.key == key then self.view:html(plancard.html(plan, meta, self.folded, self.step)) end
 end
 
 function PlanCard:isShown() return self.view ~= nil end

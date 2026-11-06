@@ -7,24 +7,25 @@ local panel = require("puppet.ui.panel")
 
 local function has(html, text) return html:find(text, 1, true) ~= nil end
 
-local p = panel.html("turns", "What did <each> turn do?", "4 turns", "<ol></ol>")
-check("html: a details open by default, chevron, title, summary, body", p == '<details class="panel turns" data-panel="turns" open>'
-  .. '<summary><span class="chev">›</span><h2>What did &lt;each&gt; turn do?</h2><span class="sum">4 turns</span></summary>'
+local p = panel.html("story", "What <happened>?", "4 turns", "<ol></ol>")
+check("html: a details open by default, chevron, title, summary, body", p == '<details class="panel story" data-panel="story" open>'
+  .. '<summary><span class="chev">›</span><h2>What &lt;happened&gt;?</h2><span class="sum">4 turns</span></summary>'
   .. '<div class="panel-body"><ol></ol></div></details>')
 
-local page = panel.html("actual", "A", "a", "x") .. panel.html("turns", "T", "t", "y") .. panel.html("activity", "W", "w", "z")
-local folded = panel.fold(page, { turns = true })
-check("fold: a folded panel has no open", has(folded, '<details class="panel turns" data-panel="turns"><summary>')
-  and has(folded, '<details class="panel actual" data-panel="actual" open>')
-  and has(folded, '<details class="panel activity" data-panel="activity" open>'))
+-- One timeline now: the story replaced the turns and the activity.
+check("ids: the plan block and the story", panel.IDS.actual and panel.IDS.story and not panel.IDS.turns and not panel.IDS.activity)
+local page = panel.html("actual", "A", "a", "x") .. panel.html("story", "T", "t", "y")
+local folded = panel.fold(page, { story = true })
+check("fold: a folded panel has no open", has(folded, '<details class="panel story" data-panel="story"><summary>')
+  and has(folded, '<details class="panel actual" data-panel="actual" open>'))
 check("fold: nothing folded, the page as it was", panel.fold(page, {}) == page and panel.fold(page, nil) == page)
 check("fold: an unknown id does nothing", panel.fold(page, { plan = true }) == page)
 
 local function msg(body) return { panel.message(body) } end
-check("message: fold a panel", msg("fold:turns:closed")[1] == "turns" and msg("fold:turns:closed")[2] == true)
-check("message: open it again", msg("fold:activity:open")[1] == "activity" and msg("fold:activity:open")[2] == false)
-for _, junk in ipairs({ "fold:plan:closed", "fold:turns:shut", "fold:turns:closed:x", "fold:turns:closedx", " fold:turns:closed",
-  "fold:Turns:closed", "fold::closed", "focus", "", 42, nil, {} }) do
+check("message: fold a panel", msg("fold:story:closed")[1] == "story" and msg("fold:story:closed")[2] == true)
+check("message: open it again", msg("fold:actual:open")[1] == "actual" and msg("fold:actual:open")[2] == false)
+for _, junk in ipairs({ "fold:plan:closed", "fold:turns:closed", "fold:activity:open", "fold:story:shut",
+  "fold:story:closed:x", "fold:story:closedx", " fold:story:closed", "fold:Story:closed", "fold::closed", "focus", "", 42, nil, {} }) do
   check("message: junk ignored (" .. tostring(junk) .. ")", panel.message(junk) == nil)
 end
 

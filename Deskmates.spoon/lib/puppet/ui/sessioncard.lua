@@ -1,9 +1,7 @@
 -- The session part of the card: what a session is working on, from its facts (model/facts.lua). sessioncard.view
--- turns them into what the card shows (the current ticket first, its Jira badge, the phase strip, NOW and the
--- timeline); sessioncard.html makes its two parts of the page, the header and the timeline, every text escaped.
--- It knows no Hammerspoon.
-
-local panel = require("puppet.ui.panel")
+-- turns them into what the card shows (the current ticket first, its Jira badge, the phase strip, NOW, and each
+-- ticket's timeline rows for the story, ui/story.lua); sessioncard.html makes the header, every text escaped, the
+-- step picked marked. It knows no Hammerspoon.
 
 local sessioncard = {}
 
@@ -26,13 +24,25 @@ function sessioncard.took(seconds)
 end
 local took = sessioncard.took
 
+-- A timeline line's label: the lane started, the phase of a skill or subagent (its kind when it names none), a
+-- lane's end (✓), Jira, tests; nothing for a reply.
 local function label(e)
-  if e.kind == "phase" then return e.text end
+  if e.kind == "phase" then return (NAMES[e.text] or e.text) .. " started" end
   if e.kind == "jira" then return "Jira" end
   if e.kind == "tests" then return e.text == "failed" and "✗ tests" or "✓ tests" end
   if e.kind == "reply" then return "" end
-  if e.kind == "done" then return "✓ " .. (e.phase or "") end
-  return e.phase or ""
+  if e.kind == "done" then return "✓" .. (e.phase and " " .. NAMES[e.phase] or "") end
+  if NAMES[e.phase] then return NAMES[e.phase] end
+  return (e.kind:gsub("^%l", string.upper))
+end
+
+-- The verdict of ticket `t`'s step that a "done" line `e` ended, if any.
+local function verdictOf(t, e)
+  if e.kind ~= "done" then return nil end
+  for _, p in ipairs(t.passes or {}) do
+    if p.phase == e.phase and p.endAt == e.at and p.verdict then return p.verdict end
+  end
+  return nil
 end
 
 -- What the strip says under it once a ticket has steps: where they come from.
@@ -86,16 +96,16 @@ local function ticketView(key, t, timeline, now, isWorking)
   for _, e in ipairs(timeline) do
     if e.ticket == key then
       if e.kind == "reply" and not v.now then v.now = e.text end
-      v.rows[#v.rows + 1] = { at = e.at, time = clock(e.at), label = label(e),
-        text = e.kind == "phase" and "started" or e.text, phase = e.phase }
+      v.rows[#v.rows + 1] = { at = e.at, time = clock(e.at), kind = e.kind, label = label(e),
+        text = e.kind == "phase" and "" or e.text, phase = e.phase, verdict = verdictOf(t, e) }
     end
   end
-  v.summary = #v.rows == 0 and "Nothing yet" or #v.rows .. " line" .. (#v.rows == 1 and "" or "s")
   return v
 end
 
 -- What the card shows for facts `f` at time `now`, `isWorking` while the agent's turn runs: { current = key,
--- tickets = { ticket views } }, the current ticket first, then the others by when they were last worked on;
+-- tickets = { { key, jira, strip, source, now, rows } } }, rows (each { at, time, kind, label, text, phase,
+-- verdict }) newest first, the current ticket first, then the others by when they were last worked on;
 -- nil when there is nothing to show.
 function sessioncard.view(f, now, isWorking)
   if not f or next(f.tickets) == nil then return nil end
@@ -115,12 +125,36 @@ end
 
 local function hidden(i) return i > 1 and " hidden" or "" end
 
--- The page's two parts for view `v`: the header (each ticket's key, badge, strip and NOW, and the Also choice)
--- and the activity panel, "What happened along the way?" (each ticket's rows and summary). Every ticket is there,
--- all but the first hidden; the page's script switches them (data-key) and filters rows by a step's span (each
--- step's data-from and data-to against each row's data-at).
-function sessioncard.html(v)
-  local head, rows, sums = { '<section class="session">' }, { '<section class="timelines">' }, {}
+-- The step of `strip` drawn picked (its index), nil for none: the reader's own pick `kept` (a step's start, or
+-- "none") while a step starts then; else the current step; else the newest one not ahead.
+function sessioncard.pick(strip, kept)
+  if kept == "none" then return nil end
+  if kept then
+    for i, s in ipairs(strip) do if s.from == kept then return i end end
+  end
+  local newest
+  for i, s in ipairs(strip) do
+    if s.state == "current" then return i end
+    if s.state ~= "ahead" then newest = i end
+  end
+  return newest
+end
+
+-- A page message "step:<start>" (digits only) or "step:none": the step the reader picked, as its start, or
+-- "none"; nil for anything else.
+function sessioncard.stepMessage(body)
+  if type(body) ~= "string" then return nil end
+  if body == "step:none" then return "none" end
+  local digits = body:match("^step:(%d+)$")
+  if not digits or #digits > 15 then return nil end
+  return tonumber(digits)
+end
+
+-- The header for view `v`: each ticket's key, badge, strip and NOW, and the Also choice. Every ticket is there,
+-- all but the first hidden; the page's script switches them (data-key). On each strip the step sessioncard.pick
+-- gives for `kept` is drawn picked (class on); the page filters the story by it (data-from, data-to).
+function sessioncard.html(v, kept)
+  local head = { '<section class="session">' }
   if #v.tickets > 1 then
     local options = {}
     for _, t in ipairs(v.tickets) do
@@ -138,9 +172,10 @@ function sessioncard.html(v)
         .. (t.jira and '<span class="jira">' .. escape(t.jira.status)
           .. (t.jira.time and " <small>" .. t.jira.time .. "</small>" or "") .. "</span>" or "") .. "</div>"
     end
+    local picked = sessioncard.pick(t.strip, kept)
     local steps = {}
-    for _, s in ipairs(t.strip) do
-      steps[#steps + 1] = '<button class="phase ' .. s.state .. '" data-phase="' .. s.phase .. '"'
+    for n, s in ipairs(t.strip) do
+      steps[#steps + 1] = '<button class="phase ' .. s.state .. (n == picked and " on" or "") .. '" data-phase="' .. s.phase .. '"'
         .. (s.from and ' data-from="' .. string.format("%d", s.from) .. '"' or "")
         .. (s.to and ' data-to="' .. string.format("%d", s.to) .. '"' or "")
         .. (s.by and ' title="' .. escape(s.by) .. '"' or "") .. '><span class="dot"></span>'
@@ -153,17 +188,9 @@ function sessioncard.html(v)
     if t.source then head[#head + 1] = '<p class="source">' .. escape(t.source) .. "</p>" end
     if t.now then head[#head + 1] = '<p class="now"><span class="label">NOW</span> ' .. escape(t.now) .. "</p>" end
     head[#head + 1] = "</div>"
-    local items = {}
-    for _, r in ipairs(t.rows) do
-      items[#items + 1] = '<li data-at="' .. string.format("%d", r.at) .. '"><span class="time">' .. (r.time or "")
-        .. '</span><span class="what">' .. escape(r.label) .. '</span><span class="text">' .. escape(r.text) .. "</span></li>"
-    end
-    sums[#sums + 1] = '<span data-key="' .. key .. '"' .. hidden(i) .. ">" .. escape(t.summary) .. "</span>"
-    rows[#rows + 1] = '<ul class="timeline" data-key="' .. key .. '"' .. hidden(i) .. ">" .. table.concat(items) .. "</ul>"
   end
   head[#head + 1] = "</section>"
-  rows[#rows + 1] = "</section>"
-  return table.concat(head), panel.html("activity", "What happened along the way?", table.concat(sums), table.concat(rows))
+  return table.concat(head)
 end
 
 -- The styles for the session part, in the page's tokens (--accent, --faint).
@@ -194,10 +221,6 @@ sessioncard.CSS = table.concat({
   ".verdict { font-size: 10px; font-weight: 700; border-radius: 4px; padding: 1px 5px; color: var(--accent);",
   " background: color-mix(in srgb, var(--accent) 15%, transparent); }",
   ".now { margin: 6px 0 0; } .now .label { display: inline; margin-right: 4px; color: var(--accent); opacity: 1; }",
-  ".timeline { list-style: none; padding: 0; margin: 8px 0; }",
-  ".timeline li { display: grid; grid-template-columns: 44px 64px 1fr; gap: 8px; padding: 3px 0;",
-  " border-bottom: 1px solid var(--faint); } .timeline li.out { display: none; }",
-  ".timeline .time { font: 12px Menlo, monospace; opacity: 0.6; } .timeline .what { font-weight: 600; color: var(--accent); }",
 })
 
 return sessioncard

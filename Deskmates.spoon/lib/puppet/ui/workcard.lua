@@ -1,7 +1,8 @@
--- The card's two git blocks, for a session in a git repo: did it change what the plan said (the plan's file map
--- beside what git says changed since the session's base; what changed, without a plan) and what each turn did.
--- workcard.view does the work (git's texts read and compared by model/actual.lua, rows, dots and words chosen,
--- lists cut at MAX_PATHS); workcard.html only draws, every text escaped. It knows no agent, and no Hammerspoon.
+-- The card's git part, for a session in a git repo: did it change what the plan said (the plan's file map beside
+-- what git says changed since the session's base; what changed, without a plan), and what each turn did, for the
+-- story (ui/story.lua draws the turns). workcard.view does the work (git's texts read and compared by
+-- model/actual.lua, rows, dots and words chosen, lists cut at MAX_PATHS); workcard.html only draws the plan block,
+-- every text escaped. It knows no agent, and no Hammerspoon.
 
 local actual = require("puppet.model.actual")
 local facts = require("puppet.model.facts")
@@ -143,43 +144,46 @@ local function dot(t, isRunning)
   return "none"
 end
 
--- One turn's row: { at, time, dot, head, tests, summary, files, more, total, commits }; at is its start (the page
--- keeps it while a step picked on the strip covers it), summary the files in words. head is "Working now" for an
--- open turn when `isRunning`, how long it took when it ended, else "No end recorded".
+-- One turn's row: { at, endAt, time, dot, head, tests, summary, files, more, total, commits }; at is its start (the
+-- page keeps it while a step picked on the strip covers it), endAt its end (its reply came by then), summary the
+-- files in words (nil for none). head is "Working now" for an open turn when `isRunning`, how long it took when it
+-- ended (nil under a minute: it says nothing), else "No end recorded".
 local function turnRow(t, isRunning)
   isRunning = isRunning and not t.endAt
   local files, more = capped(t.files)
-  local head = isRunning and "Working now" or (t.endAt and sessioncard.took(t.endAt - t.at)) or "No end recorded"
-  return { at = t.at, time = os.date("%H:%M", t.at), dot = dot(t.tests, isRunning), head = head, tests = testsText(t.tests),
-    summary = #t.files == 0 and "No files edited." or counted(#t.files, "file") .. "…",
+  local head
+  if isRunning then head = "Working now"
+  elseif not t.endAt then head = "No end recorded"
+  elseif t.endAt - t.at >= 60 then head = sessioncard.took(t.endAt - t.at) end
+  return { at = t.at, endAt = t.endAt, time = os.date("%H:%M", t.at), dot = dot(t.tests, isRunning), head = head,
+    tests = testsText(t.tests), summary = #t.files > 0 and counted(#t.files, "file") .. "…" or nil,
     files = files, more = more, total = #t.files, commits = t.commits }
 end
 
--- What the two blocks show for facts `f`, git's answer `gitState` ({ reading = true }, { error = text }, or
+-- What the git part shows for facts `f`, git's answer `gitState` ({ reading = true }, { error = text }, or
 -- terminals/git.lua's result) and `plan` (model/plans.lua's shape, or nil): { actual = actualView, turns = { turn
--- rows, newest first }, turnsSummary = "4 turns · 2 commits" }; nil when the facts know no git base. Only the
--- newest turn, open while the session `isWorking`, is working now.
+-- rows, newest first } }; nil when the facts know no git base. Only the newest turn, open while the session
+-- `isWorking`, is working now.
 function workcard.view(f, gitState, plan, isWorking)
   if not facts.hasGit(f) then return nil end
   local turns = {}
-  local commits = 0
-  for i, t in ipairs(f.turns or {}) do
-    turns[#turns + 1] = turnRow(t, i == 1 and isWorking == true)
-    commits = commits + #t.commits
-  end
-  return { actual = actualView(f, gitState, plan), turns = turns,
-    turnsSummary = counted(#turns, "turn") .. (commits > 0 and " · " .. counted(commits, "commit") or "") }
+  for i, t in ipairs(f.turns or {}) do turns[#turns + 1] = turnRow(t, i == 1 and isWorking == true) end
+  return { actual = actualView(f, gitState, plan), turns = turns }
 end
+
+workcard.counted = counted
 
 -- One path's `<li>`, escaped, tagged when `unseen`.
 local function item(path, unseen)
   return "<li><code>" .. escape(path) .. "</code>" .. (unseen and UNSEEN or "") .. "</li>"
 end
+workcard.item = item
 
 -- The `<li>` saying how many paths were left out; nothing when none were.
 local function moreItem(more)
   return more > 0 and '<li class="more">and ' .. more .. " more</li>" or ""
 end
+workcard.moreItem = moreItem
 
 -- One table cell: a path on its tint (tagged when unseen), or muted words in their tone.
 local function cell(c)
@@ -224,45 +228,16 @@ local function actualHtml(a)
     end
     out[#out + 1] = '<p class="foot">' .. escape(a.footer) .. "</p>"
   end
-  return panel.html("actual", a.heading, escape(a.summary),
-    table.concat(out) .. '<p class="wholesession">The whole session, not only the step picked.</p>')
+  return panel.html("actual", a.heading, escape(a.summary), table.concat(out))
 end
 
--- One turn's `<li>`: the time, its dot on the rail, then how long and its tests, the files (a pill that opens to
--- the paths), the commits.
-local function turnHtml(t)
-  local files
-  if t.total == 0 then
-    files = '<div class="nofiles">' .. escape(t.summary) .. "</div>"
-  else
-    local lis = {}
-    for _, path in ipairs(t.files) do lis[#lis + 1] = item(path) end
-    files = '<details class="files"><summary><span class="chev">›</span>' .. escape(t.summary) .. "</summary><ul>"
-      .. table.concat(lis) .. moreItem(t.more) .. "</ul></details>"
-  end
-  local commits = {}
-  for _, c in ipairs(t.commits) do
-    commits[#commits + 1] = '<div class="commit"><code>' .. escape(c.hash) .. "</code> " .. escape(c.subject) .. "</div>"
-  end
-  return '<li data-at="' .. string.format("%d", t.at) .. '"><span class="at">' .. t.time .. '</span><span class="rail"><span class="pip ' .. t.dot .. '"></span></span>'
-    .. '<div class="turnbody"><div class="turnhead"><b>' .. escape(t.head) .. "</b>"
-    .. (t.tests and '<span class="tests"> · ' .. escape(t.tests) .. "</span>" or "") .. "</div>" .. files
-    .. table.concat(commits) .. "</div></li>"
-end
-
--- The two panels for view `v` (workcard.view): the plan block, then the turns when there are any.
+-- The plan block's panel for view `v` (workcard.view); the turns are drawn in the story (ui/story.lua).
 function workcard.html(v)
-  local out = { actualHtml(v.actual) }
-  if #v.turns > 0 then
-    local rowsHtml = {}
-    for _, t in ipairs(v.turns) do rowsHtml[#rowsHtml + 1] = turnHtml(t) end
-    out[#out + 1] = panel.html("turns", "What did each turn do?", escape(v.turnsSummary),
-      '<ol class="turnlist">' .. table.concat(rowsHtml) .. '</ol><p class="nolane">No turns in this step.</p>')
-  end
-  return table.concat(out)
+  return actualHtml(v.actual)
 end
 
--- The styles for the two blocks: their colours (light, then dark on a dark page), and the page's --faint.
+-- The styles for the plan block, and the colours the story shares (light, then dark on a dark page), with the
+-- page's --faint.
 workcard.CSS = table.concat({
   ":root { --ok: #1A7F37; --ok-text: #116329; --ok-bg: rgba(26,127,55,0.10); --pill: #116329;",
   " --pill-bg: rgba(26,127,55,0.14); --warn: #9A6700; --warn-text: #7D5400; --warn-bg: rgba(154,103,0,0.10); --off: #4A55C8;",
@@ -271,7 +246,7 @@ workcard.CSS = table.concat({
   " --pill: #8FD18B; --pill-bg: rgba(63,185,80,0.16); --warn: #F2C14E; --warn-text: #F5D88A; --warn-bg: rgba(242,193,78,0.10);",
   " --off: #9DA6F5; --off-bg: rgba(157,166,245,0.10); --bad: #E5534B; } }",
   ".actual p { margin: 0 0 8px; color: var(--muted); } .actual .foot { font-size: 12px; margin: 8px 0 0; }",
-  ".actual code, .turns code { font: 12px Menlo, monospace; overflow-wrap: anywhere; }",
+  ".actual code { font: 12px Menlo, monospace; overflow-wrap: anywhere; }",
   ".vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }",
   ".pva { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0;",
   " border: 1px solid var(--faint); border-radius: 8px; overflow: hidden; }",
@@ -289,33 +264,8 @@ workcard.CSS = table.concat({
   ".pva .say-warn { color: var(--warn); }",
   ".pva .say-off { color: var(--off); }",
   ".unseen { font: 11px -apple-system, sans-serif; color: var(--muted); margin-left: 4px; }",
-  ".actual .changed, .turns ul { list-style: none; padding: 0; margin: 0; } .actual .changed li { padding: 1px 0; }",
-  ".actual .more, .turns .more { color: var(--muted); }",
-  ".turnlist { list-style: none; padding: 0; margin: 0; }",
-  ".turnlist > li { display: grid; grid-template-columns: 44px 14px minmax(0, 1fr); gap: 0 10px; }",
-  ".turnlist .at { font-size: 12px; color: var(--muted); padding-top: 1px; }",
-  ".turnlist .rail { display: flex; flex-direction: column; align-items: center; }",
-  ".turnlist .rail::after { content: ''; flex: 1; width: 2px; background: var(--faint); }",
-  ".turnlist > li:last-child .rail::after { content: none; }",
-  ".pip { width: 10px; height: 10px; border-radius: 50%; box-sizing: border-box; margin-top: 4px; flex: none; }",
-  ".pip.running { border: 2px solid var(--off); } .pip.bad { background: var(--bad); }",
-  ".pip.ok { background: var(--ok); } .pip.none { background: color-mix(in srgb, CanvasText 25%, transparent); }",
-  ".turnbody { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; padding-bottom: 14px;",
-  " min-width: 0; } .turnbody > * { max-width: 100%; } .turnlist > li:last-child .turnbody { padding-bottom: 0; }",
-  ".turns .tests, .turns .nofiles { color: var(--muted); }",
-  -- A step picked (body.lane, set by the page's script): the turns outside it hidden, a word when none is left,
-  -- and the plan block saying it does not follow the step.
-  ".turnlist > li.out { display: none; } .nolane, .wholesession { display: none; color: var(--muted); }",
-  "body.lane .turnlist:not(:has(> li:not(.out))) + .nolane { display: block; } body.lane .wholesession { display: block; }",
-  ".turns .files > summary { list-style: none; cursor: pointer; display: inline-flex; gap: 6px; padding: 2px 9px;",
-  " border-radius: 4px; background: var(--pill-bg); color: var(--pill); font: 12px Menlo, monospace; }",
-  ".turns .files > summary::-webkit-details-marker { display: none; }",
-  ".turns .files > summary:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }",
-  ".turns .files .chev { display: inline-block; transition: transform 0.12s; }",
-  ".turns .files[open] > summary .chev { transform: rotate(90deg); }",
-  ".turns .files[open] ul { margin-top: 4px; padding: 5px 10px; border-radius: 4px; color: var(--ok-text);",
-  " background: color-mix(in srgb, var(--ok-bg) 60%, transparent); }",
-  ".turns .commit { font: 12px Menlo, monospace; overflow-wrap: anywhere; } .commit code { color: var(--warn); }",
+  ".actual .changed { list-style: none; padding: 0; margin: 0; } .actual .changed li { padding: 1px 0; }",
+  ".actual .more { color: var(--muted); }",
 })
 
 return workcard

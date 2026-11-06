@@ -6,6 +6,7 @@ local root = arg[0]:match("^(.*)/tests/") or "."
 package.path = root .. "/Deskmates.spoon/lib/?.lua;" .. root .. "/Deskmates.spoon/lib/?/init.lua;" .. package.path
 local check = dofile(root .. "/tests/support/check.lua")
 local workcard = require("puppet.ui.workcard")
+local story = require("puppet.ui.story")
 
 local function has(html, text) return html:find(text, 1, true) ~= nil end
 local function at(h, m) return os.time({ year = 2026, month = 11, day = 5, hour = h, min = m, sec = 0 }) end
@@ -106,7 +107,7 @@ check("html: unchecked", has(html, '<tr class="unchecked"><td class="tint-neutra
 check("html: unplanned, no edit seen", has(html, '<tr class="unplanned"><td class="say say-off">not in the plan</td>'
   .. MARK:format("→", "not in the plan") .. '<td class="tint-off"><code>scratch.sh</code> <span class="unseen">no edit seen</span></td></tr>')
   and count(html, "no edit seen") == 1)
-check("html: the footer after the table", has(html, '</tbody></table><p class="foot">3 commits, 2 not committed.</p><p class="wholesession">The whole session, not only the step picked.</p></div></details>'))
+check("html: the footer after the table", has(html, '</tbody></table><p class="foot">3 commits, 2 not committed.</p></div></details>'))
 check("html: no old labels", not has(html, "PLAN VS ACTUAL") and not has(html, "✓") and not has(html, "＋")
   and not has(html, "not seen from the agent"))
 check("html: one commit is one", has(workcard.html(workcard.view(factsWith(), { commits = "1", diff = "", uncommitted = "",
@@ -126,7 +127,7 @@ for name, plan in pairs({ ["no plan"] = false, ["a plan with no file map"] = { s
     .. '<p class="explain">What git shows changed'
     .. ' since <code>a1b2c3d</code>.</p><ul class="changed"><li><code>scratch.sh</code> <span class="unseen">no edit seen'
     .. "</span></li><li><code>src/app.js</code></li><li><code>src/new.js</code></li></ul>"
-    .. '<p class="foot">3 commits, 2 not committed.</p><p class="wholesession">The whole session, not only the step picked.</p></div></details>') and not has(nh, "<table"))
+    .. '<p class="foot">3 commits, 2 not committed.</p></div></details>') and not has(nh, "<table"))
   check(name .. ": its summary", nv and nv.actual.summary == "3 changed · 1 no edit seen")
 end
 
@@ -136,7 +137,7 @@ check("reading: the line", reading and reading.actual.line == "Reading git…" a
   and reading.actual.list == nil and reading.actual.heading == "Did it change what the plan said?")
 local rh = workcard.html(reading)
 check("reading: drawn", has(rh, '<h2>Did it change what the plan said?</h2><span class="sum">Reading git…</span></summary>'
-  .. '<div class="panel-body"><p class="line">Reading git…</p><p class="wholesession">The whole session, not only the step picked.</p></div></details>') and not has(rh, "<table") and not has(rh, 'class="foot"'))
+  .. '<div class="panel-body"><p class="line">Reading git…</p></div></details>') and not has(rh, "<table") and not has(rh, 'class="foot"'))
 check("reading, no file map: what changed", has(workcard.html(workcard.view(factsWith(), { reading = true }, nil, false)),
   '<h2>What changed?</h2><span class="sum">Reading git…</span></summary><div class="panel-body"><p class="line">Reading git…</p>'))
 local gone = workcard.html(workcard.view(factsWith(), { error = "base a1b2c3d no longer exists" }, PLAN, false))
@@ -161,40 +162,23 @@ local tv = workcard.view(factsWith(turns), GIT, PLAN, true)
 local rows = tv and tv.turns
 check("turns: newest first", rows and #rows == 5 and rows[1].time == "14:05" and rows[2].time == "13:50"
   and rows[3].time == "13:00" and rows[5].time == "11:00")
-check("turns: working now, then how long", rows and rows[1].head == "Working now" and rows[2].head == "5 min"
-  and rows[3].head == "<1 min" and rows[4].head == "4 min")
+check("turns: working now, then how long, only from a minute", rows and rows[1].head == "Working now" and rows[2].head == "5 min"
+  and rows[3].head == nil and rows[4].head == "4 min")
+check("turns: each with its end, for its reply", rows and rows[1].endAt == nil and rows[2].endAt == at(13, 55))
 check("turns: the dots", rows and rows[1].dot == "running" and rows[2].dot == "none" and rows[3].dot == "none"
   and rows[4].dot == "ok" and rows[5].dot == "bad")
 check("turns: tests in words", rows and rows[1].tests == "1 test failed (of 2)" and rows[2].tests == "tests ran 3"
   and rows[3].tests == nil and rows[4].tests == "tests passed (2 of 2)" and rows[5].tests == "2 tests failed (of 3)")
-check("turns: the summary", tv and tv.turnsSummary == "5 turns · 2 commits")
-check("turns: one turn, no commits", (workcard.view(factsWith({ turns[2] }), GIT, PLAN, false) or {}).turnsSummary == "1 turn")
 check("turns: the files", rows and #rows[1].files == 2 and rows[1].files[1] == "src/app.js" and #rows[3].files == 0)
-check("turns: the files in words", rows and rows[1].summary == "2 files…" and rows[2].summary == "1 file…"
-  and rows[3].summary == "No files edited.")
+check("turns: the files in words, nothing when none", rows and rows[1].summary == "2 files…" and rows[2].summary == "1 file…"
+  and rows[3].summary == nil)
 check("turns: commits", rows and #rows[1].commits == 2 and rows[1].commits[1].hash == "a1b2c3d"
   and rows[1].commits[1].subject == "Fix the typo" and #rows[2].commits == 0)
 
 local th = workcard.html(tv)
-check("turns html: a panel after the plan block", has(th, '<details class="panel turns" data-panel="turns" open><summary><span class="chev">›</span><h2>What did each turn do?</h2>'
-  .. '<span class="sum">5 turns · 2 commits</span></summary><div class="panel-body"><ol class="turnlist">')
-  and (th:find('data-panel="actual"', 1, true) or math.huge) < (th:find('data-panel="turns"', 1, true) or 0))
-check("turns html: a running row", has(th, '<li data-at="' .. at(14, 5) .. '"><span class="at">14:05</span><span class="rail"><span class="pip running">'
-  .. '</span></span><div class="turnbody"><div class="turnhead"><b>Working now</b><span class="tests"> · 1 test failed (of 2)'
-  .. "</span></div>"))
-check("turns html: the other dots", has(th, '<span class="pip none">') and has(th, '<span class="pip ok">')
-  and has(th, '<span class="pip bad">'))
-check("turns html: the file count opens to the paths", has(th, '<details class="files"><summary><span class="chev">›</span>'
-  .. "2 files…</summary><ul><li><code>src/app.js</code></li><li><code>src/new.js</code></li></ul></details>"))
-check("turns html: one file", has(th, '<summary><span class="chev">›</span>1 file…</summary>'))
-check("turns html: no files", has(th, '<b>&lt;1 min</b></div><div class="nofiles">No files edited.</div>'))
-check("turns html: tests", has(th, '<b>5 min</b><span class="tests"> · tests ran 3</span>')
-  and has(th, '<b>4 min</b><span class="tests"> · tests passed (2 of 2)</span>')
-  and has(th, '<span class="tests"> · 2 tests failed (of 3)</span>'))
-check("turns html: commits", has(th, '<div class="commit"><code>a1b2c3d</code> Fix the typo</div>'))
-check("turns html: a subject escaped", has(th, "<code>e4f5a6b</code> Fix this &amp; that</div>"))
-check("turns html: newest first", (th:find("14:05", 1, true) or math.huge) < (th:find("13:50", 1, true) or 0))
-check("turns html: no old labels", not has(th, "TURNS") and not has(th, "running</span>") and not has(th, "✓"))
+check("html: the plan block only; the turns are in the story", has(th, 'data-panel="actual"') and not has(th, "turnlist")
+  and not has(th, 'data-panel="turns"') and not has(th, "14:05"))
+check("html: the plan block no longer speaks of the step picked", not has(th, "wholesession") and not has(workcard.CSS, "wholesession"))
 -- A turn carries its start, so a step picked on the strip keeps the turns that started during it.
 local timed = factsWith({
   { at = at(14, 5), endAt = at(14, 6), files = {}, tests = { ran = 0, passed = 0, failed = 0 }, commits = {} },
@@ -203,21 +187,12 @@ local timed = factsWith({
 local starts = workcard.view(timed, GIT, PLAN, false)
 check("turns: each with its start", starts and starts.turns[1].at == at(14, 5) and starts.turns[2].at == at(11, 0)
   and starts.turns[1].phase == nil)
-local sh = workcard.html(starts)
-check("turns html: the start on every row", has(sh, '<li data-at="' .. at(14, 5) .. '"><span class="at">14:05</span>')
-  and has(sh, '<li data-at="' .. at(11, 0) .. '"><span class="at">11:00</span>') and not has(sh, "data-phase"))
-check("turns html: a step with no turns says so", has(sh, '<p class="nolane">No turns in this step.</p>'))
-check("plan block: says it is the whole session while a step is picked",
-  has(sh, '<p class="wholesession">The whole session, not only the step picked.</p>'))
 
 -- Working now only while the session works and only for the newest turn: an open turn the agent left (it was
 -- stopped, or its last hook never came) says no end was recorded; its dot comes from its tests.
 local idle = workcard.view(factsWith(turns), GIT, PLAN, false)
 check("not working: the open turn has no end recorded", idle and idle.turns[1].head == "No end recorded"
   and idle.turns[1].dot == "bad" and idle.turns[2].head == "5 min")
-check("not working: drawn", has(workcard.html(idle), '<span class="at">14:05</span><span class="rail"><span class="pip bad">'
-  .. '</span></span><div class="turnbody"><div class="turnhead"><b>No end recorded</b>')
-  and not has(workcard.html(idle), "Working now"))
 local left = {
   { at = at(14, 5), files = {}, tests = { ran = 0, passed = 0, failed = 0 }, commits = {} },
   { at = at(13, 50), files = {}, tests = { ran = 0, passed = 0, failed = 0 }, commits = {} },
@@ -229,7 +204,7 @@ check("working: only the newest open turn is working now", lv and lv.turns[1].he
 local ended = workcard.view(factsWith({ { at = at(14, 5), endAt = at(14, 8), files = {},
   tests = { ran = 0, passed = 0, failed = 0 }, commits = {} } }), GIT, PLAN, true)
 check("working, the newest turn ended: its length, not working now", ended and ended.turns[1].head == "3 min"
-  and ended.turns[1].dot == "none" and not has(workcard.html(ended), "Working now"))
+  and ended.turns[1].dot == "none")
 -- A turn stopped with Esc (no Stop hook) is left open when the next prompt comes, with no end and no commits.
 local stopped = workcard.view(factsWith({
   { at = at(14, 5), files = {}, tests = { ran = 0, passed = 0, failed = 0 }, commits = {} },
@@ -237,10 +212,6 @@ local stopped = workcard.view(factsWith({
 }), GIT, PLAN, true)
 check("stopped: its start, no end recorded, no commits", stopped and stopped.turns[2].time == "13:50"
   and stopped.turns[2].head == "No end recorded" and #stopped.turns[2].commits == 0)
-check("stopped: drawn with no commits", has(workcard.html(stopped), '<b>No end recorded</b></div><details class="files">'
-  .. '<summary><span class="chev">›</span>1 file…</summary><ul><li><code>src/app.js</code></li></ul></details></div></li></ol>'))
-
-check("no turns: no turns block", not has(workcard.html(workcard.view(factsWith(), GIT, PLAN, false)), 'data-panel="turns"'))
 
 -- The styles: light colours, dark ones for a dark page, sentence-case headings, paths that wrap.
 local CSS = workcard.CSS
@@ -259,18 +230,18 @@ check("css: the warn text colour", has(CSS, "--warn-text: #7D5400;") and has(dar
 check("css: muted words in full colour (4.5:1)", has(CSS, ".pva .say-warn { color: var(--warn); }")
   and has(CSS, ".pva .say-off { color: var(--off); }") and not CSS:match("say%-%a+ {[^}]*color%-mix"))
 check("css: a path on the warn tint in the warn text colour", has(CSS, ".tint-warn { background: var(--warn-bg); color: var(--warn-text); }"))
-check("css: the dots", CSS:match("%.pip%.running {[^}]*border[^}]*var%(%-%-off%)") and CSS:match("%.pip%.ok {[^}]*var%(%-%-ok%)")
-  and CSS:match("%.pip%.bad {[^}]*var%(%-%-bad%)") ~= nil)
-check("css: no line after the last dot", has(CSS, ".turnlist > li:last-child .rail::after { content: none; }"))
-check("css: the pill and its chevron", CSS:match("%.turns %.files > summary {[^}]*var%(%-%-pill%-bg%)") and has(CSS, "var(--pill)")
-  and CSS:match("%.files%[open%] > summary %.chev {[^}]*rotate%(90deg%)") ~= nil)
-check("css: open, the files are tinted too", CSS:match("%.turns %.files%[open%] ul {[^}]*background") ~= nil)
-check("css: a hash in amber", CSS:match("%.commit code {[^}]*var%(%-%-warn%)") ~= nil)
+check("css: the dots", story.CSS:match("%.pip%.running {[^}]*border[^}]*var%(%-%-off%)") and story.CSS:match("%.pip%.ok {[^}]*var%(%-%-ok%)")
+  and story.CSS:match("%.pip%.bad {[^}]*var%(%-%-bad%)") ~= nil)
+check("css: the pill and its chevron", story.CSS:match("%.story %.files > summary {[^}]*var%(%-%-pill%-bg%)") and has(story.CSS, "var(--pill)")
+  and story.CSS:match("%.files%[open%] > summary %.chev {[^}]*rotate%(90deg%)") ~= nil)
+check("css: open, the files are tinted too", story.CSS:match("%.story %.files%[open%] ul {[^}]*background") ~= nil)
+check("css: a hash in amber", story.CSS:match("%.commit code {[^}]*var%(%-%-warn%)") ~= nil)
 check("css: paths wrap", CSS:match("overflow%-wrap: anywhere") ~= nil)
 
 -- Escaping: a path from git and a path from a hook.
-local evil = workcard.html(workcard.view(factsWith({ { at = at(9, 0), files = { "src/<b>.js" }, tests = { ran = 0, passed = 0,
-  failed = 0 }, commits = {} } }), { commits = "0", diff = "M\0src/<b>.js\0", uncommitted = "", untracked = "" }, nil, false))
+local evilView = workcard.view(factsWith({ { at = at(9, 0), files = { "src/<b>.js" }, tests = { ran = 0, passed = 0,
+  failed = 0 }, commits = {} } }), { commits = "0", diff = "M\0src/<b>.js\0", uncommitted = "", untracked = "" }, nil, false)
+local evil = workcard.html(evilView) .. story.html(story.view(nil, evilView, at(10, 0)))
 check("escaped: a path", has(evil, "<li><code>src/&lt;b&gt;.js</code>") and count(evil, "src/&lt;b&gt;.js") == 2
   and not has(evil, "<b>.js"))
 local evilPlan = workcard.html(workcard.view(factsWith(), { commits = "0", diff = "M\0src/<b>.js\0", uncommitted = "",
@@ -294,7 +265,7 @@ local bv = workcard.view(big, BIGGIT, nil, false)
 check("cap: 200 rows and the rest counted", bv and bv.actual.list and #bv.actual.list.rows == 200 and bv.actual.list.more == 1
   and bv.actual.list.rows[200].path == "src/f200.js")
 check("cap: a turn's files too", bv and #bv.turns[1].files == 200 and bv.turns[1].more == 1)
-local bh = workcard.html(bv)
+local bh = workcard.html(bv) .. story.html(story.view(nil, bv, at(10, 0)))
 check("cap: and 1 more", count(bh, '<li class="more">and 1 more</li>') == 2 and not has(bh, "src/f201.js")
   and has(bh, '<span class="chev">›</span>201 files…</summary>'))
 local pv = workcard.view(big, BIGGIT, { steps = {}, markdown = "# x\n\n## Files\n\n- `README.md` — y\n" }, false)

@@ -1,12 +1,12 @@
--- The card's foldable panels: each block (did it change what the plan said, what each turn did, what happened
--- along the way) is a <details> with its question and a short summary that still says something folded. The page
--- tells the Spoon when one folds ("fold:turns:closed"); panel.message reads that strictly, and panel.fold draws the
+-- The card's foldable panels: each block (did it change what the plan said, what happened) is a <details> with
+-- its question and a short summary that still says something folded. The page tells the Spoon when one folds
+-- ("fold:story:closed"); panel.message reads that strictly, and panel.fold draws the
 -- folded ones closed when the card is drawn again. It knows no Hammerspoon.
 
 local panel = {}
 
 -- The panels a fold message may name.
-panel.IDS = { actual = true, turns = true, activity = true }
+panel.IDS = { actual = true, story = true }
 
 local function escape(text)
   return (text:gsub("[&<>\"']", { ["&"] = "&amp;", ["<"] = "&lt;", [">"] = "&gt;", ['"'] = "&quot;", ["'"] = "&#39;" }))
