@@ -284,6 +284,9 @@ function obj:click(key)
     self:readGit(key)
   else
     self:focus(key)
+    -- The gap to a second click counts from here: a click waiting while the terminal came forward is still the
+    -- second click of a double click.
+    if self.lastClick then self.lastClick.at = hs.timer.secondsSinceEpoch() end
   end
 end
 

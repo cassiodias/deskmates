@@ -70,8 +70,15 @@ function Iterm:select(tty)
     end tell
     return 0]], tty))
   if not ok or type(id) ~= "number" or id == 0 then return false end
-  local window = hs.window.get(id)
-  if window then window:focus() end
+  -- Only iTerm is asked about its windows: hs.window.get asks every app, Hammerspoon too, and once a card had been
+  -- shown that took 1.6 s a click.
+  local app = hs.application.get("com.googlecode.iterm2")
+  for _, window in ipairs(app and app:allWindows() or {}) do
+    if window:id() == id then
+      window:focus()
+      break
+    end
+  end
   return true
 end
 

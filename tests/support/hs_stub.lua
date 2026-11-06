@@ -149,7 +149,16 @@ hs = {
     get = function(bundle)
       if bundle == "com.googlecode.iterm2" and not stub.itermRunning then return nil end
       if stub.quitApps and stub.quitApps[bundle] then return nil end
-      return { allWindows = function() return {} end }
+      -- iTerm's own windows: one per window number named in stub.tabs, id 100 + number; focusing one records its id
+      -- in stub.raised.
+      local windows = {}
+      if bundle == "com.googlecode.iterm2" then
+        for number in (stub.tabs or ""):gmatch("=(%d+)/") do
+          local id = 100 + tonumber(number)
+          windows[#windows + 1] = { id = function() return id end, focus = function() stub.raised = id end }
+        end
+      end
+      return { allWindows = function() return windows end }
     end,
     launchOrFocusByBundleID = function(id) stub.focused = id end,
   },
@@ -160,12 +169,18 @@ hs = {
       stub.selectScript = script
       local tty = script:match('tty of s is "([^"]+)"')
       stub.selected = tty
+      -- How long iTerm takes to answer (stub.selectSeconds), on the stub's clock.
+      stub.clock = stub.clock + (stub.selectSeconds or 0)
       local window = stub.tabs:match(tty:gsub("%p", "%%%0") .. "=(%d+)/")
       return true, window and 100 + tonumber(window) or 0
     end,
   },
-  -- A window by id; focusing it records the id in stub.raised.
-  window = { get = function(id) return { focus = function() stub.raised = id end } end },
+  -- A window by id: counted in stub.windowGets, as it asks every app (Hammerspoon too) about its windows, which
+  -- took 1.6 s live once a card had been shown; focusing it records the id in stub.raised.
+  window = { get = function(id)
+    stub.windowGets = (stub.windowGets or 0) + 1
+    return { focus = function() stub.raised = id end }
+  end },
   styledtext = { new = function(text, style)
     stub.styled = { text = text, style = style }
     return text
@@ -222,7 +237,8 @@ function stub.advance(seconds)
     if next.repeats then next.due = next.due + next.seconds else next.stopped = true end
     next.fn()
   end
-  stub.clock = target
+  -- Time a timer spent (a slow AppleScript answer) is not given back.
+  stub.clock = math.max(stub.clock, target)
 end
 
 return stub

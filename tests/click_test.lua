@@ -17,6 +17,7 @@ local P = dofile(stub.spoonPath .. "init.lua")
 P.eventsFile = eventsFile
 P:start()
 stub.tabs = "/dev/ttys009=1/1;/dev/ttys001=2/1;"
+stub.itermRunning = true
 write("UserPromptSubmit|tab1||||/dev-skill|app|iTerm.app||/dev/ttys001|claude|")
 stub.advance(0.2)
 
@@ -51,6 +52,9 @@ release()
 stub.advance(0.2)
 check("a quick click selects its tab", stub.selected == "/dev/ttys001")
 check("one click raises the tab's own window, in a second iTerm window too", stub.raised == 102)
+-- Live (6 Nov): hs.window.get asks every app about its windows; once a card had been shown, asking Hammerspoon
+-- about its own took 1.6 s a click: the Mac stalled and the double click's second click came too late.
+check("one click asks only iTerm about its windows", (stub.windowGets or 0) == 0)
 -- Live (5 Nov): AppleScript's `w` is "window N", and selecting a tab reorders iTerm's windows, so `id of w` read
 -- after it named another window; and iTerm, once active, raised its own front window over ours.
 local script = stub.selectScript or ""
@@ -165,6 +169,18 @@ check("and the terminal taking the focus does not hide it", card.shown and P.pla
 card.content.callback({ body = "close" })
 stub.advance(0.2)
 check("Close still closes it", not card.shown and card.deleted)
+
+-- Live (6 Nov): when going to the terminal was slow, the second click waited behind it and was judged a second
+-- single click. The double click's gap is counted from when the first click was done.
+stub.selectSeconds = 1.6
+local slowViews = #stub.webviews
+doubleClick()
+stub.advance(0.2)
+stub.selectSeconds = nil
+check("a double click opens the card when the first click was slow", #stub.webviews > slowViews
+  and stub.webviews[#stub.webviews].shown)
+stub.webviews[#stub.webviews].content.callback({ body = "close" })
+stub.advance(0.2)
 
 doubleClick()
 stub.advance(0.2)
