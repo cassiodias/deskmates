@@ -130,10 +130,10 @@ end
 
 -- The whole page for `plan` (model/plans.lua's shape, or nil); meta.title names the session, meta.color is its
 -- puppet's. On top what changed (meta.work, workcard.html, or nil): the session's result, whatever the step
--- picked, scrolling in a third of the card when open. Then the header for meta.session (sessioncard.view, or nil),
+-- picked, scrolling in a third of the card when open (a fifth, giving way, with a plan). Then the header for meta.session (sessioncard.view, or nil),
 -- what the session is working on, with the step `step` keeps picked (sessioncard.pick: a step's start, "none", or
 -- nil for the default). Then the story (meta.story, story.html, or nil): it fills the card when no plan follows,
--- else it scrolls in 45% of it and the plan comes below. `folded` ({ [panel id] = true }, or nil): the panels
+-- else it scrolls in 30% of it, giving way, and the plan comes below with at least 120px. `folded` ({ [panel id] = true }, or nil): the panels
 -- drawn closed.
 function plancard.html(plan, meta, folded, step)
   local nonce = string.format("%08x%08x", math.random(0, 0x7fffffff), math.random(0, 0x7fffffff))
@@ -147,7 +147,7 @@ function plancard.html(plan, meta, folded, step)
   local title, summary, article, sections = split(plan.markdown)
 
   local body = {}
-  if meta.work then body[#body + 1] = '<div class="result">' .. meta.work .. "</div>" end
+  if meta.work then body[#body + 1] = '<div class="result' .. (hasPlan and " capped" or "") .. '">' .. meta.work .. "</div>" end
   if session then body[#body + 1] = "<header>" .. session .. "</header>" end
   if meta.story then
     body[#body + 1] = '<div class="panels' .. (hasPlan and " capped" or "") .. '">' .. meta.story .. "</div>"
@@ -193,7 +193,7 @@ function plancard.html(plan, meta, folded, step)
     "script-src 'nonce-", nonce, "'\">",
     "<style>",
     ":root { --accent: ", color, "; --faint: ", faint, "; color-scheme: light dark; }",
-    "body { margin: 0; font: 13px -apple-system, sans-serif; background: Canvas; color: CanvasText;",
+    "body { margin: 0; box-sizing: border-box; font: 13px -apple-system, sans-serif; background: Canvas; color: CanvasText;",
     " display: flex; flex-direction: column; height: 100vh; border-top: 4px solid var(--accent); }",
     ".label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; opacity: 0.55; margin-bottom: 4px; }",
     "header { padding: 10px 14px 8px; border-bottom: 1px solid var(--faint); }",
@@ -241,7 +241,10 @@ function plancard.html(plan, meta, folded, step)
     workcard.CSS,
     story.CSS,
     panel.CSS,
-    ".result { flex: none; max-height: 35vh; overflow: auto; padding: 10px 14px 0; }",
+    ".result { flex: none; max-height: 35vh; overflow: auto; padding: 10px 14px 0; border-bottom: 1px solid var(--faint);",
+    " padding-bottom: 8px; }",
+    -- With a plan below, what changed and the story give way to it, and the plan always shows some lines.
+    ".result.capped { flex: 0 1 auto; min-height: 44px; max-height: 22vh; } #plan { min-height: 120px; }",
     "footer { display: flex; gap: 8px; justify-content: flex-end; padding: 8px 14px; border-top: 1px solid var(--faint); }",
     "footer button { font: inherit; padding: 4px 12px; }",
     "#focus { background: var(--accent); color: white; border: 0; border-radius: 5px; }",
@@ -266,17 +269,20 @@ plancard.SCRIPT = "function send(m){window.webkit.messageHandlers.deskmates.post
   .. "var also=document.querySelector('select.also');if(also)also.onchange=function(){"
   .. "document.querySelectorAll('[data-key]').forEach(function(el){el.hidden=el.getAttribute('data-key')!==also.value});"
   .. "document.querySelectorAll('.ticket:not([hidden]) .strip').forEach(function(s){s.scrollLeft=s.scrollWidth});picked()};"
-  -- A step filters the story in place and marks the page (body.lane); a second click clears it. A row stays when
-  -- it happened during the step: from its start (data-from) up to the next step's (data-to, none for the last); a
-  -- step not reached yet (no data-from) leaves no row. A folded panel stays folded: folds are the reader's alone.
+  -- A step filters the story in place and marks the page (body.lane); a second click clears it. A line or a reply
+  -- stays when it happened during the step: from its start (data-from) up to the next step's (data-to, none for the
+  -- last). A turn stays while it overlaps the step: it started before the step's end and ended (data-end, empty
+  -- while it has no end) after its start, since a step mostly starts inside a turn. A step not reached yet (no
+  -- data-from) leaves no row. A folded panel stays folded: folds are the reader's alone.
   -- The panels stay where the reader left them: nothing is brought into view, and their scroll position is put
   -- back after the rows change. With a plan, a Plan step not reached yet clears it and takes the plan's article
   -- (what scrolls: the body never does) back to its top. The Spoon is told the step picked (its start, or none),
   -- to draw it picked again next time.
   .. "function only(b){document.body.classList.toggle('lane',!!b);"
   .. "var f=b&&b.getAttribute('data-from'),t=b&&b.getAttribute('data-to');"
-  .. "document.querySelectorAll('.storylist>li').forEach(function(li){var a=Number(li.getAttribute('data-at'));"
-  .. "li.classList.toggle('out',!!b&&(f===null||a<Number(f)||(t!==null&&a>=Number(t))))})}"
+  .. "document.querySelectorAll('.storylist>li').forEach(function(li){var a=Number(li.getAttribute('data-at')),"
+  .. "e=li.getAttribute('data-end'),s=e===null?a:e===''?Infinity:Number(e);"
+  .. "li.classList.toggle('out',!!b&&(f===null||s<Number(f)||(t!==null&&a>=Number(t))))})}"
   .. "function picked(){only(document.querySelector('.ticket:not([hidden]) button.phase.on'))}"
   .. "document.querySelectorAll('button.phase').forEach(function(b){b.onclick=function(){"
   .. "var p=b.getAttribute('data-phase'),f=b.getAttribute('data-from'),plan=document.getElementById('plan'),"

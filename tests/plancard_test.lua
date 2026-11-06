@@ -249,7 +249,8 @@ var strip=el(),panels=el(),article=el(),plan=el();plan.querySelector=function(){
 strip.querySelectorAll=function(){return steps};
 steps.forEach(function(s){s.classList.add('phase');s.parentNode=strip});
 steps[3].classList.add('on');
-var rows=[5,10,12,29,30,39,40,45,99].map(function(a){return el({'data-at':String(a)})});
+var rows=[5,10,12,29,30,39,40,45,99].map(function(a){return el({'data-at':String(a)})})
+  .concat([ ['25','35'], ['38',''], ['2','8'] ].map(function(p){return el({'data-at':p[0],'data-end':p[1]})}));
 var ids={focus:el(),close:el(),plan:plan};
 var document={body:el(),getElementById:function(i){return ids[i]||null},addEventListener:function(){},
   querySelector:function(q){return q==='.panels'?panels:q==='.ticket:not([hidden]) button.phase.on'
@@ -271,9 +272,12 @@ ids.plan=null;steps[0].onclick();log.push(kept(),document.body.classList.contain
 log.push(sent.join(' '));
 console.log(log.join('/'))]])
   check("script: node parses it", checked == "|0\n")
-  check("script: the step drawn picked filters at load; a step keeps the rows from its start to the next one's, "
-    .. "an ahead step none", out == "500/40,45,99/true/0/10,12,29/true/70/40,45,99/30,39/5,10,12,29,30,39,40,45,99/false/"
-    .. "5,10,12,29,30,39,40,45,99/0//true/step:10 step:40 step:30 step:none step:none step:none\n|0\n")
+  -- Review (6 Nov): a step mostly starts inside a turn (its subagent call): a turn stays while it overlaps the step
+  -- (its end, data-end, empty while it runs); a line or a reply stays when it happened during the step.
+  check("script: the step drawn picked filters at load; a step keeps the lines from its start to the next one's and "
+    .. "the turns that overlap it, an ahead step none", out == "500/40,45,99,38/true/0/10,12,29,25/true/70/40,45,99,38/"
+    .. "30,39,25,38/5,10,12,29,30,39,40,45,99,25,38,2/false/5,10,12,29,30,39,40,45,99,25,38,2/0//true/"
+    .. "step:10 step:40 step:30 step:none step:none step:none\n|0\n")
 end
 check("script: a fold tells the Spoon", has(plancard.SCRIPT, "details.panel")
   and has(plancard.SCRIPT, "send('fold:'+d.getAttribute('data-panel')+':'+(d.open?'open':'closed'))"))
@@ -298,16 +302,28 @@ local aAt, sAt, vAt, pAt = workAll:find('data-panel="actual"', 1, true), workAll
   workAll:find('data-panel="story"', 1, true), workAll:find(">PLAN<", 1, true)
 check("panels: what changed, the strip, the story, then the plan", aAt and sAt and vAt and pAt
   and aAt < sAt and sAt < vAt and vAt < pAt)
-check("what changed: in its own box above the header", has(workAll, '<div class="result"><details class="panel actual"')
-  and (workAll:find('<div class="result">', 1, true) or math.huge) < (workAll:find("<header>", 1, true) or 0))
+check("what changed: in its own box above the header", has(workAll, '<div class="result capped"><details class="panel actual"')
+  and (workAll:find('<div class="result', 1, true) or math.huge) < (workAll:find("<header>", 1, true) or 0)
+  and has(workOnly, '<div class="result"><details'))
 check("what changed: open, it scrolls in a third of the card", workAll:match("%.result {[^}]*max%-height: 35vh[^}]*overflow: auto") ~= nil)
-check("no work: no plan block", not has(both, 'data-panel="actual"') and not has(both, 'class="result"'))
+check("what changed: a line under its box", workAll:match("%.result {[^}]*border%-bottom: 1px solid var%(%-%-faint%)[^}]*padding%-bottom: 8px") ~= nil)
+check("no work: no plan block", not has(both, 'data-panel="actual"') and not has(both, 'class="result'))
+-- Review (6 Nov): with a plan, what changed (35vh), the story (45vh), the headers and the footer left the plan no
+-- room at 600×560 and pushed the footer out of the window. With a plan, both boxes are smaller and give way, and
+-- the plan always shows some lines.
+check("with a plan: what changed in 22vh, giving way", workAll:match("%.result%.capped {[^}]*max%-height: 22vh") ~= nil
+  and workAll:match("%.result%.capped {[^}]*flex: 0 1 auto") ~= nil)
+check("with a plan: the story in 30vh, giving way", workAll:match("%.panels%.capped {[^}]*max%-height: 30vh") ~= nil
+  and workAll:match("%.panels%.capped {[^}]*flex: 0 1 auto") ~= nil)
+-- The page's top border is inside its 100vh, so the footer ends at the window's bottom, not 4px under it.
+check("the page's border inside its height", workAll:match("body {[^}]*box%-sizing: border%-box[^}]*height: 100vh[^}]*border%-top: 4px") ~= nil)
+check("with a plan: the plan keeps 120px", workAll:match("#plan {[^}]*min%-height: 120px") ~= nil)
 -- Cassio (6 Nov): the panels scroll in 45% of the card only when a plan follows them; with no plan they take the
 -- card's full height, scrolling in it, the buttons always in view.
 check("panels, no plan: no cap", has(workOnly, '<div class="panels">') and has(only, '<div class="panels">'))
 check("panels and a plan: capped", has(workAll, '<div class="panels capped">'))
 check("panels css: fill the card, capped only before a plan", has(workAll, ".panels { flex: 1; min-height: 0; overflow: auto;")
-  and has(workAll, ".panels.capped { flex: none; max-height: 45vh; }"))
+  and not has(workAll, "45vh"))
 check("a fixed page, the footer always in view", has(workOnly, "<body>") and has(only, "<body>") and not has(workAll, "free"))
 
 -- Folded panels (PlanCard's set for the session shown) are drawn closed; the others open.

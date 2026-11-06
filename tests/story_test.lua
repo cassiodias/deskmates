@@ -99,6 +99,8 @@ check("html: one panel, its question and summary", has(html, '<details class="pa
   .. '<span class="chev">›</span><h2>What happened?</h2><span class="sum"><span data-key="ABC-12">4 turns · 1 commit</span></span>'))
 check("html: every row with its time for the filter", count(html, "<li ") == 8 and has(html, '<li data-at="' .. at(14, 57) .. '"')
   and has(html, '<li class="marker" data-at="' .. at(14, 56) .. '"'))
+check("html: a turn's start and end, for the step filter", has(html, '<li data-at="' .. at(14, 57) .. '" data-end="'
+  .. at(14, 57, 50) .. '">') and not has(html, '<li data-at="' .. at(13, 40) .. '" data-end'))
 check("html: a turn's reply first, then how long and tests", has(html, '<div class="turnbody"><div class="reply">Reviewed &lt;it&gt;.</div>'
   .. '<div class="turnhead"><span class="tests">tests passed (2 of 2)</span></div>'))
 check("html: a turn's length", has(html, '<div class="turnhead"><b>15 min</b></div>'))
@@ -123,7 +125,8 @@ local rv = story.view(nil, running, at(14, 6))
 check("running: shown, an open turn left before it with nothing is not", rv and #rv.tickets[1].rows == 1
   and rv.tickets[1].rows[1].head == "Working now" and rv.tickets[1].rows[1].dot == "running")
 local rh = story.html(rv)
-check("running: drawn with its ring", has(rh, '<span class="pip running"></span>') and has(rh, "<b>Working now</b>"))
+check("running: drawn with its ring, no end yet", has(rh, '<span class="pip running"></span>') and has(rh, "<b>Working now</b>")
+  and has(rh, '<li data-at="' .. at(14, 5) .. '" data-end="">'))
 check("git only: one list, no ticket key", not has(rh, "data-key") and has(rh, "1 turn"))
 local leftOpen = workcard.view({ tickets = {}, timeline = {}, seen = {}, git = facts.git,
   turns = { { at = at(13, 0), files = { "a.js" }, tests = NONE, commits = {} } } }, { reading = true }, nil, false)

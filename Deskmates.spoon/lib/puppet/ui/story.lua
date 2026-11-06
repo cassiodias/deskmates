@@ -145,7 +145,9 @@ local function turnHtml(t)
   for _, c in ipairs(t.commits or {}) do
     body[#body + 1] = '<div class="commit"><code>' .. escape(c.hash) .. "</code> " .. escape(c.subject) .. "</div>"
   end
-  return '<li data-at="' .. string.format("%d", t.at) .. '"><span class="at">' .. escape(t.time or "")
+  -- A turn's end (empty while it has none) lets a step keep the turn it started in; a reply alone has none.
+  local ends = t.kind == "turn" and ' data-end="' .. (t.endAt and string.format("%d", t.endAt) or "") .. '"' or ""
+  return '<li data-at="' .. string.format("%d", t.at) .. '"' .. ends .. '><span class="at">' .. escape(t.time or "")
     .. '</span><span class="rail"><span class="pip ' .. (t.dot or "none") .. '"></span></span><div class="turnbody">'
     .. table.concat(body) .. "</div></li>"
 end

@@ -46,7 +46,9 @@ end
 
 panel.CSS = table.concat({
   ".panels { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 10px;",
-  " padding: 10px 14px; } .panels.capped { flex: none; max-height: 45vh; }",
+  " padding: 10px 14px; }",
+  -- With a plan below, the panels give way to it (flex-shrink), at most 30% of the card.
+  ".panels.capped { flex: 0 1 auto; min-height: 44px; max-height: 30vh; }",
   ".panel { border: 1px solid var(--faint); border-radius: 10px; padding: 0 12px; flex: none; }",
   ".panel > summary { list-style: none; cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline;",
   " gap: 4px 8px; padding: 10px 0; }",
