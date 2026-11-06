@@ -35,32 +35,49 @@ local function label(e)
   return e.phase or ""
 end
 
-local function ticketView(key, t, timeline, now, isWorking)
-  local v = { key = key ~= "-" and key or nil, strip = {}, rows = {} }
-  if t.jira then v.jira = { status = t.jira.status, time = clock(t.jira.at) } end
-  for _, p in ipairs(PHASES) do
-    local entered = t.phases and t.phases[p]
-    local step = { phase = p, time = clock(entered) }
-    local ended = t.ends and t.ends[p]
-    if ended then
-      -- The lane finished: ✓, its span, and the verdict the agent wrote, if any.
-      step.state, step.ended, step.verdict = "done", clock(ended.at), ended.verdict
-    elseif p == t.phase then
+-- What the strip says under it once a ticket has steps: where they come from.
+sessioncard.SOURCE = "Steps come from the names of the agent's skills and subagents: plan is Plan; build, implement "
+  .. "or dev is Dev; review, test or QA is Review."
+
+-- The strip: ticket `t`'s passes in the order they happened, each { phase, time, ended, state, took, verdict, by,
+-- from, to } (from and to: its start and the next one's, what the page filters by). A pass with an end is done; the
+-- last one still open, in the ticket's phase, is current; any other is reached, up to the next start. Plan comes
+-- first, ahead, when the steps do not start with it; with no steps, the three phases are ahead.
+local function strip(t, now, isWorking)
+  local passes, out = t.passes or {}, {}
+  for i, p in ipairs(passes) do
+    local nextAt = passes[i + 1] and passes[i + 1].at
+    local step = { phase = p.phase, time = clock(p.at), by = p.by, verdict = p.verdict, from = p.at, to = nextAt }
+    if p.endAt then
+      -- The step finished: ✓, its span, and the verdict the agent wrote, if any.
+      step.state, step.ended = "done", clock(p.endAt)
+    elseif i == #passes and p.phase == t.phase then
+      -- Counted from its start; once the agent's turn is over, it ends at the last thing that happened.
       step.state = "current"
-      -- Counted from the time shown; once the agent's turn is over, it ends at the last thing that happened.
-      local from = entered or t.phaseAt
-      if from and isWorking then step.took = took(now - from)
-      elseif from and t.seen and t.seen > from then step.ended = clock(t.seen) end
+      if isWorking then step.took = took(now - p.at)
+      elseif t.seen and t.seen > p.at then step.ended = clock(t.seen) end
     else
-      step.state = entered and "reached" or "ahead"
+      step.state, step.ended = "reached", clock(nextAt)
     end
-    v.strip[#v.strip + 1] = step
+    out[#out + 1] = step
   end
+  if #out == 0 then
+    for _, p in ipairs(PHASES) do out[#out + 1] = { phase = p, state = "ahead" } end
+  elseif out[1].phase ~= "plan" then
+    table.insert(out, 1, { phase = "plan", state = "ahead" })
+  end
+  return out
+end
+
+local function ticketView(key, t, timeline, now, isWorking)
+  local v = { key = key ~= "-" and key or nil, strip = strip(t, now, isWorking), rows = {} }
+  if t.jira then v.jira = { status = t.jira.status, time = clock(t.jira.at) } end
+  if t.passes and #t.passes > 0 then v.source = sessioncard.SOURCE end
   for _, e in ipairs(timeline) do
     if e.ticket == key then
       if e.kind == "reply" and not v.now then v.now = e.text end
-      v.rows[#v.rows + 1] = { time = clock(e.at), label = label(e), text = e.kind == "phase" and "started" or e.text,
-        phase = e.phase }
+      v.rows[#v.rows + 1] = { at = e.at, time = clock(e.at), label = label(e),
+        text = e.kind == "phase" and "started" or e.text, phase = e.phase }
     end
   end
   v.summary = #v.rows == 0 and "Nothing yet" or #v.rows .. " line" .. (#v.rows == 1 and "" or "s")
@@ -90,7 +107,8 @@ local function hidden(i) return i > 1 and " hidden" or "" end
 
 -- The page's two parts for view `v`: the header (each ticket's key, badge, strip and NOW, and the Also choice)
 -- and the activity panel, "What happened along the way?" (each ticket's rows and summary). Every ticket is there,
--- all but the first hidden; the page's script switches them (data-key) and filters rows by phase (data-phase).
+-- all but the first hidden; the page's script switches them (data-key) and filters rows by a step's span (each
+-- step's data-from and data-to against each row's data-at).
 function sessioncard.html(v)
   local head, rows, sums = { '<section class="session">' }, { '<section class="timelines">' }, {}
   if #v.tickets > 1 then
@@ -110,19 +128,24 @@ function sessioncard.html(v)
         .. (t.jira and '<span class="jira">' .. escape(t.jira.status)
           .. (t.jira.time and " <small>" .. t.jira.time .. "</small>" or "") .. "</span>" or "") .. "</div>"
     end
-    local strip = {}
+    local steps = {}
     for _, s in ipairs(t.strip) do
-      strip[#strip + 1] = '<button class="phase ' .. s.state .. '" data-phase="' .. s.phase .. '"><span class="dot"></span>'
+      steps[#steps + 1] = '<button class="phase ' .. s.state .. '" data-phase="' .. s.phase .. '"'
+        .. (s.from and ' data-from="' .. string.format("%d", s.from) .. '"' or "")
+        .. (s.to and ' data-to="' .. string.format("%d", s.to) .. '"' or "")
+        .. (s.by and ' title="' .. escape(s.by) .. '"' or "") .. '><span class="dot"></span>'
         .. NAMES[s.phase] .. "<small>" .. (s.time or "") .. (s.took and " · " .. escape(s.took) or "")
         .. (s.ended and " → " .. s.ended or "") .. (s.state == "done" and " ✓" or "") .. "</small>"
+        .. (s.by and '<span class="by">' .. escape(s.by) .. "</span>" or "")
         .. (s.verdict and '<span class="verdict">' .. escape(s.verdict) .. "</span>" or "") .. "</button>"
     end
-    head[#head + 1] = '<div class="strip">' .. table.concat(strip) .. "</div>"
+    head[#head + 1] = '<div class="strip">' .. table.concat(steps) .. "</div>"
+    if t.source then head[#head + 1] = '<p class="source">' .. escape(t.source) .. "</p>" end
     if t.now then head[#head + 1] = '<p class="now"><span class="label">NOW</span> ' .. escape(t.now) .. "</p>" end
     head[#head + 1] = "</div>"
     local items = {}
     for _, r in ipairs(t.rows) do
-      items[#items + 1] = '<li data-phase="' .. (r.phase or "") .. '"><span class="time">' .. (r.time or "")
+      items[#items + 1] = '<li data-at="' .. string.format("%d", r.at) .. '"><span class="time">' .. (r.time or "")
         .. '</span><span class="what">' .. escape(r.label) .. '</span><span class="text">' .. escape(r.text) .. "</span></li>"
     end
     sums[#sums + 1] = '<span data-key="' .. key .. '"' .. hidden(i) .. ">" .. escape(t.summary) .. "</span>"
@@ -141,10 +164,14 @@ sessioncard.CSS = table.concat({
   ".jira { font-size: 11px; font-weight: 600; border-radius: 4px; padding: 1px 6px; color: var(--accent);",
   " background: color-mix(in srgb, var(--accent) 15%, transparent); } .jira small { opacity: 0.7; }",
   ".also-row { float: right; display: flex; gap: 6px; align-items: center; } .also { font: inherit; }",
-  ".strip { display: flex; gap: 4px; margin: 8px 0 4px; }",
-  ".phase { flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; background: none;",
-  " border: 0; border-top: 2px solid var(--faint); padding: 6px 4px 2px; color: inherit; font: inherit; cursor: pointer; }",
+  ".strip { display: flex; gap: 4px; margin: 8px 0 4px; overflow-x: auto; }",
+  ".phase { flex: 1 0 104px; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;",
+  " background: none; border: 0; border-top: 2px solid var(--faint); padding: 6px 4px 2px; color: inherit; font: inherit;",
+  " cursor: pointer; text-align: left; }",
+  ".phase > * { max-width: 100%; white-space: nowrap; }",
   ".phase small { font-size: 10px; opacity: 0.6; min-height: 1em; }",
+  ".phase .by { font-size: 10px; font-weight: 400; opacity: 0.6; overflow: hidden; text-overflow: ellipsis; }",
+  ".source { margin: 2px 0 0; font-size: 10px; opacity: 0.6; }",
   ".phase .dot { width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--faint); margin-top: -12px; background: Canvas; }",
   ".phase.reached { border-top-color: var(--accent); } .phase.reached .dot { background: var(--accent); border-color: var(--accent); }",
   ".phase.current { border-top-color: var(--accent); font-weight: 600; }",
