@@ -163,7 +163,7 @@ facts_run_git() {
   GIT_OPTIONAL_LOCKS=0 "$_facts_bin" "$@" 2>/dev/null
 }
 
-# Sets git to the git to run, when git facts may be written now: Deskmates runs, jq and git are there.
+# Sets _facts_git to the git to run, when git facts may be written now: Deskmates runs, jq and git are there.
 facts_git_ready() {
   deskmates_on && [ -n "$PUPPET_JQ" ] && deskmates_git > /dev/null || return 1
   _facts_git=$DESKMATES_GIT
