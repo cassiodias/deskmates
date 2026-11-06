@@ -71,6 +71,43 @@ local ends = ended and ended.tickets["ABC-12"].ends
 check("load: a lane's end", ends and ends.dev.at == 2 and ends.dev.outcome == "Applied." and ends.dev.verdict == nil)
 check("load: its verdict", ends and ends.review.verdict == "CHANGES_REQUESTED")
 check("load: an end without a time, or of no lane, dropped", ends and ends.plan == nil and ends.qa == nil)
+-- passes: the steps in the order they happened, read with every field checked; junk dropped alone.
+local stepped = facts.load(file("passes.json", [[{"current": "ABC-12", "tickets": {"ABC-12": {"phase": "dev", "seen": 9,
+  "phases": {"dev": 1, "review": 3}, "ends": {"review": {"at": 2}},
+  "passes": [ {"phase": "dev", "at": 5, "by": "Implement ABC-12 fixes"},
+              {"phase": "dev", "at": 1, "endAt": 3, "by": "my-developer"},
+              {"phase": "review", "at": 3, "endAt": 5, "verdict": "CHANGES_REQUESTED", "by": "QA ABC-12 review"},
+              {"phase": "qa", "at": 2}, {"phase": "dev"}, {"phase": "dev", "at": "4"}, 7, "x",
+              {"phase": "review", "at": 6, "endAt": "later", "by": 3, "verdict": false} ]}}, "timeline": []}]]))
+local ps = stepped and stepped.tickets["ABC-12"].passes
+check("passes: sorted by start, junk dropped alone", ps and #ps == 4 and ps[1].at == 1 and ps[2].at == 3
+  and ps[3].at == 5 and ps[4].at == 6)
+check("passes: their fields", ps and ps[1].phase == "dev" and ps[1].endAt == 3 and ps[1].by == "my-developer"
+  and ps[2].phase == "review" and ps[2].verdict == "CHANGES_REQUESTED" and ps[3].endAt == nil
+  and ps[3].by == "Implement ABC-12 fixes")
+check("passes: bad optional fields dropped, the pass kept", ps and ps[4].phase == "review" and ps[4].endAt == nil
+  and ps[4].by == nil and ps[4].verdict == nil)
+-- Facts written before passes (or passes all junk): one pass per lane started, by its start; its end and verdict
+-- from the lane's end when that is not before the start.
+local old = facts.load(file("oldfacts.json", [[{"current": "ABC-12", "tickets": {"ABC-12": {"phase": "review", "seen": 9,
+  "phases": {"plan": 1, "dev": 4, "review": 2},
+  "ends": {"plan": {"at": 2, "outcome": "Plan approved"}, "review": {"at": 3, "outcome": "Two findings.", "verdict": "CHANGES_REQUESTED"},
+           "dev": {"at": 5}},
+  "passes": [7]}}, "timeline": []}]]))
+local ops = old and old.tickets["ABC-12"].passes
+check("passes from old facts: one per lane started, by its start", ops and #ops == 3 and ops[1].phase == "plan"
+  and ops[2].phase == "review" and ops[3].phase == "dev" and ops[1].at == 1 and ops[2].at == 2 and ops[3].at == 4)
+check("passes from old facts: ends and verdicts from the lanes' ends", ops and ops[1].endAt == 2 and ops[2].endAt == 3
+  and ops[2].verdict == "CHANGES_REQUESTED" and ops[3].endAt == 5 and ops[1].verdict == nil)
+check("passes from old facts: no by", ops and ops[1].by == nil and ops[2].by == nil)
+local early = facts.load(file("early.json", [[{"tickets": {"ABC-12": {"phase": "dev", "phases": {"dev": 5},
+  "ends": {"dev": {"at": 4, "verdict": "DONE"}}}}, "timeline": []}]]))
+local eps = early and early.tickets["ABC-12"].passes
+check("passes from old facts: an end before the start is not its end", eps and #eps == 1 and eps[1].endAt == nil
+  and eps[1].verdict == nil)
+local none = facts.load(file("nopass.json", [[{"tickets": {"ABC-12": {"seen": 1, "ends": {"dev": {"at": 4}}}}, "timeline": []}]]))
+check("passes: none for a ticket with no lane started", none and #none.tickets["ABC-12"].passes == 0)
+
 -- git, seen and turns: the session's edits as the hooks record them.
 local full = facts.load(file("git.json", [[{
   "git": { "root": "/work/my-app", "base": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678", "dirtyAtStart": ["src/a.js", "docs/ção.md"],

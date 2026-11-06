@@ -1,11 +1,13 @@
 -- A session's facts, as the hooks write them (hook/facts-lib.sh): one file per session,
---   { "current": "ABC-12", "tickets": { "ABC-12": { "phase", "phaseAt", "phases", "ends", "jira", "seen" } },
+--   { "current": "ABC-12", "tickets": { "ABC-12": { "phase", "phaseAt", "phases", "ends", "jira", "seen",
+--                                                   "passes": [ { "phase", "at", "endAt", "by", "verdict" } ] } },
 --     "timeline": [ { "at", "ticket", "kind", "text", "phase" } ], "updatedAt": …,
 --     "git": { "root", "base", "prefix", "dirtyAtStart": [ path ] }, "seen": { path: true },
 --     "turns": [ { "at", "endAt", "files": [ path ], "tests": { "ran", "passed", "failed" },
 --                  "commits": [ { "hash", "subject" } ] } ] }
 -- read here with every field checked: a bad field, ticket or entry is dropped on its own; a file that is not
--- facts is nil. It knows no agent, and no Hammerspoon.
+-- facts is nil. A ticket's passes (its steps, oldest first) come from its lanes' starts and ends when the file
+-- has none (written before passes were kept). It knows no agent, and no Hammerspoon.
 
 local plans = require("puppet.model.plans")
 
@@ -39,6 +41,40 @@ end
 -- The facts file of a session in folder `dir`; nil for an id that could name a path outside it.
 facts.path = plans.path
 
+-- The steps in the order they happened, checked: each pass with a phase and a start, its end, what started it
+-- and its verdict when they are right; junk dropped alone. Sorted by start.
+local function passes(list)
+  local out = {}
+  for _, p in ipairs(type(list) == "table" and list or {}) do
+    if type(p) == "table" and IS_PHASE[p.phase] and num(p.at) then
+      out[#out + 1] = { phase = p.phase, at = p.at, endAt = num(p.endAt), by = str(p.by), verdict = str(p.verdict),
+        n = #out }
+    end
+  end
+  -- Passes that start in the same second keep the order they were written in.
+  table.sort(out, function(a, b) if a.at ~= b.at then return a.at < b.at end return a.n < b.n end)
+  for _, p in ipairs(out) do p.n = nil end
+  return out
+end
+
+-- The steps of facts written before passes, from ticket `t`'s lanes (checked): one per lane started, by its
+-- start; its end and verdict from the lane's end when that is not before the start.
+local function derivedPasses(t)
+  local out = {}
+  for _, p in ipairs(PHASES) do
+    local at = t.phases[p]
+    if at then
+      local e = t.ends and t.ends[p]
+      local ended = e and e.at >= at
+      out[#out + 1] = { phase = p, at = at, endAt = ended and e.at or nil, verdict = ended and e.verdict or nil,
+        n = #out }
+    end
+  end
+  table.sort(out, function(a, b) if a.at ~= b.at then return a.at < b.at end return a.n < b.n end)
+  for _, p in ipairs(out) do p.n = nil end
+  return out
+end
+
 local function ticket(t)
   if type(t) ~= "table" then return nil end
   local out = { phase = IS_PHASE[t.phase] and t.phase or nil, phaseAt = num(t.phaseAt), seen = num(t.seen) or 0,
@@ -58,6 +94,8 @@ local function ticket(t)
   if type(t.jira) == "table" and str(t.jira.status) then
     out.jira = { status = t.jira.status, at = num(t.jira.at) }
   end
+  out.passes = passes(t.passes)
+  if #out.passes == 0 then out.passes = derivedPasses(out) end
   return out
 end
 
