@@ -185,6 +185,11 @@ local evilView = sessioncard.view({ current = "ABC-1", tickets = { ["ABC-1"] = {
 local evilPage = plancard.html(nil, { title = "x", session = evilView })
 check("session: escaped on the page", count(evilPage, "<script") == 1 and has(evilPage, "default-src 'none'"))
 check("script: Also switches tickets", has(plancard.SCRIPT, "select.also") and has(plancard.SCRIPT, "data-key"))
+-- Live (6 Nov): Review, Dev, then Review again moved the page: each phase click brought the activity panel into view.
+-- A phase click now filters in place: the panels stay where the reader left them.
+local phaseClick = plancard.SCRIPT:match("button%.phase'%)%.forEach%(function%(b%){b%.onclick=function%(%)(.-)}}%);") or ""
+check("script: a phase click scrolls nothing", phaseClick ~= "" and not has(phaseClick, "scrollIntoView"))
+check("script: a phase click keeps the panels' scroll position", has(phaseClick, "panels.scrollTop=top"))
 check("script: a phase click filters the activity and opens it, or goes to the plan", has(plancard.SCRIPT, "button.phase")
   and has(plancard.SCRIPT, "data-phase") and has(plancard.SCRIPT, "getElementById('plan')")
   and has(plancard.SCRIPT, "[data-panel=activity]") and has(plancard.SCRIPT, "act.open=true"))

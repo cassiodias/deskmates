@@ -260,16 +260,19 @@ plancard.SCRIPT = "function send(m){window.webkit.messageHandlers.deskmates.post
   -- Also: show the ticket chosen (its header and its timeline), hide the others.
   .. "var also=document.querySelector('select.also');if(also)also.onchange=function(){"
   .. "document.querySelectorAll('[data-key]').forEach(function(el){el.hidden=el.getAttribute('data-key')!==also.value})};"
-  -- A phase filters the activity (opened, and brought into view); a second click clears it. With a plan, Plan
-  -- clears it and takes the plan's article (what scrolls: the body never does) back to its top.
+  -- A phase filters the activity (opened) in place; a second click clears it. The panels stay where the reader
+  -- left them: nothing is brought into view, and their scroll position is put back after the rows change. With a
+  -- plan, Plan clears it and takes the plan's article (what scrolls: the body never does) back to its top.
   .. "function only(p){document.querySelectorAll('.timeline li').forEach(function(li){"
   .. "li.classList.toggle('out',p!==''&&li.getAttribute('data-phase')!==p)})}"
   .. "document.querySelectorAll('button.phase').forEach(function(b){b.onclick=function(){"
   .. "var p=b.getAttribute('data-phase'),plan=document.getElementById('plan'),"
-  .. "act=document.querySelector('[data-panel=activity]'),on=b.classList.contains('on');"
+  .. "act=document.querySelector('[data-panel=activity]'),on=b.classList.contains('on'),"
+  .. "panels=document.querySelector('.panels'),top=panels?panels.scrollTop:0;"
   .. "document.querySelectorAll('button.phase').forEach(function(x){x.classList.remove('on')});only('');"
   .. "if(plan&&p==='plan'){var art=plan.querySelector('article');if(art)art.scrollTop=0;return}"
-  .. "if(on)return;b.classList.add('on');only(p);if(act){act.open=true;act.scrollIntoView({block:'nearest'})}}});"
+  .. "if(!on){b.classList.add('on');only(p);if(act)act.open=true}"
+  .. "if(panels)panels.scrollTop=top}});"
   -- A panel folded or opened: the Spoon keeps it so for the next drawing of this session's card. A panel drawn
   -- open fires toggle on load too: only a change from the state drawn is told, so a redraw sends nothing.
   .. "document.querySelectorAll('details.panel').forEach(function(d){var was=d.open;d.addEventListener('toggle',"
