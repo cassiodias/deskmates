@@ -299,6 +299,18 @@ check("moved: its stop under s2 closes it in s1", moved.all.s1.agents.bg1.done =
 check("moved: s1 rests", Sessions.sceneFor(moved.all.s1, mapping) == "rest")
 check("moved: s1 says what it did", said[1] and said[1].key == "s1")
 check("moved: s2 has no stray subagent", next(moved.all.s2.agents) == nil and moved.all.s2.isWorking == true)
+-- Final review: the moved subagent's tools play on the puppet that started it, and leave s2's bubble alone.
+local tapped = Sessions.new(100)
+local function tap(name, fields) return tapped:apply(event(name, fields), { mapping = mapping, harness = fake, frame = 1, now = 100 }) end
+tap("UserPromptSubmit", { text = "/build" })
+tap("SubagentStart", { agentId = "bg4", agentType = "general-purpose" })
+tap("Stop", { text = "Started it." })
+tap("UserPromptSubmit", { session = "s2", text = "/build" })
+tap("Stop", { session = "s2", text = "Answered." })
+local before = tapped.all.s1.score
+local bubbles = tap("PreToolUse", { session = "s2", agentId = "bg4", tool = "edit" })
+check("moved: its tools tap on s1's puppet", tapped.all.s1.score == before + 1 and tapped.all.s2.score == 0)
+check("moved: s2's done bubble stays", #bubbles == 0 or bubbles[1].key ~= "s2")
 check("moved: an unknown agent's stop is ignored", #under("SubagentStop", { session = "s2", agentId = "nobody" }) == 0
   and moved.all.s1.agents.nobody == nil and moved.all.s2.agents.nobody == nil)
 under("SubagentStart", { agentId = "bg2", agentType = "general-purpose" })
@@ -312,7 +324,7 @@ via("SubagentStart", { agentId = "bg3", agentType = "general-purpose" })
 via("PreToolUse", { session = "s3", agentId = "bg3", tool = "edit" })
 local onStage = false
 for _, key in ipairs(seen:stageKeys(100)) do onStage = onStage or key == "s3" end
-check("moved: a session seen only through a subagent gets no puppet", seen.all.s3.hasPlayed ~= true and not onStage
+check("moved: a session seen only through a subagent gets no puppet", (seen.all.s3 == nil or seen.all.s3.hasPlayed ~= true) and not onStage
   and seen.all.s1.agents.bg3.hits == 1)
 
 

@@ -32,6 +32,9 @@ local function ownerOf(all, sid, agentId)
   return nil
 end
 
+-- The events of a subagent that go to the session that started it.
+local ROUTED = { PreToolUse = true, PostToolUse = true, PostToolUseFailure = true, SubagentStop = true }
+
 local function isAtRest(s)
   return not s.isWorking and s.mood == nil and liveAgents(s) == 0
 end
@@ -146,6 +149,9 @@ end
 function Sessions:apply(e, ctx)
   local intents = {}
   local sid, harness, mapping = e.session, ctx.harness, ctx.mapping
+  -- A subagent's tools and its stop belong to the session that started it, whichever id they come under: its
+  -- puppet taps while the subagent works and rests when it stops; the session they came under is left alone.
+  if ROUTED[e.name] then sid = ownerOf(self.all, sid, e.agentId) or sid end
   local at = e.at or ctx.now
   if ctx.replayFrom and at < ctx.replayFrom then return intents end
   if e.name == "SessionEnd" then
@@ -197,8 +203,7 @@ function Sessions:apply(e, ctx)
   elseif e.name == "PreToolUse" then
     s.tools = s.tools + 1
     if e.tool ~= "" then s.lastTool = e.tool end
-    local owner = ownerOf(self.all, sid, e.agentId)
-    if owner then self.all[owner].agents[e.agentId].hits = self.all[owner].agents[e.agentId].hits + 1 end
+    if e.agentId ~= "" and s.agents[e.agentId] then s.agents[e.agentId].hits = s.agents[e.agentId].hits + 1 end
     -- Starting a subagent names its job; the subagent it starts takes the name, in the order they were called.
     if kind == "agent" and e.agentId == "" and e.text ~= "" then s.queued[#s.queued + 1] = e.text end
     -- The agent calling a listed skill starts the show mid-turn, as typing its /command does.
@@ -236,10 +241,9 @@ function Sessions:apply(e, ctx)
     local label = e.text ~= "" and e.text or queued or (e.agentType ~= "" and e.agentType or "agent")
     s.agents[e.agentId] = { label = label, hits = 0, done = false }
     s.order[#s.order + 1] = e.agentId
-  elseif e.name == "SubagentStop" and ownerOf(self.all, sid, e.agentId) then
-    local owner = ownerOf(self.all, sid, e.agentId)
-    self.all[owner].agents[e.agentId].done = true
-    finish(intents, owner, self.all[owner])
+  elseif e.name == "SubagentStop" and s.agents[e.agentId] then
+    s.agents[e.agentId].done = true
+    finish(intents, sid, s)
   elseif e.name == "Notification" then
     local isShown = s.mood == "permission" or s.mood == "asking"
     if s.isListed and not isShown then say(e.text ~= "" and e.text or (harness.name .. " needs you")) end
