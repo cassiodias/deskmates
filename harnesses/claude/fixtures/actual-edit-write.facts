@@ -1,0 +1,30 @@
+{
+  "git": {
+    "base": "@BASE@",
+    "dirtyAtStart": [],
+    "folder": "@REPO@",
+    "prefix": "",
+    "root": "@REPO@",
+    "top": null
+  },
+  "seen": {
+    "src/new.js": true
+  },
+  "tickets": {},
+  "timeline": [],
+  "turns": [
+    {
+      "at": 0,
+      "commits": [],
+      "files": [
+        "src/new.js"
+      ],
+      "head": "@BASE@",
+      "tests": {
+        "failed": 0,
+        "passed": 0,
+        "ran": 0
+      }
+    }
+  ]
+}
