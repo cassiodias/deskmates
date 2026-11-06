@@ -155,6 +155,26 @@ check("load: seen and turns not tables give none", (function()
 end)())
 check("load: no tickets and no git is not facts", facts.load(file("g3.json", '{"seen": {"a.js": true}}')) == nil)
 
+-- The hook <-> Spoon seam: the facts the Claude Code hook really writes (its fixtures, as tests/harnesses.sh pins
+-- them), with @REPO@ and @BASE@ filled in, read back.
+local SHA = "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+local function fixture(name)
+  local h = assert(io.open(root .. "/harnesses/claude/fixtures/" .. name .. ".facts"))
+  local text = h:read("a"):gsub("@REPO@", "/work/my-app"):gsub("@BASE@", SHA)
+  h:close()
+  return facts.load(file(name .. ".json", text))
+end
+local stop, edit = fixture("actual-stop"), fixture("actual-edit")
+check("fixture stop: has git, its root, base and prefix", facts.hasGit(stop) and stop.git.root == "/work/my-app"
+  and stop.git.base == SHA and stop.git.prefix == "" and next(stop.git.dirtyAtStart) == nil)
+check("fixture stop: one ended turn, nothing in it", stop and #stop.turns == 1 and stop.turns[1].at == 0
+  and stop.turns[1].endAt == 0 and #stop.turns[1].files == 0 and #stop.turns[1].commits == 0
+  and stop.turns[1].tests.ran == 0 and next(stop.seen) == nil)
+check("fixture edit: has git", facts.hasGit(edit) and edit.git.base == SHA)
+check("fixture edit: the open turn holds the edited path, seen too", edit and #edit.turns == 1
+  and edit.turns[1].endAt == nil and #edit.turns[1].files == 1 and edit.turns[1].files[1] == "src/app.js"
+  and edit.seen["src/app.js"] == true)
+
 check("path: a session's file", facts.path(dir, "s1") == dir .. "/s1.json")
 check("path: refuses a path out", facts.path(dir, "../x") == nil and facts.path(dir, "..") == nil)
 
