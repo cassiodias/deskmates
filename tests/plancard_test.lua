@@ -193,5 +193,12 @@ local workAll = plancard.html({ steps = STEPS, markdown = "# Add a flag\n\n## Fi
 local wAt, sAt, pAt = workAll:find(WORK, 1, true), workAll:find('class="strip"', 1, true), workAll:find(">PLAN<", 1, true)
 check("work: under the session's strip, before the plan", wAt and sAt and pAt and sAt < wAt and wAt < pAt)
 check("no work: no work block", not has(both, 'class="work"'))
+-- Cassio (6 Nov): the git blocks scroll in 45% of the card only when a plan follows them; with no plan they take
+-- the card's full height and the page scrolls as usual.
+check("work, no plan: no cap, the page scrolls", has(workOnly, '<div class="work">') and has(workOnly, '<body class="free">'))
+check("work and a plan: capped", has(workAll, '<div class="work capped">') and has(workAll, "<body>")
+  and not has(workAll, 'class="free"'))
+check("work css: the cap only on .capped", has(workAll, ".work.capped { max-height: 45vh; overflow: auto; }")
+  and not has(workAll, ".work { max-height") and has(workAll, "body.free { height: auto; min-height: 100vh; }"))
 
 check.done("plan card")
