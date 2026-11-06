@@ -58,13 +58,16 @@ check("plan: unplanned, the one no hook named marked", r[4] and r[4].mark == "�
   and r[4].left.say == "not in the plan" and r[4].left.tone == "off"
   and r[4].right.path == "scratch.sh" and r[4].right.tint == "off" and r[4].right.unseen
   and r[5].right.path == "src/new.js" and not r[5].right.unseen)
-check("plan: the summary", a and a.summary == "1 of 3 planned changed · 2 not in the plan")
+check("plan: the summary", a and a.summary == "1 of 2 planned changed · 1 not checked · 2 not in the plan")
 check("reading and errors: the line is the summary", workcard.view(factsWith(), { reading = true }, PLAN, false).actual.summary
   == "Reading git…" and workcard.view(factsWith(), { error = "git did not answer" }, nil, false).actual.summary == "git did not answer")
 local nothing = workcard.view(factsWith(), { commits = "0", diff = "", uncommitted = "", untracked = "" }, nil, false)
 check("nothing changed: the summary says so", nothing and nothing.actual.summary == "Nothing changed")
 local allIn = workcard.view(factsWith(), { commits = "1", diff = "M\0src/app.js\0", uncommitted = "", untracked = "" },
   { steps = {}, markdown = "# x\n\n## Files\n\n- `src/app.js` — a\n" }, false)
+local someMissing = workcard.view(factsWith(), { commits = "1", diff = "M\0src/app.js\0", uncommitted = "", untracked = "" },
+  { steps = {}, markdown = "# x\n\n## Files\n\n- `src/app.js` — a\n- `src/gone.js` — b\n" }, false)
+check("plan, none unchecked: no not-checked part", someMissing and someMissing.actual.summary == "1 of 2 planned changed")
 check("plan, all changed, none unplanned: no unplanned part", allIn and allIn.actual.summary == "1 of 1 planned changed")
 check("plan: dirty at start and never named, left out", a and not has(workcard.html(v), "old.txt"))
 
@@ -89,7 +92,7 @@ check("in a subfolder: the plan's src/app.js is git's packages/web/src/app.js", 
 local MARK = '<td class="mark"><span aria-hidden="true">%s</span><span class="vh">%s</span></td>'
 local html = workcard.html(v)
 check("html: a panel, its question and summary, then what it shows", has(html, '<details class="panel actual" data-panel="actual" open><summary><span class="chev">›</span><h2>Did it change what the plan said?</h2>'
-  .. '<span class="sum">1 of 3 planned changed · 2 not in the plan</span></summary><div class="panel-body">'
+  .. '<span class="sum">1 of 2 planned changed · 1 not checked · 2 not in the plan</span></summary><div class="panel-body">'
   .. '<p class="explain">Left, the files the plan named. Right, what git shows changed since <code>a1b2c3d</code>. '
   .. "A gap on either side is the answer.</p>"))
 check("html: the table's header", has(html, '<table class="pva"><thead><tr><th>The plan said</th><th></th>'

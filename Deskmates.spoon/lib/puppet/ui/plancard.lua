@@ -261,17 +261,19 @@ plancard.SCRIPT = "function send(m){window.webkit.messageHandlers.deskmates.post
   .. "var also=document.querySelector('select.also');if(also)also.onchange=function(){"
   .. "document.querySelectorAll('[data-key]').forEach(function(el){el.hidden=el.getAttribute('data-key')!==also.value})};"
   -- A phase filters the activity (opened, and brought into view); a second click clears it. With a plan, Plan
-  -- clears it and goes to the plan.
+  -- clears it and takes the plan's article (what scrolls: the body never does) back to its top.
   .. "function only(p){document.querySelectorAll('.timeline li').forEach(function(li){"
   .. "li.classList.toggle('out',p!==''&&li.getAttribute('data-phase')!==p)})}"
   .. "document.querySelectorAll('button.phase').forEach(function(b){b.onclick=function(){"
   .. "var p=b.getAttribute('data-phase'),plan=document.getElementById('plan'),"
   .. "act=document.querySelector('[data-panel=activity]'),on=b.classList.contains('on');"
   .. "document.querySelectorAll('button.phase').forEach(function(x){x.classList.remove('on')});only('');"
-  .. "if(plan&&p==='plan'){plan.scrollIntoView({block:'start'});return}"
+  .. "if(plan&&p==='plan'){var art=plan.querySelector('article');if(art)art.scrollTop=0;return}"
   .. "if(on)return;b.classList.add('on');only(p);if(act){act.open=true;act.scrollIntoView({block:'nearest'})}}});"
-  -- A panel folded or opened: the Spoon keeps it so for the next drawing of this session's card.
-  .. "document.querySelectorAll('details.panel').forEach(function(d){d.addEventListener('toggle',function(){"
+  -- A panel folded or opened: the Spoon keeps it so for the next drawing of this session's card. A panel drawn
+  -- open fires toggle on load too: only a change from the state drawn is told, so a redraw sends nothing.
+  .. "document.querySelectorAll('details.panel').forEach(function(d){var was=d.open;d.addEventListener('toggle',"
+  .. "function(){if(d.open===was)return;was=d.open;"
   .. "send('fold:'+d.getAttribute('data-panel')+':'+(d.open?'open':'closed'))})});"
 
 local PlanCard = {}

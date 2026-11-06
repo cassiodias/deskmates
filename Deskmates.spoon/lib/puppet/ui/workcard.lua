@@ -79,8 +79,8 @@ local function commitCount(raw)
 end
 
 -- The plan block for facts `f`, git's answer `gitState` and `plan`: { heading, line, summary } while git reads or
--- when it cannot answer; otherwise { heading, summary, base, footer } and, with a plan's file map, `rows` (KINDS, in order: matched,
--- missing, unchecked, unplanned), or without one `list` ({ rows = { path, unseen }, more }).
+-- when it cannot answer; otherwise { heading, summary, base, footer } and, with a plan's file map, `rows` (KINDS,
+-- in order: matched, missing, unchecked, unplanned), or without one `list` ({ rows = { path, unseen }, more }).
 local function actualView(f, gitState, plan)
   local maps = filemaps(plan)
   local heading = maps and ASKS_PLAN or ASKS_CHANGED
@@ -114,7 +114,9 @@ local function actualView(f, gitState, plan)
     return out
   end
   out.heading, out.rows = ASKS_PLAN, {}
-  out.summary = #c.matched .. " of " .. (#c.matched + #c.missing + #c.unchecked) .. " planned changed"
+  -- The entries no rule can check are named apart: they are neither changed nor not changed.
+  out.summary = #c.matched .. " of " .. (#c.matched + #c.missing) .. " planned changed"
+    .. (#c.unchecked > 0 and " · " .. #c.unchecked .. " not checked" or "")
     .. (#c.unplanned > 0 and " · " .. #c.unplanned .. " not in the plan" or "")
   addRows(out.rows, "matched", c.matched, c.notSeen)
   addRows(out.rows, "missing", c.missing, {})
@@ -154,8 +156,8 @@ end
 
 -- What the two blocks show for facts `f`, git's answer `gitState` ({ reading = true }, { error = text }, or
 -- terminals/git.lua's result) and `plan` (model/plans.lua's shape, or nil): { actual = actualView, turns = { turn
--- rows, newest first }, turnsSummary = "4 turns · 2 commits" }; nil when the facts know no git base. Only the newest turn, open while the session
--- `isWorking`, is working now.
+-- rows, newest first }, turnsSummary = "4 turns · 2 commits" }; nil when the facts know no git base. Only the
+-- newest turn, open while the session `isWorking`, is working now.
 function workcard.view(f, gitState, plan, isWorking)
   if not facts.hasGit(f) then return nil end
   local turns = {}

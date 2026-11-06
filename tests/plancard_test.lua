@@ -188,6 +188,12 @@ check("script: Also switches tickets", has(plancard.SCRIPT, "select.also") and h
 check("script: a phase click filters the activity and opens it, or goes to the plan", has(plancard.SCRIPT, "button.phase")
   and has(plancard.SCRIPT, "data-phase") and has(plancard.SCRIPT, "getElementById('plan')")
   and has(plancard.SCRIPT, "[data-panel=activity]") and has(plancard.SCRIPT, "act.open=true"))
+-- A <details> drawn open fires toggle on load: only a change from the state drawn is told, so a redraw sends nothing.
+check("script: only a user's fold is told", has(plancard.SCRIPT, "var was=d.open;")
+  and has(plancard.SCRIPT, "if(d.open===was)return;was=d.open;"))
+-- The body never scrolls: Plan takes the plan's article (the part that scrolls) back to its top.
+check("script: Plan scrolls the plan's article to its top", has(plancard.SCRIPT, "plan.querySelector('article')")
+  and has(plancard.SCRIPT, ".scrollTop=0") and not has(plancard.SCRIPT, "plan.scrollIntoView"))
 check("script: a fold tells the Spoon", has(plancard.SCRIPT, "details.panel")
   and has(plancard.SCRIPT, "send('fold:'+d.getAttribute('data-panel')+':'+(d.open?'open':'closed'))"))
 

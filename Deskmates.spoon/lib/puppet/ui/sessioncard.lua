@@ -89,8 +89,8 @@ end
 local function hidden(i) return i > 1 and " hidden" or "" end
 
 -- The page's two parts for view `v`: the header (each ticket's key, badge, strip and NOW, and the Also choice)
--- and the activity panel, "What happened along the way?" (each ticket's rows and summary). Every ticket is there, all but the first hidden; the page's script
--- switches them (data-key) and filters rows by phase (data-phase).
+-- and the activity panel, "What happened along the way?" (each ticket's rows and summary). Every ticket is there,
+-- all but the first hidden; the page's script switches them (data-key) and filters rows by phase (data-phase).
 function sessioncard.html(v)
   local head, rows, sums = { '<section class="session">' }, { '<section class="timelines">' }, {}
   if #v.tickets > 1 then
