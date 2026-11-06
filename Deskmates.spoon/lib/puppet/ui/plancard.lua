@@ -260,10 +260,11 @@ plancard.SCRIPT = "function send(m){window.webkit.messageHandlers.deskmates.post
   -- Also: show the ticket chosen (its header and its timeline), hide the others.
   .. "var also=document.querySelector('select.also');if(also)also.onchange=function(){"
   .. "document.querySelectorAll('[data-key]').forEach(function(el){el.hidden=el.getAttribute('data-key')!==also.value})};"
-  -- A phase filters the activity (opened) in place; a second click clears it. The panels stay where the reader
+  -- A phase filters the activity (opened) and the turns in place, and marks the page (body.lane); a second click clears it. The panels stay where the reader
   -- left them: nothing is brought into view, and their scroll position is put back after the rows change. With a
   -- plan, Plan clears it and takes the plan's article (what scrolls: the body never does) back to its top.
-  .. "function only(p){document.querySelectorAll('.timeline li').forEach(function(li){"
+  .. "function only(p){document.body.classList.toggle('lane',p!=='');"
+  .. "document.querySelectorAll('.timeline li,.turnlist>li').forEach(function(li){"
   .. "li.classList.toggle('out',p!==''&&li.getAttribute('data-phase')!==p)})}"
   .. "document.querySelectorAll('button.phase').forEach(function(b){b.onclick=function(){"
   .. "var p=b.getAttribute('data-phase'),plan=document.getElementById('plan'),"

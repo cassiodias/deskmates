@@ -106,7 +106,7 @@ check("html: unchecked", has(html, '<tr class="unchecked"><td class="tint-neutra
 check("html: unplanned, no edit seen", has(html, '<tr class="unplanned"><td class="say say-off">not in the plan</td>'
   .. MARK:format("→", "not in the plan") .. '<td class="tint-off"><code>scratch.sh</code> <span class="unseen">no edit seen</span></td></tr>')
   and count(html, "no edit seen") == 1)
-check("html: the footer after the table", has(html, '</tbody></table><p class="foot">3 commits, 2 not committed.</p></div></details>'))
+check("html: the footer after the table", has(html, '</tbody></table><p class="foot">3 commits, 2 not committed.</p><p class="wholesession">The whole session, not only the lane picked.</p></div></details>'))
 check("html: no old labels", not has(html, "PLAN VS ACTUAL") and not has(html, "✓") and not has(html, "＋")
   and not has(html, "not seen from the agent"))
 check("html: one commit is one", has(workcard.html(workcard.view(factsWith(), { commits = "1", diff = "", uncommitted = "",
@@ -126,7 +126,7 @@ for name, plan in pairs({ ["no plan"] = false, ["a plan with no file map"] = { s
     .. '<p class="explain">What git shows changed'
     .. ' since <code>a1b2c3d</code>.</p><ul class="changed"><li><code>scratch.sh</code> <span class="unseen">no edit seen'
     .. "</span></li><li><code>src/app.js</code></li><li><code>src/new.js</code></li></ul>"
-    .. '<p class="foot">3 commits, 2 not committed.</p></div></details>') and not has(nh, "<table"))
+    .. '<p class="foot">3 commits, 2 not committed.</p><p class="wholesession">The whole session, not only the lane picked.</p></div></details>') and not has(nh, "<table"))
   check(name .. ": its summary", nv and nv.actual.summary == "3 changed · 1 no edit seen")
 end
 
@@ -136,7 +136,7 @@ check("reading: the line", reading and reading.actual.line == "Reading git…" a
   and reading.actual.list == nil and reading.actual.heading == "Did it change what the plan said?")
 local rh = workcard.html(reading)
 check("reading: drawn", has(rh, '<h2>Did it change what the plan said?</h2><span class="sum">Reading git…</span></summary>'
-  .. '<div class="panel-body"><p class="line">Reading git…</p></div></details>') and not has(rh, "<table") and not has(rh, 'class="foot"'))
+  .. '<div class="panel-body"><p class="line">Reading git…</p><p class="wholesession">The whole session, not only the lane picked.</p></div></details>') and not has(rh, "<table") and not has(rh, 'class="foot"'))
 check("reading, no file map: what changed", has(workcard.html(workcard.view(factsWith(), { reading = true }, nil, false)),
   '<h2>What changed?</h2><span class="sum">Reading git…</span></summary><div class="panel-body"><p class="line">Reading git…</p>'))
 local gone = workcard.html(workcard.view(factsWith(), { error = "base a1b2c3d no longer exists" }, PLAN, false))
@@ -195,6 +195,31 @@ check("turns html: commits", has(th, '<div class="commit"><code>a1b2c3d</code> F
 check("turns html: a subject escaped", has(th, "<code>e4f5a6b</code> Fix this &amp; that</div>"))
 check("turns html: newest first", (th:find("14:05", 1, true) or math.huge) < (th:find("13:50", 1, true) or 0))
 check("turns html: no old labels", not has(th, "TURNS") and not has(th, "running</span>") and not has(th, "✓"))
+-- A turn carries the lane it started in: the phase of the newest activity at or before it (a "done" still counts:
+-- the work right after a lane closes belongs to it). Before any activity, no lane: a lane filter hides it.
+local laned = factsWith({
+  { at = at(14, 5), endAt = at(14, 6), files = {}, tests = { ran = 0, passed = 0, failed = 0 }, commits = {} },
+  { at = at(13, 0), endAt = at(13, 1), files = {}, tests = { ran = 0, passed = 0, failed = 0 }, commits = {} },
+  { at = at(12, 30), endAt = at(12, 31), files = {}, tests = { ran = 0, passed = 0, failed = 0 }, commits = {} },
+  { at = at(11, 0), endAt = at(11, 1), files = {}, tests = { ran = 0, passed = 0, failed = 0 }, commits = {} },
+})
+laned.timeline = {
+  { at = at(14, 0), ticket = "ABC-1", kind = "phase", text = "Dev", phase = "dev" },
+  { at = at(12, 0), ticket = "ABC-1", kind = "phase", text = "Dev", phase = "dev" },
+  { at = at(13, 0), ticket = "ABC-1", kind = "done", text = "review", phase = "review" },
+  { at = at(12, 20), ticket = "ABC-1", kind = "phase", text = "Review", phase = "review" },
+  { at = at(12, 25), ticket = "ABC-1", kind = "reply", text = "no lane" },
+}
+local lanes = workcard.view(laned, GIT, PLAN, false)
+check("turns: each in the lane it started in", lanes and lanes.turns[1].phase == "dev" and lanes.turns[2].phase == "review"
+  and lanes.turns[3].phase == "review" and lanes.turns[4].phase == nil)
+local lh = workcard.html(lanes)
+check("turns html: the lane on the row", has(lh, '<li data-phase="dev"><span class="at">14:05</span>')
+  and has(lh, '<li data-phase="review"><span class="at">13:00</span>') and has(lh, '<li><span class="at">11:00</span>'))
+check("turns html: a lane with no turns says so", has(lh, '<p class="nolane">No turns in this lane.</p>'))
+check("plan block: says it is the whole session while a lane is picked",
+  has(lh, '<p class="wholesession">The whole session, not only the lane picked.</p>'))
+
 -- Working now only while the session works and only for the newest turn: an open turn the agent left (it was
 -- stopped, or its last hook never came) says no end was recorded; its dot comes from its tests.
 local idle = workcard.view(factsWith(turns), GIT, PLAN, false)
