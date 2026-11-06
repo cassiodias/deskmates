@@ -156,6 +156,44 @@ check("passes from old facts: an end with no start is a step of its own; another
   #mps == 2 and mps[1].phase == "review" and mps[1].at == day(6, 9, 0) and mps[1].endAt == day(6, 9, 0)
   and mps[2].phase == "dev" and mps[2].at == day(6, 9, 5) and mps[2].endAt == nil and mps[2].by == "my-developer")
 
+-- The phase a skill's name or a subagent's description names, by the hooks' word rules (hook/facts-lib.sh, phase).
+check("phaseOf: a developer", facts.phaseOf("my-developer") == "dev")
+check("phaseOf: QA", facts.phaseOf("QA ABC-12 lens break") == "review")
+check("phaseOf: review wins over plan", facts.phaseOf("Review the plan") == "review")
+check("phaseOf: dev wins over plan", facts.phaseOf("Implement the plan") == "dev")
+check("phaseOf: only whole words", facts.phaseOf("rebuild the planet") == nil)
+check("phaseOf: an engineer plans", facts.phaseOf("my-engineer") == "plan")
+check("phaseOf: none", facts.phaseOf("commit") == nil and facts.phaseOf("") == nil)
+-- Review (6 Nov): every line carries the ticket's phase at the time, a skill with no phase word too. Such a line
+-- starts nothing: Review stays done with its verdict; a Dev ticket gets no extra step.
+local function derive(name, phase, lines, ends)
+  local out = {}
+  for i = #lines, 1, -1 do
+    local l = lines[i]
+    out[#out + 1] = string.format('{"at": %d, "ticket": "ABC-12", "kind": "%s", "text": "%s", "phase": "%s"}', l[1], l[2], l[3], l[4])
+  end
+  local f = facts.load(file(name, '{"tickets": {"ABC-12": {"phase": "' .. phase .. '", "phases": {}' .. (ends or "")
+    .. '}}, "timeline": [' .. table.concat(out, ",") .. "]}"))
+  return f and f.tickets["ABC-12"].passes or {}
+end
+local afterDone = derive("afterdone.json", "review", { { 200, "subagent", "Review ABC-12", "review" },
+  { 300, "done", "Approved.", "review" }, { 400, "skill", "commit", "review" } },
+  ', "ends": {"review": {"at": 300, "verdict": "APPROVED"}}')
+check("passes from old facts: a skill with no phase word after a done keeps the step done", #afterDone == 1
+  and afterDone[1].endAt == 300 and afterDone[1].verdict == "APPROVED")
+local devTicket = derive("devticket.json", "dev", { { 100, "subagent", "Implement ABC-12", "dev" },
+  { 200, "done", "Two findings.", "review" }, { 300, "skill", "commit", "dev" } })
+check("passes from old facts: a skill with no phase word starts no step", #devTicket == 2 and devTicket[1].phase == "dev"
+  and devTicket[1].endAt == nil and devTicket[2].phase == "review" and devTicket[2].endAt == 200)
+local named = derive("named.json", "dev", { { 100, "skill", "my-developer", "review" } })
+check("passes from old facts: a skill's phase from its name, not the line's", #named == 1 and named[1].phase == "dev")
+-- A lane started before the timeline in the phase the timeline starts with is one step, from its earlier start.
+local joined = facts.load(file("joined.json", [[{"tickets": {"ABC-12": {"phase": "dev", "phases": {"dev": 50}}}, "timeline": [
+  {"at": 100, "ticket": "ABC-12", "kind": "subagent", "text": "Implement ABC-12", "phase": "dev"}]}]]))
+local jps = joined and joined.tickets["ABC-12"].passes or {}
+check("passes from old facts: a lane before the timeline joins the same phase after it", #jps == 1 and jps[1].at == 50
+  and jps[1].endAt == nil and jps[1].by == "Implement ABC-12")
+
 -- git, seen and turns: the session's edits as the hooks record them.
 local full = facts.load(file("git.json", [[{
   "git": { "root": "/work/my-app", "base": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678", "dirtyAtStart": ["src/a.js", "docs/ção.md"],

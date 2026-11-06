@@ -77,6 +77,26 @@ local function lanePasses(t)
   return byStart(out)
 end
 
+-- The words that name each phase, by the hooks' rules (hook/facts-lib.sh, phase): Review's win, then Dev's.
+local PHASE_WORDS = {
+  { "review", { qa = true, review = true, reviewer = true, test = true, tests = true, testing = true, tester = true } },
+  { "dev", { dev = true, developer = true, develop = true, implement = true, implementation = true, build = true,
+    builder = true } },
+  { "plan", { plan = true, planner = true, planning = true, engineer = true, architect = true } },
+}
+
+-- The phase a skill's name or a subagent's description names, by whole words; nil for none.
+function facts.phaseOf(text)
+  local words = {}
+  for w in tostring(text or ""):lower():gmatch("[a-z0-9]+") do words[w] = true end
+  for _, p in ipairs(PHASE_WORDS) do
+    for w in pairs(words) do
+      if p[2][w] then return p[1] end
+    end
+  end
+  return nil
+end
+
 -- What started a step, as the hooks keep it: nil when empty or only the phase's word; 80 characters at most.
 local function startedBy(text, phase)
   local by = text:sub(1, 80)
@@ -85,8 +105,9 @@ local function startedBy(text, phase)
 end
 
 -- The steps of facts written before passes, for ticket `t` and its timeline lines `lines` (oldest first), by the
--- hooks' own rules: a lane started (a "phase" line), or a skill or subagent of another phase than the open step's,
--- starts a step, closing the open one (the same phase as the last step continues it); a "done" line closes the
+-- hooks' own rules: a lane started (a "phase" line), or a skill or subagent whose name names another phase than the
+-- open step's (the phase its line carries is only the ticket's at the time: a name with no phase word starts
+-- nothing), starts a step, closing the open one (the same phase as the last step continues it); a "done" line closes the
 -- newest open step of its phase, or is a step of no length. Before the oldest line, the lanes started earlier give
 -- a step each, up to the next one's start. With no lines, the lanes alone.
 local function derivedPasses(t, lines)
@@ -106,13 +127,14 @@ local function derivedPasses(t, lines)
   for _, e in ipairs(lines) do
     if e.kind == "phase" and IS_PHASE[e.text] then
       start(e.text, e.at)
-    elseif (e.kind == "skill" or e.kind == "subagent") and e.phase then
+    elseif (e.kind == "skill" or e.kind == "subagent") and facts.phaseOf(e.text) then
+      local phase = facts.phaseOf(e.text)
       local l = last()
-      if l and not l.endAt and l.phase == e.phase then
+      if l and not l.endAt and l.phase == phase then
         -- The skill or subagent that came with the lane's start is what started the step.
-        if not l.by and l.at == e.at then l.by = startedBy(e.text, e.phase) end
+        if not l.by and l.at == e.at then l.by = startedBy(e.text, phase) end
       else
-        start(e.phase, e.at, startedBy(e.text, e.phase))
+        start(phase, e.at, startedBy(e.text, phase))
       end
     elseif e.kind == "done" and e.phase then
       local open
@@ -130,6 +152,11 @@ local function derivedPasses(t, lines)
     if p.at < lines[1].at then before[#before + 1] = { phase = p.phase, at = p.at } end
   end
   if #out == 0 then return lanePasses(t) end
+  -- A lane started before the timeline in the phase it starts with is that step, from its earlier start.
+  if before[#before] and before[#before].phase == out[1].phase then
+    out[1].at = before[#before].at
+    before[#before] = nil
+  end
   for i, p in ipairs(before) do p.endAt = (before[i + 1] or out[1]).at end
   table.move(out, 1, #out, #before + 1, before)
   return before
