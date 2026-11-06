@@ -41,17 +41,27 @@ sessioncard.SOURCE = "Steps come from the names of the agent's skills and subage
 
 -- The strip: ticket `t`'s passes in the order they happened, each { phase, time, ended, state, took, verdict, by,
 -- from, to } (from and to: its start and the next one's, what the page filters by). A pass with an end is done; the
--- last one still open, in the ticket's phase, is current; any other is reached, up to the next start. Plan comes
+-- last one still open, in the ticket's phase, is current (zero-length steps after it, an end whose start was missed
+-- or a parallel subagent's, do not stop it); any other is reached, up to the next start. Plan comes
 -- first, ahead, when the steps do not start with it; with no steps, the three phases are ahead.
 local function strip(t, now, isWorking)
   local passes, out = t.passes or {}, {}
+  local current
+  for i = #passes, 1, -1 do
+    local p = passes[i]
+    if not p.endAt then
+      if p.phase == t.phase then current = i end
+      break
+    end
+    if p.endAt ~= p.at then break end
+  end
   for i, p in ipairs(passes) do
     local nextAt = passes[i + 1] and passes[i + 1].at
     local step = { phase = p.phase, time = clock(p.at), by = p.by, verdict = p.verdict, from = p.at, to = nextAt }
     if p.endAt then
       -- The step finished: ✓, its span, and the verdict the agent wrote, if any.
       step.state, step.ended = "done", clock(p.endAt)
-    elseif i == #passes and p.phase == t.phase then
+    elseif i == current then
       -- Counted from its start; once the agent's turn is over, it ends at the last thing that happened.
       step.state = "current"
       if isWorking then step.took = took(now - p.at)
@@ -164,12 +174,15 @@ sessioncard.CSS = table.concat({
   ".jira { font-size: 11px; font-weight: 600; border-radius: 4px; padding: 1px 6px; color: var(--accent);",
   " background: color-mix(in srgb, var(--accent) 15%, transparent); } .jira small { opacity: 0.7; }",
   ".also-row { float: right; display: flex; gap: 6px; align-items: center; } .also { font: inherit; }",
-  ".strip { display: flex; gap: 4px; margin: 8px 0 4px; overflow-x: auto; }",
+  -- Scrolling sideways clips what pokes out of the box: the padding keeps the dots above the line (and the
+  -- current one's ring) inside it.
+  ".strip { display: flex; gap: 4px; margin: 0 0 4px; padding-top: 8px; overflow-x: auto; overflow-y: hidden; }",
   ".phase { flex: 1 0 104px; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;",
   " background: none; border: 0; border-top: 2px solid var(--faint); padding: 6px 4px 2px; color: inherit; font: inherit;",
   " cursor: pointer; text-align: left; }",
   ".phase > * { max-width: 100%; white-space: nowrap; }",
   ".phase small { font-size: 10px; opacity: 0.6; min-height: 1em; }",
+  ".phase .verdict { overflow: hidden; text-overflow: ellipsis; }",
   ".phase .by { font-size: 10px; font-weight: 400; opacity: 0.6; overflow: hidden; text-overflow: ellipsis; }",
   ".source { margin: 2px 0 0; font-size: 10px; opacity: 0.6; }",
   ".phase .dot { width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--faint); margin-top: -12px; background: Canvas; }",

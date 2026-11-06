@@ -42,6 +42,20 @@ check("view: the last step, in the ticket's phase, is current", t and t.strip[3]
 check("view: the strip's times", t and t.strip[1].time == "13:10" and t.strip[2].time == "14:50" and t.strip[3].time == "15:40")
 check("view: each step's span, for the filter", t and t.strip[1].from == at(13, 10) and t.strip[1].to == at(14, 50)
   and t.strip[3].from == at(15, 40) and t.strip[3].to == nil)
+-- Review: a Review end whose start was missed (or a parallel subagent's) left a zero-length step after the open Dev:
+-- Dev is still the one running, not "reached".
+local parallel = sessioncard.view({ current = "ABC-1", tickets = { ["ABC-1"] = { phase = "dev", seen = at(10, 40),
+  passes = { { phase = "dev", at = at(10, 20) }, { phase = "review", at = at(10, 30), endAt = at(10, 30) } } } },
+  timeline = {} }, at(10, 45), true).tickets[1].strip
+check("view: a step followed only by zero-length ones is still current", parallel[2].state == "current"
+  and parallel[2].took == "25 min" and parallel[3].state == "done")
+local closed = sessioncard.view({ current = "ABC-1", tickets = { ["ABC-1"] = { phase = "dev", seen = at(10, 40),
+  passes = { { phase = "dev", at = at(10, 20) }, { phase = "review", at = at(10, 30), endAt = at(10, 35) } } } },
+  timeline = {} }, at(10, 45), true).tickets[1].strip
+check("view: a step followed by a real one is reached", closed[2].state == "reached")
+-- Review: the strip scrolls sideways; the dots above its line and a long verdict stay whole.
+check("css: the strip leaves room for its dots", has(sessioncard.CSS, ".strip { display: flex; gap: 4px; margin: 0 0 4px; padding-top: 8px; overflow-x: auto; overflow-y: hidden; }"))
+check("css: a long verdict is cut, not spilled", has(sessioncard.CSS, ".phase .verdict { overflow: hidden; text-overflow: ellipsis; }"))
 check("view: what started each step", t and t.strip[1].by == nil and t.strip[2].by == "my-developer"
   and t.strip[3].by == "QA ABC-12 lens break")
 check("view: how long, on the current step only", t and t.strip[3].took == "12 min" and t.strip[1].took == nil)

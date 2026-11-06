@@ -191,6 +191,8 @@ local phaseClick = plancard.SCRIPT:match("button%.phase'%)%.forEach%(function%(b
 check("script: a phase click scrolls nothing", phaseClick ~= "" and not has(phaseClick, "scrollIntoView"))
 check("script: a phase click keeps the panels' scroll position", has(phaseClick, "panels.scrollTop=top"))
 check("script: a phase click filters the turns too, their own rows only", has(plancard.SCRIPT, ".turnlist>li"))
+-- Review: a strip hidden at load has no width, so Also scrolls the strip of the ticket it shows to its newest step.
+check("script: Also scrolls the shown ticket's strip to its end", has(plancard.SCRIPT:match("also%.onchange=function%(%)(.-)};") or "", "scrollLeft=s.scrollWidth"))
 check("script: a picked lane is told to the page", has(plancard.SCRIPT, "classList.toggle('lane'"))
 check("script: a phase click filters the activity, or goes to the plan", has(plancard.SCRIPT, "button.phase")
   and has(plancard.SCRIPT, "data-phase") and has(plancard.SCRIPT, "getElementById('plan')")

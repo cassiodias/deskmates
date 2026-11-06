@@ -257,9 +257,11 @@ plancard.SCRIPT = "function send(m){window.webkit.messageHandlers.deskmates.post
   .. "document.querySelectorAll('button[data-to]:not(.phase)').forEach(function(b){b.onclick=function(){"
   .. "var t=document.getElementById(b.getAttribute('data-to'));if(!t)return;t.scrollIntoView({block:'start'});"
   .. "t.classList.remove('here');void t.offsetWidth;t.classList.add('here')}});"
-  -- Also: show the ticket chosen (its header and its timeline), hide the others.
+  -- Also: show the ticket chosen (its header and its timeline), hide the others. A strip hidden at load had no
+  -- width to scroll: the one shown now opens on its newest step.
   .. "var also=document.querySelector('select.also');if(also)also.onchange=function(){"
-  .. "document.querySelectorAll('[data-key]').forEach(function(el){el.hidden=el.getAttribute('data-key')!==also.value})};"
+  .. "document.querySelectorAll('[data-key]').forEach(function(el){el.hidden=el.getAttribute('data-key')!==also.value});"
+  .. "document.querySelectorAll('.ticket:not([hidden]) .strip').forEach(function(s){s.scrollLeft=s.scrollWidth})};"
   -- A step filters the activity and the turns in place and marks the page (body.lane); a second click clears it.
   -- A row stays when it happened during the step: from its start (data-from) up to the next step's (data-to, none
   -- for the last); a step not reached yet (no data-from) leaves no row. A folded panel stays folded: folds are the
