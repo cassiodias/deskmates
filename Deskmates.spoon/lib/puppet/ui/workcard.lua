@@ -143,23 +143,14 @@ local function dot(t, isRunning)
   return "none"
 end
 
--- One turn's row: { time, dot, head, tests, summary, files, more, total, commits } (workcard.view adds its phase); summary is the files in words. head is "Working now" for an open turn
--- when `isRunning`, how long it took when it ended, else "No end recorded".
--- The lane a turn started in: the phase of the newest activity at or before `at` that names one (a "done" too:
--- the work right after a lane closes belongs to it); nil before any.
-local function laneAt(timeline, at)
-  local best
-  for _, e in ipairs(timeline or {}) do
-    if e.phase and e.at <= at and (not best or e.at >= best.at) then best = e end
-  end
-  return best and best.phase
-end
-
+-- One turn's row: { at, time, dot, head, tests, summary, files, more, total, commits }; at is its start (the page
+-- keeps it while a step picked on the strip covers it), summary the files in words. head is "Working now" for an
+-- open turn when `isRunning`, how long it took when it ended, else "No end recorded".
 local function turnRow(t, isRunning)
   isRunning = isRunning and not t.endAt
   local files, more = capped(t.files)
   local head = isRunning and "Working now" or (t.endAt and sessioncard.took(t.endAt - t.at)) or "No end recorded"
-  return { time = os.date("%H:%M", t.at), dot = dot(t.tests, isRunning), head = head, tests = testsText(t.tests),
+  return { at = t.at, time = os.date("%H:%M", t.at), dot = dot(t.tests, isRunning), head = head, tests = testsText(t.tests),
     summary = #t.files == 0 and "No files edited." or counted(#t.files, "file") .. "…",
     files = files, more = more, total = #t.files, commits = t.commits }
 end
@@ -174,7 +165,6 @@ function workcard.view(f, gitState, plan, isWorking)
   local commits = 0
   for i, t in ipairs(f.turns or {}) do
     turns[#turns + 1] = turnRow(t, i == 1 and isWorking == true)
-    turns[#turns].phase = laneAt(f.timeline, t.at)
     commits = commits + #t.commits
   end
   return { actual = actualView(f, gitState, plan), turns = turns,
@@ -235,7 +225,7 @@ local function actualHtml(a)
     out[#out + 1] = '<p class="foot">' .. escape(a.footer) .. "</p>"
   end
   return panel.html("actual", a.heading, escape(a.summary),
-    table.concat(out) .. '<p class="wholesession">The whole session, not only the lane picked.</p>')
+    table.concat(out) .. '<p class="wholesession">The whole session, not only the step picked.</p>')
 end
 
 -- One turn's `<li>`: the time, its dot on the rail, then how long and its tests, the files (a pill that opens to
@@ -254,7 +244,7 @@ local function turnHtml(t)
   for _, c in ipairs(t.commits) do
     commits[#commits + 1] = '<div class="commit"><code>' .. escape(c.hash) .. "</code> " .. escape(c.subject) .. "</div>"
   end
-  return '<li' .. (t.phase and ' data-phase="' .. t.phase .. '"' or "") .. '><span class="at">' .. t.time .. '</span><span class="rail"><span class="pip ' .. t.dot .. '"></span></span>'
+  return '<li data-at="' .. string.format("%d", t.at) .. '"><span class="at">' .. t.time .. '</span><span class="rail"><span class="pip ' .. t.dot .. '"></span></span>'
     .. '<div class="turnbody"><div class="turnhead"><b>' .. escape(t.head) .. "</b>"
     .. (t.tests and '<span class="tests"> · ' .. escape(t.tests) .. "</span>" or "") .. "</div>" .. files
     .. table.concat(commits) .. "</div></li>"
@@ -267,7 +257,7 @@ function workcard.html(v)
     local rowsHtml = {}
     for _, t in ipairs(v.turns) do rowsHtml[#rowsHtml + 1] = turnHtml(t) end
     out[#out + 1] = panel.html("turns", "What did each turn do?", escape(v.turnsSummary),
-      '<ol class="turnlist">' .. table.concat(rowsHtml) .. '</ol><p class="nolane">No turns in this lane.</p>')
+      '<ol class="turnlist">' .. table.concat(rowsHtml) .. '</ol><p class="nolane">No turns in this step.</p>')
   end
   return table.concat(out)
 end
@@ -313,8 +303,8 @@ workcard.CSS = table.concat({
   ".turnbody { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; padding-bottom: 14px;",
   " min-width: 0; } .turnbody > * { max-width: 100%; } .turnlist > li:last-child .turnbody { padding-bottom: 0; }",
   ".turns .tests, .turns .nofiles { color: var(--muted); }",
-  -- A lane picked (body.lane, set by the page's script): the turns outside it hidden, a word when none is left,
-  -- and the plan block saying it does not follow the lane.
+  -- A step picked (body.lane, set by the page's script): the turns outside it hidden, a word when none is left,
+  -- and the plan block saying it does not follow the step.
   ".turnlist > li.out { display: none; } .nolane, .wholesession { display: none; color: var(--muted); }",
   "body.lane .turnlist:not(:has(> li:not(.out))) + .nolane { display: block; } body.lane .wholesession { display: block; }",
   ".turns .files > summary { list-style: none; cursor: pointer; display: inline-flex; gap: 6px; padding: 2px 9px;",
