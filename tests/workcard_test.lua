@@ -60,6 +60,14 @@ check("plan: unplanned, the one no hook named marked", r[4] and r[4].mark == "�
   and r[5].right.path == "src/new.js" and not r[5].right.unseen)
 check("plan: dirty at start and never named, left out", a and not has(workcard.html(v), "old.txt"))
 
+-- A planned path changed by something no hook named: tagged on the matched row too.
+local planScratch = { steps = {}, markdown = "# Fix it\n\n## Files\n\n- `scratch.sh` — a script\n" }
+local mv = workcard.view(factsWith(), GIT, planScratch, false)
+local mr = mv and mv.actual.rows or {}
+check("plan: a matched path no hook named, tagged", mr[1] and mr[1].kind == "matched" and mr[1].right.path == "scratch.sh"
+  and mr[1].right.unseen and has(workcard.html(mv), '<td class="tint-ok"><code>scratch.sh</code> <span class="unseen">'
+  .. "no edit seen</span></td></tr>"))
+
 -- A session started in a subfolder: the plan's relative entries are read from there, as the hooks read its paths.
 local inSub = factsWith()
 inSub.git.prefix = "packages/web/"
@@ -83,9 +91,9 @@ check("html: missing", has(html, '<tr class="missing"><td class="tint-warn"><cod
   .. MARK:format("←", "planned, not changed") .. '<td class="say say-warn">not changed yet</td></tr>'))
 check("html: unchecked", has(html, '<tr class="unchecked"><td class="tint-neutral"><code>src/*.css</code></td>'
   .. MARK:format("?", "not checked") .. '<td class="say">not checked</td></tr>'))
-check("html: unplanned, not by the agent", has(html, '<tr class="unplanned"><td class="say say-off">not in the plan</td>'
-  .. MARK:format("→", "not in the plan") .. '<td class="tint-off"><code>scratch.sh</code> <span class="unseen">not by the agent</span></td></tr>')
-  and count(html, "not by the agent") == 1)
+check("html: unplanned, no edit seen", has(html, '<tr class="unplanned"><td class="say say-off">not in the plan</td>'
+  .. MARK:format("→", "not in the plan") .. '<td class="tint-off"><code>scratch.sh</code> <span class="unseen">no edit seen</span></td></tr>')
+  and count(html, "no edit seen") == 1)
 check("html: the footer after the table", has(html, '</tbody></table><p class="foot">3 commits, 2 not committed.</p></section>'))
 check("html: no old labels", not has(html, "PLAN VS ACTUAL") and not has(html, "✓") and not has(html, "＋")
   and not has(html, "not seen from the agent"))
@@ -102,7 +110,7 @@ for name, plan in pairs({ ["no plan"] = false, ["a plan with no file map"] = { s
     and nl.rows[2].path == "src/app.js" and nl.rows[3].path == "src/new.js" and nl.more == 0)
   local nh = workcard.html(nv)
   check(name .. ": drawn", has(nh, '<section class="actual"><h2>What changed?</h2><p class="explain">What git shows changed'
-    .. ' since <code>a1b2c3d</code>.</p><ul class="changed"><li><code>scratch.sh</code> <span class="unseen">not by the agent'
+    .. ' since <code>a1b2c3d</code>.</p><ul class="changed"><li><code>scratch.sh</code> <span class="unseen">no edit seen'
     .. "</span></li><li><code>src/app.js</code></li><li><code>src/new.js</code></li></ul>"
     .. '<p class="foot">3 commits, 2 not committed.</p></section>') and not has(nh, "<table"))
 end
@@ -145,6 +153,8 @@ check("turns: the dots", rows and rows[1].dot == "running" and rows[2].dot == "n
 check("turns: tests in words", rows and rows[1].tests == "1 test failed (of 2)" and rows[2].tests == "tests ran 3"
   and rows[3].tests == nil and rows[4].tests == "tests passed (2 of 2)" and rows[5].tests == "2 tests failed (of 3)")
 check("turns: the files", rows and #rows[1].files == 2 and rows[1].files[1] == "src/app.js" and #rows[3].files == 0)
+check("turns: the files in words", rows and rows[1].summary == "2 files…" and rows[2].summary == "1 file…"
+  and rows[3].summary == "No files edited.")
 check("turns: commits", rows and #rows[1].commits == 2 and rows[1].commits[1].hash == "a1b2c3d"
   and rows[1].commits[1].subject == "Fix the typo" and #rows[2].commits == 0)
 
@@ -182,6 +192,11 @@ local left = {
 local lv = workcard.view(factsWith(left), GIT, PLAN, true)
 check("working: only the newest open turn is working now", lv and lv.turns[1].head == "Working now"
   and lv.turns[1].dot == "running" and lv.turns[2].head == "No end recorded" and lv.turns[2].dot == "none")
+-- The newest turn already ended while the session works (between its Stop and the next prompt): its length.
+local ended = workcard.view(factsWith({ { at = at(14, 5), endAt = at(14, 8), files = {},
+  tests = { ran = 0, passed = 0, failed = 0 }, commits = {} } }), GIT, PLAN, true)
+check("working, the newest turn ended: its length, not working now", ended and ended.turns[1].head == "3 min"
+  and ended.turns[1].dot == "none" and not has(workcard.html(ended), "Working now"))
 -- A turn stopped with Esc (no Stop hook) is left open when the next prompt comes, with no end and no commits.
 local stopped = workcard.view(factsWith({
   { at = at(14, 5), files = {}, tests = { ran = 0, passed = 0, failed = 0 }, commits = {} },
@@ -207,6 +222,10 @@ check("css: the dark colours", has(dark, "--ok: #3FB950;") and has(dark, "--ok-t
   and has(dark, "--off-bg: rgba(157,166,245,0.10);") and has(dark, "--bad: #E5534B;"))
 check("css: the tints", CSS:match("%.tint%-ok {[^}]*var%(%-%-ok%-bg%)") and CSS:match("%.tint%-warn {[^}]*var%(%-%-warn%-bg%)")
   and CSS:match("%.tint%-off {[^}]*var%(%-%-off%-bg%)") and CSS:match("%.tint%-neutral {[^}]*background") ~= nil)
+check("css: the warn text colour", has(CSS, "--warn-text: #7D5400;") and has(dark, "--warn-text: #F5D88A;"))
+check("css: muted words in full colour (4.5:1)", has(CSS, ".pva .say-warn { color: var(--warn); }")
+  and has(CSS, ".pva .say-off { color: var(--off); }") and not CSS:match("say%-%a+ {[^}]*color%-mix"))
+check("css: a path on the warn tint in the warn text colour", has(CSS, ".tint-warn { background: var(--warn-bg); color: var(--warn-text); }"))
 check("css: the dots", CSS:match("%.pip%.running {[^}]*border[^}]*var%(%-%-off%)") and CSS:match("%.pip%.ok {[^}]*var%(%-%-ok%)")
   and CSS:match("%.pip%.bad {[^}]*var%(%-%-bad%)") ~= nil)
 check("css: no line after the last dot", has(CSS, ".turnlist > li:last-child .rail::after { content: none; }"))

@@ -130,7 +130,7 @@ end
 -- puppet's, meta.session (sessioncard.view, or nil) what the session is working on: shown on top, with the plan
 -- below, or the session's timeline when there is no plan (the timeline also waits, hidden, behind the plan).
 -- meta.work (workcard.html, or nil), the git blocks, goes under the session, before the plan: capped at 45% of the
--- card's height when a plan follows, else as tall as it is, the page scrolling as usual.
+-- card's height when a plan follows, else as tall as it is, the page scrolling as usual (its buttons kept in view).
 function plancard.html(plan, meta)
   local nonce = string.format("%08x%08x", math.random(0, 0x7fffffff), math.random(0, 0x7fffffff))
   local color = (meta.color or ""):match("^#%x%x%x%x%x%x$") or "#888888"
@@ -237,10 +237,11 @@ function plancard.html(plan, meta)
     sessioncard.CSS,
     workcard.CSS,
     ".work.capped { max-height: 45vh; overflow: auto; } body.free { height: auto; min-height: 100vh; }",
+    "body.free footer { position: sticky; bottom: 0; background: Canvas; }",
     "footer { display: flex; gap: 8px; justify-content: flex-end; padding: 8px 14px; border-top: 1px solid var(--faint); }",
     "footer button { font: inherit; padding: 4px 12px; }",
     "#focus { background: var(--accent); color: white; border: 0; border-radius: 5px; }",
-    "</style></head><body", hasPlan and "" or ' class="free"', ">",
+    "</style></head><body", (meta.work and not hasPlan) and ' class="free"' or "", ">",
     table.concat(body),
     '<script nonce="', nonce, '">', plancard.SCRIPT, "</script>",
     "</body></html>",

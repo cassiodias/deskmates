@@ -21,8 +21,8 @@ local DID_NOT_ANSWER = "git did not answer"
 local ASKS_PLAN = "Did it change what the plan said?"
 local ASKS_CHANGED = "What changed?"
 
--- After a changed path no hook of the session named.
-local UNSEEN = ' <span class="unseen">not by the agent</span>'
+-- After a changed path no edit of the agent named (a shell command's write, or a change outside the session).
+local UNSEEN = ' <span class="unseen">no edit seen</span>'
 
 -- `n` and the word for it: "1 commit", "3 commits".
 local function counted(n, word) return n .. " " .. word .. (n == 1 and "" or "s") end
@@ -133,13 +133,14 @@ local function dot(t, isRunning)
   return "none"
 end
 
--- One turn's row: { time, dot, head, tests, files, more, total, commits }. head is "Working now" for an open turn
+-- One turn's row: { time, dot, head, tests, summary, files, more, total, commits }; summary is the files in words. head is "Working now" for an open turn
 -- when `isRunning`, how long it took when it ended, else "No end recorded".
 local function turnRow(t, isRunning)
   isRunning = isRunning and not t.endAt
   local files, more = capped(t.files)
   local head = isRunning and "Working now" or (t.endAt and sessioncard.took(t.endAt - t.at)) or "No end recorded"
   return { time = os.date("%H:%M", t.at), dot = dot(t.tests, isRunning), head = head, tests = testsText(t.tests),
+    summary = #t.files == 0 and "No files edited." or counted(#t.files, "file") .. "…",
     files = files, more = more, total = #t.files, commits = t.commits }
 end
 
@@ -215,11 +216,11 @@ end
 local function turnHtml(t)
   local files
   if t.total == 0 then
-    files = '<div class="nofiles">No files edited.</div>'
+    files = '<div class="nofiles">' .. escape(t.summary) .. "</div>"
   else
     local lis = {}
     for _, path in ipairs(t.files) do lis[#lis + 1] = item(path) end
-    files = '<details class="files"><summary><span class="chev">›</span>' .. counted(t.total, "file") .. "…</summary><ul>"
+    files = '<details class="files"><summary><span class="chev">›</span>' .. escape(t.summary) .. "</summary><ul>"
       .. table.concat(lis) .. moreItem(t.more) .. "</ul></details>"
   end
   local commits = {}
@@ -247,10 +248,10 @@ end
 -- The styles for the two blocks: their colours (light, then dark on a dark page), and the page's --faint.
 workcard.CSS = table.concat({
   ":root { --ok: #1A7F37; --ok-text: #116329; --ok-bg: rgba(26,127,55,0.10); --pill: #116329;",
-  " --pill-bg: rgba(26,127,55,0.14); --warn: #9A6700; --warn-bg: rgba(154,103,0,0.10); --off: #4A55C8;",
+  " --pill-bg: rgba(26,127,55,0.14); --warn: #9A6700; --warn-text: #7D5400; --warn-bg: rgba(154,103,0,0.10); --off: #4A55C8;",
   " --off-bg: rgba(74,85,200,0.10); --bad: #CF222E; --muted: color-mix(in srgb, CanvasText 60%, transparent); }",
   "@media (prefers-color-scheme: dark) { :root { --ok: #3FB950; --ok-text: #C8FFC0; --ok-bg: rgba(63,185,80,0.12);",
-  " --pill: #8FD18B; --pill-bg: rgba(63,185,80,0.16); --warn: #F2C14E; --warn-bg: rgba(242,193,78,0.10);",
+  " --pill: #8FD18B; --pill-bg: rgba(63,185,80,0.16); --warn: #F2C14E; --warn-text: #F5D88A; --warn-bg: rgba(242,193,78,0.10);",
   " --off: #9DA6F5; --off-bg: rgba(157,166,245,0.10); --bad: #E5534B; } }",
   ".actual, .turns { padding-top: 10px; border-top: 1px solid var(--faint); margin-bottom: 12px; }",
   ".actual h2, .turns h2 { font-size: 15px; font-weight: 600; margin: 0 0 6px; }",
@@ -266,12 +267,12 @@ workcard.CSS = table.concat({
   ".pva .matched .mark { color: var(--ok); } .pva .missing .mark { color: var(--warn); }",
   ".pva .unchecked .mark { color: var(--muted); } .pva .unplanned .mark { color: var(--off); }",
   ".tint-ok { background: var(--ok-bg); color: var(--ok-text); }",
-  ".tint-warn { background: var(--warn-bg); color: var(--warn); }",
+  ".tint-warn { background: var(--warn-bg); color: var(--warn-text); }",
   ".tint-off { background: var(--off-bg); color: var(--off); }",
   ".tint-neutral { background: color-mix(in srgb, CanvasText 6%, transparent); }",
   ".pva .say, .pva .more td { color: var(--muted); }",
-  ".pva .say-warn { color: color-mix(in srgb, var(--warn) 70%, transparent); }",
-  ".pva .say-off { color: color-mix(in srgb, var(--off) 70%, transparent); }",
+  ".pva .say-warn { color: var(--warn); }",
+  ".pva .say-off { color: var(--off); }",
   ".unseen { font: 11px -apple-system, sans-serif; color: var(--muted); margin-left: 4px; }",
   ".actual .changed, .turns ul { list-style: none; padding: 0; margin: 0; } .actual .changed li { padding: 1px 0; }",
   ".actual .more, .turns .more { color: var(--muted); }",

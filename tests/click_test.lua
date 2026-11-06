@@ -371,7 +371,7 @@ check("git only: git runs in the session's repo", first ~= nil and first.path ==
 answer(tasks, ANSWER)
 check("git's answer fills the card", gitCard.html_:find("1 commit, 1 not committed.", 1, true) ~= nil
   and gitCard.html_:find("<li><code>src/app.js</code></li>", 1, true) ~= nil
-  and gitCard.html_:find('<li><code>scratch.sh</code> <span class="unseen">not by the agent</span></li>', 1, true) ~= nil
+  and gitCard.html_:find('<li><code>scratch.sh</code> <span class="unseen">no edit seen</span></li>', 1, true) ~= nil
   and not gitCard.html_:find("Reading git…", 1, true))
 
 -- A facts line: the card shows the new facts with the git answer it has, and reads git again.

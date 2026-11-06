@@ -200,5 +200,8 @@ check("work and a plan: capped", has(workAll, '<div class="work capped">') and h
   and not has(workAll, 'class="free"'))
 check("work css: the cap only on .capped", has(workAll, ".work.capped { max-height: 45vh; overflow: auto; }")
   and not has(workAll, ".work { max-height") and has(workAll, "body.free { height: auto; min-height: 100vh; }"))
+check("a ticket card, no work and no plan: its timeline scrolls in a fixed page", has(only, "<body>")
+  and not has(only, 'class="free"'))
+check("work only: the buttons stay in view", has(workOnly, "body.free footer { position: sticky; bottom: 0; background: Canvas; }"))
 
 check.done("plan card")

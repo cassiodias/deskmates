@@ -297,8 +297,8 @@ When the agent's events do not line up with the table (`harnesses/cursor/transla
   their internals and may use any other name. The facts file keeps the repo's root, the commit it started from, the
   paths that were already dirty, the paths the agent edited, and per turn its start, end, files, test counts and
   commits: never prompts or contents. Git runs with `GIT_OPTIONAL_LOCKS=0`, so it never takes the `index.lock` the
-  agent's own git needs. The Spoon says "not by the agent" for a path git shows changed that no edit
-  named, such as a write through a shell command.
+  agent's own git needs. The Spoon says "no edit seen" for a path git shows changed that no edit
+  named: a write through a shell command, or a change made outside the session.
 
 ### 4. hooks.json, detect.sh, config.sh, install.sh, uninstall.sh
 
