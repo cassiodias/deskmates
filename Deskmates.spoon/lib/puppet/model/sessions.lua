@@ -21,6 +21,17 @@ local function liveAgents(s)
   return live
 end
 
+-- The session that started subagent `agentId`: the event's own session `sid` when it did, else the one that did
+-- (a background subagent outlives its session's id: its events and its stop come under the next one); nil for none.
+local function ownerOf(all, sid, agentId)
+  if agentId == "" then return nil end
+  if all[sid] and all[sid].agents[agentId] then return sid end
+  for key, s in pairs(all) do
+    if s.agents[agentId] then return key end
+  end
+  return nil
+end
+
 local function isAtRest(s)
   return not s.isWorking and s.mood == nil and liveAgents(s) == 0
 end
@@ -186,7 +197,8 @@ function Sessions:apply(e, ctx)
   elseif e.name == "PreToolUse" then
     s.tools = s.tools + 1
     if e.tool ~= "" then s.lastTool = e.tool end
-    if e.agentId ~= "" and s.agents[e.agentId] then s.agents[e.agentId].hits = s.agents[e.agentId].hits + 1 end
+    local owner = ownerOf(self.all, sid, e.agentId)
+    if owner then self.all[owner].agents[e.agentId].hits = self.all[owner].agents[e.agentId].hits + 1 end
     -- Starting a subagent names its job; the subagent it starts takes the name, in the order they were called.
     if kind == "agent" and e.agentId == "" and e.text ~= "" then s.queued[#s.queued + 1] = e.text end
     -- The agent calling a listed skill starts the show mid-turn, as typing its /command does.
@@ -224,9 +236,10 @@ function Sessions:apply(e, ctx)
     local label = e.text ~= "" and e.text or queued or (e.agentType ~= "" and e.agentType or "agent")
     s.agents[e.agentId] = { label = label, hits = 0, done = false }
     s.order[#s.order + 1] = e.agentId
-  elseif e.name == "SubagentStop" and s.agents[e.agentId] then
-    s.agents[e.agentId].done = true
-    finish(intents, sid, s)
+  elseif e.name == "SubagentStop" and ownerOf(self.all, sid, e.agentId) then
+    local owner = ownerOf(self.all, sid, e.agentId)
+    self.all[owner].agents[e.agentId].done = true
+    finish(intents, owner, self.all[owner])
   elseif e.name == "Notification" then
     local isShown = s.mood == "permission" or s.mood == "asking"
     if s.isListed and not isShown then say(e.text ~= "" and e.text or (harness.name .. " needs you")) end

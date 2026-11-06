@@ -281,4 +281,39 @@ check("setFacts: nil clears them", planned.all.s1.facts == nil)
 planned:setFacts("nope", { tickets = {}, timeline = {} })
 check("setFacts: an unknown session gets none", planned.all.nope == nil)
 
+-- Seen 5 Nov: a background subagent started in session s1; the tab went on as session s2, and the subagent's own
+-- events and its stop came under s2. An agent id belongs to the session that started it: its stop closes it
+-- there, so s1's puppet rests instead of coding for hours.
+local moved = Sessions.new(100)
+local function under(name, fields) return moved:apply(event(name, fields), { mapping = mapping, harness = fake, frame = 1, now = 100 }) end
+under("UserPromptSubmit", { text = "/build" })
+under("PreToolUse", { tool = "spawn", text = "Build it in the background" })
+under("SubagentStart", { agentId = "bg1", agentType = "general-purpose" })
+under("Stop", { text = "Started it." })
+check("moved: the subagent works in s1", Sessions.sceneFor(moved.all.s1, mapping) ~= "rest")
+under("UserPromptSubmit", { session = "s2", text = "something else" })
+under("PreToolUse", { session = "s2", agentId = "bg1", tool = "edit" })
+check("moved: the subagent's tools still count for s1", moved.all.s1.agents.bg1.hits == 1)
+local said = under("SubagentStop", { session = "s2", agentId = "bg1" })
+check("moved: its stop under s2 closes it in s1", moved.all.s1.agents.bg1.done == true)
+check("moved: s1 rests", Sessions.sceneFor(moved.all.s1, mapping) == "rest")
+check("moved: s1 says what it did", said[1] and said[1].key == "s1")
+check("moved: s2 has no stray subagent", next(moved.all.s2.agents) == nil and moved.all.s2.isWorking == true)
+check("moved: an unknown agent's stop is ignored", #under("SubagentStop", { session = "s2", agentId = "nobody" }) == 0
+  and moved.all.s1.agents.nobody == nil and moved.all.s2.agents.nobody == nil)
+under("SubagentStart", { agentId = "bg2", agentType = "general-purpose" })
+under("SessionEnd", {})
+check("moved: a stop after its session ended is ignored", pcall(under, "SubagentStop", { session = "s2", agentId = "bg2" })
+  and moved.all.s1 == nil and next(moved.all.s2.agents) == nil)
+local seen = Sessions.new(100)
+local function via(name, fields) return seen:apply(event(name, fields), { mapping = mapping, harness = fake, frame = 1, now = 100 }) end
+via("UserPromptSubmit", { text = "/build" })
+via("SubagentStart", { agentId = "bg3", agentType = "general-purpose" })
+via("PreToolUse", { session = "s3", agentId = "bg3", tool = "edit" })
+local onStage = false
+for _, key in ipairs(seen:stageKeys(100)) do onStage = onStage or key == "s3" end
+check("moved: a session seen only through a subagent gets no puppet", seen.all.s3.hasPlayed ~= true and not onStage
+  and seen.all.s1.agents.bg3.hits == 1)
+
+
 check.done("sessions")
