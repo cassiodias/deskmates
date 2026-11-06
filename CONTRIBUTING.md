@@ -57,9 +57,10 @@ Deskmates.spoon/
     terminals/                bringing a session's terminal forward; one look at what runs (liveness.lua);
                               reading a session's repo with git for its card (git.lua)
     ui/menu.lua               the menu bar menu
-    ui/plancard.lua           the card a double click opens: the session on top, the plan or the timeline below
-    ui/sessioncard.lua        the card's session part: ticket, Jira badge, phase strip, NOW and the timeline
-    ui/workcard.lua           the card's git blocks: plan vs actual, and the session's turns
+    ui/plancard.lua           the card a double click opens: what changed, the session, the story, then the plan
+    ui/sessioncard.lua        the card's session part: ticket, Jira badge, step strip (the step picked), NOW
+    ui/workcard.lua           the card's git part: plan vs actual, and the session's turns for the story
+    ui/story.lua              the card's one timeline, "What happened?": turns, replies and markers merged
     ui/planblocks.lua         the plan card's blocks: markdown read into blocks, and the blocks lifted from it
 tests/                        run.sh runs them all
 tools/screenshots/            makes the README's pictures
@@ -85,7 +86,7 @@ tests/run.sh
   for Hammerspoon and compare every frame with `tests/snapshots/`. If you changed a drawing on purpose, record
   it again with `UPDATE=1 lua5.4 tests/scenario_test.lua` and check the diff.
 - `sessions_test.lua` runs the session model with a fake agent; `liveness_test.lua` checks when puppets leave,
-  with iTerm not running; `status_test.lua` checks the status line and the card's text; `plancard_test.lua` checks the card's page, `sessioncard_test.lua` and `facts_test.lua` its session part and the facts file it reads, `workcard_test.lua` its git blocks, `panel_test.lua` its foldable panels and the fold message, and `planblocks_test.lua` what it lifts from a plan's markdown (file maps, endpoints) and what it leaves as text; `actual_test.lua` the plan's file map against git's changes; `git_test.lua` the git commands a card runs, in order, and what it says when git cannot answer; `settings_test.lua`
+  with iTerm not running; `status_test.lua` checks the status line and the card's text; `plancard_test.lua` checks the card's page, `sessioncard_test.lua` and `facts_test.lua` its session part and the facts file it reads, `workcard_test.lua` its git part, `story_test.lua` its timeline (a reply matched to its turn, the merge), `panel_test.lua` its foldable panels and the fold message, and `planblocks_test.lua` what it lifts from a plan's markdown (file maps, endpoints) and what it leaves as text; `actual_test.lua` the plan's file map against git's changes; `git_test.lua` the git commands a card runs, in order, and what it says when git cannot answer; `settings_test.lua`
   checks the saved settings carry over from the old name.
 - `harness_contract_test.lua` checks every harness and every creature (see "What the tests check for you").
 - `puppet_lib.sh` checks the hook library's helpers on their own (what they keep and drop, cutting text,
