@@ -33,6 +33,9 @@ check("css: bordered, rounded, apart", has(panel.CSS, ".panel { border: 1px soli
 check("css: a sentence-case heading", panel.CSS:match("%.panel > summary h2 {[^}]*15px[^}]*600") ~= nil)
 check("css: the chevron is plain to see", panel.CSS:match("%.panel > summary > %.chev {[^}]*font%-size: 13px[^}]*color: CanvasText") ~= nil)
 check("css: the chevron turns when open", panel.CSS:match("%.panel%[open%] > summary > %.chev {[^}]*rotate%(90deg%)") ~= nil)
+-- The question is never squeezed: the summary sits beside it when it fits, else wraps onto its own line.
+check("css: the header wraps", panel.CSS:match("%.panel > summary {[^}]*flex%-wrap: wrap") ~= nil)
+check("css: the title keeps its width", panel.CSS:match("%.panel > summary h2 {[^}]*flex: 0 0 auto") ~= nil)
 check("css: the summary muted, on the right", panel.CSS:match("%.panel > summary %.sum {[^}]*margin%-left: auto[^}]*var%(%-%-muted%)") ~= nil)
 check("css: focus shows", panel.CSS:match("%.panel > summary:focus%-visible {[^}]*outline") ~= nil)
 

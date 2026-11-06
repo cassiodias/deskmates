@@ -48,13 +48,17 @@ panel.CSS = table.concat({
   ".panels { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 10px;",
   " padding: 10px 14px; } .panels.capped { flex: none; max-height: 45vh; }",
   ".panel { border: 1px solid var(--faint); border-radius: 10px; padding: 0 12px; flex: none; }",
-  ".panel > summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 8px; padding: 10px 0; }",
+  ".panel > summary { list-style: none; cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline;",
+  " gap: 4px 8px; padding: 10px 0; }",
   ".panel > summary::-webkit-details-marker { display: none; }",
   ".panel > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }",
   ".panel > summary > .chev { display: inline-block; width: 12px; font-size: 13px; font-weight: 700; color: CanvasText;",
   " line-height: 1; text-align: center; transform: scale(1.5); transition: transform 0.12s; }",
   ".panel[open] > summary > .chev { transform: rotate(90deg) scale(1.5); }",
-  ".panel > summary h2 { display: inline; font-size: 15px; font-weight: 600; margin: 0; }",
+  -- The question keeps its width (wrapping only when the card is narrower than it); the summary sits beside it
+  -- when it fits, else on its own line, still on the right.
+  ".panel > summary h2 { display: inline; font-size: 15px; font-weight: 600; margin: 0; flex: 0 0 auto;",
+  " max-width: calc(100% - 20px); }",
   ".panel > summary .sum { margin-left: auto; font-size: 12px; color: var(--muted); text-align: right; }",
   ".panel-body { padding-bottom: 12px; }",
 })
