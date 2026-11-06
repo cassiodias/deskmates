@@ -364,7 +364,9 @@ if [ -n "$found_jq" ] && command -v git > /dev/null; then
   expect "trusted exit codes: passed and failed counted" "$(got t1 '.turns[0].tests')" '{"ran":2,"passed":1,"failed":2}'
   expect "a stop: the facts flag" "$(facts_track t1 "$repo" Stop "" no; echo "|$?")" "|0"
   expect "the turn ended" "$(got t1 '.turns[0] | has("endAt")')" true
+  facts_track t1 "$repo" UserPromptSubmit "" no
   expect "a stop with a test flag: no facts flag" "$(facts_track t1 "$repo" Stop test no; echo "|$?")" "|1"
+  expect "a stop with a test flag still ends the turn" "$(got t1 '.turns[0] | has("endAt")')" true
   expect "a stop with no open turn writes nothing: no flag" "$(facts_track t1 "$repo" Stop "" no; echo "|$?")" "|1"
   expect "a session end does nothing" "$(facts_track t2 "$repo" SessionEnd "" no; echo "|$?")" "|1"
   expect "a session end: no file" "$(ls "$FACTS" | grep -c '^t2')" 0
