@@ -6,6 +6,7 @@
 local actual = require("puppet.model.actual")
 local facts = require("puppet.model.facts")
 local planblocks = require("puppet.ui.planblocks")
+local panel = require("puppet.ui.panel")
 local sessioncard = require("puppet.ui.sessioncard")
 
 local workcard = {}
@@ -77,17 +78,18 @@ local function commitCount(raw)
   return tonumber(tostring(raw or ""):match("^%s*(%d+)%s*$"))
 end
 
--- The plan block for facts `f`, git's answer `gitState` and `plan`: { heading, line } while git reads or when it
--- cannot answer; otherwise { heading, base, footer } and, with a plan's file map, `rows` (KINDS, in order: matched,
+-- The plan block for facts `f`, git's answer `gitState` and `plan`: { heading, line, summary } while git reads or
+-- when it cannot answer; otherwise { heading, summary, base, footer } and, with a plan's file map, `rows` (KINDS, in order: matched,
 -- missing, unchecked, unplanned), or without one `list` ({ rows = { path, unseen }, more }).
 local function actualView(f, gitState, plan)
   local maps = filemaps(plan)
   local heading = maps and ASKS_PLAN or ASKS_CHANGED
   gitState = gitState or { reading = true }
-  if gitState.error then return { heading = heading, line = gitState.error } end
-  if gitState.reading then return { heading = heading, line = "Reading git…" } end
+  local function only(line) return { heading = heading, line = line, summary = line } end
+  if gitState.error then return only(gitState.error) end
+  if gitState.reading then return only("Reading git…") end
   local commits = commitCount(gitState.commits)
-  if not commits then return { heading = heading, line = DID_NOT_ANSWER } end
+  if not commits then return only(DID_NOT_ANSWER) end
 
   local c = actual.compare({
     planned = maps and actual.planned(maps, f.git.root, f.git.prefix) or nil,
@@ -105,9 +107,15 @@ local function actualView(f, gitState, plan)
     for _, path in ipairs(c.changed) do list[#list + 1] = { path = path, unseen = c.notSeen[path] or nil } end
     local shown, more = capped(list)
     out.list = { rows = shown, more = more }
+    local unseen = 0
+    for _ in pairs(c.notSeen) do unseen = unseen + 1 end
+    out.summary = #list == 0 and "Nothing changed"
+      or #list .. " changed" .. (unseen > 0 and " · " .. unseen .. " no edit seen" or "")
     return out
   end
   out.heading, out.rows = ASKS_PLAN, {}
+  out.summary = #c.matched .. " of " .. (#c.matched + #c.missing + #c.unchecked) .. " planned changed"
+    .. (#c.unplanned > 0 and " · " .. #c.unplanned .. " not in the plan" or "")
   addRows(out.rows, "matched", c.matched, c.notSeen)
   addRows(out.rows, "missing", c.missing, {})
   addRows(out.rows, "unchecked", c.unchecked, {})
@@ -146,13 +154,18 @@ end
 
 -- What the two blocks show for facts `f`, git's answer `gitState` ({ reading = true }, { error = text }, or
 -- terminals/git.lua's result) and `plan` (model/plans.lua's shape, or nil): { actual = actualView, turns = { turn
--- rows, newest first } }; nil when the facts know no git base. Only the newest turn, open while the session
+-- rows, newest first }, turnsSummary = "4 turns · 2 commits" }; nil when the facts know no git base. Only the newest turn, open while the session
 -- `isWorking`, is working now.
 function workcard.view(f, gitState, plan, isWorking)
   if not facts.hasGit(f) then return nil end
   local turns = {}
-  for i, t in ipairs(f.turns or {}) do turns[#turns + 1] = turnRow(t, i == 1 and isWorking == true) end
-  return { actual = actualView(f, gitState, plan), turns = turns }
+  local commits = 0
+  for i, t in ipairs(f.turns or {}) do
+    turns[#turns + 1] = turnRow(t, i == 1 and isWorking == true)
+    commits = commits + #t.commits
+  end
+  return { actual = actualView(f, gitState, plan), turns = turns,
+    turnsSummary = counted(#turns, "turn") .. (commits > 0 and " · " .. counted(commits, "commit") or "") }
 end
 
 -- One path's `<li>`, escaped, tagged when `unseen`.
@@ -189,9 +202,10 @@ local function tableHtml(rows)
   return table.concat(out)
 end
 
--- The plan block: its question, then one line, or what it shows (the table or the list) and the footer.
+-- The plan block's panel: its question and summary, then one line, or what it shows (the table or the list) and
+-- the footer.
 local function actualHtml(a)
-  local out = { '<section class="actual"><h2>' .. escape(a.heading) .. "</h2>" }
+  local out = {}
   if a.line then
     out[#out + 1] = '<p class="line">' .. escape(a.line) .. "</p>"
   else
@@ -207,8 +221,7 @@ local function actualHtml(a)
     end
     out[#out + 1] = '<p class="foot">' .. escape(a.footer) .. "</p>"
   end
-  out[#out + 1] = "</section>"
-  return table.concat(out)
+  return panel.html("actual", a.heading, escape(a.summary), table.concat(out))
 end
 
 -- One turn's `<li>`: the time, its dot on the rail, then how long and its tests, the files (a pill that opens to
@@ -233,14 +246,14 @@ local function turnHtml(t)
     .. table.concat(commits) .. "</div></li>"
 end
 
--- The two blocks for view `v` (workcard.view): the plan block, then the turns when there are any.
+-- The two panels for view `v` (workcard.view): the plan block, then the turns when there are any.
 function workcard.html(v)
   local out = { actualHtml(v.actual) }
   if #v.turns > 0 then
     local rowsHtml = {}
     for _, t in ipairs(v.turns) do rowsHtml[#rowsHtml + 1] = turnHtml(t) end
-    out[#out + 1] = '<section class="turns"><h2>What did each turn do?</h2><ol class="turnlist">' .. table.concat(rowsHtml)
-      .. "</ol></section>"
+    out[#out + 1] = panel.html("turns", "What did each turn do?", escape(v.turnsSummary),
+      '<ol class="turnlist">' .. table.concat(rowsHtml) .. "</ol>")
   end
   return table.concat(out)
 end
@@ -253,8 +266,6 @@ workcard.CSS = table.concat({
   "@media (prefers-color-scheme: dark) { :root { --ok: #3FB950; --ok-text: #C8FFC0; --ok-bg: rgba(63,185,80,0.12);",
   " --pill: #8FD18B; --pill-bg: rgba(63,185,80,0.16); --warn: #F2C14E; --warn-text: #F5D88A; --warn-bg: rgba(242,193,78,0.10);",
   " --off: #9DA6F5; --off-bg: rgba(157,166,245,0.10); --bad: #E5534B; } }",
-  ".actual, .turns { padding-top: 10px; border-top: 1px solid var(--faint); margin-bottom: 12px; }",
-  ".actual h2, .turns h2 { font-size: 15px; font-weight: 600; margin: 0 0 6px; }",
   ".actual p { margin: 0 0 8px; color: var(--muted); } .actual .foot { font-size: 12px; margin: 8px 0 0; }",
   ".actual code, .turns code { font: 12px Menlo, monospace; overflow-wrap: anywhere; }",
   ".vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }",
@@ -288,13 +299,13 @@ workcard.CSS = table.concat({
   ".turnbody { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; padding-bottom: 14px;",
   " min-width: 0; } .turnbody > * { max-width: 100%; } .turnlist > li:last-child .turnbody { padding-bottom: 0; }",
   ".turns .tests, .turns .nofiles { color: var(--muted); }",
-  ".turns summary { list-style: none; cursor: pointer; display: inline-flex; gap: 6px; padding: 2px 9px;",
+  ".turns .files > summary { list-style: none; cursor: pointer; display: inline-flex; gap: 6px; padding: 2px 9px;",
   " border-radius: 4px; background: var(--pill-bg); color: var(--pill); font: 12px Menlo, monospace; }",
-  ".turns summary::-webkit-details-marker { display: none; }",
-  ".turns summary:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }",
-  ".turns .chev { display: inline-block; transition: transform 0.12s; }",
-  ".turns details[open] > summary .chev { transform: rotate(90deg); }",
-  ".turns details[open] ul { margin-top: 4px; padding: 5px 10px; border-radius: 4px; color: var(--ok-text);",
+  ".turns .files > summary::-webkit-details-marker { display: none; }",
+  ".turns .files > summary:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }",
+  ".turns .files .chev { display: inline-block; transition: transform 0.12s; }",
+  ".turns .files[open] > summary .chev { transform: rotate(90deg); }",
+  ".turns .files[open] ul { margin-top: 4px; padding: 5px 10px; border-radius: 4px; color: var(--ok-text);",
   " background: color-mix(in srgb, var(--ok-bg) 60%, transparent); }",
   ".turns .commit { font: 12px Menlo, monospace; overflow-wrap: anywhere; } .commit code { color: var(--warn); }",
 })

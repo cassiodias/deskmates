@@ -4,6 +4,7 @@
 -- buttons and Esc) is the only one its policy allows.
 
 local planblocks = require("puppet.ui.planblocks")
+local panel = require("puppet.ui.panel")
 local sessioncard = require("puppet.ui.sessioncard")
 local workcard = require("puppet.ui.workcard")
 
@@ -127,11 +128,11 @@ local function split(markdown)
 end
 
 -- The whole page for `plan` (model/plans.lua's shape, or nil); meta.title names the session, meta.color is its
--- puppet's, meta.session (sessioncard.view, or nil) what the session is working on: shown on top, with the plan
--- below, or the session's timeline when there is no plan (the timeline also waits, hidden, behind the plan).
--- meta.work (workcard.html, or nil), the git blocks, goes under the session, before the plan: capped at 45% of the
--- card's height when a plan follows, else as tall as it is, the page scrolling as usual (its buttons kept in view).
-function plancard.html(plan, meta)
+-- puppet's, meta.session (sessioncard.view, or nil) what the session is working on: its header on top. Under it the
+-- panels: meta.work (workcard.html, or nil, the git blocks), then the session's activity; they fill the card when
+-- no plan follows, else they scroll in 45% of it and the plan comes below. `folded` ({ [panel id] = true }, or
+-- nil): the panels drawn closed.
+function plancard.html(plan, meta, folded)
   local nonce = string.format("%08x%08x", math.random(0, 0x7fffffff), math.random(0, 0x7fffffff))
   local color = (meta.color or ""):match("^#%x%x%x%x%x%x$") or "#888888"
   local session, timeline
@@ -143,17 +144,21 @@ function plancard.html(plan, meta)
   for _, step in ipairs(steps) do if step.status == "done" then done = done + 1 end end
   local title, summary, article, sections = split(plan.markdown)
 
-  local body = { "<header>", session or "" }
-  if meta.work then body[#body + 1] = '<div class="work' .. (hasPlan and " capped" or "") .. '">' .. meta.work .. "</div>" end
+  local body = {}
+  if session then body[#body + 1] = "<header>" .. session .. "</header>" end
+  if meta.work or timeline then
+    body[#body + 1] = '<div class="panels' .. (hasPlan and " capped" or "") .. '">' .. (meta.work or "") .. (timeline or "")
+      .. "</div>"
+  end
   if hasPlan then
-    body[#body + 1] = '<div class="label">PLAN</div><h1 class="title">' .. escape(title or meta.title or "Plan") .. "</h1>"
+    body[#body + 1] = '<header><div class="label">PLAN</div><h1 class="title">' .. escape(title or meta.title or "Plan") .. "</h1>"
     if summary then body[#body + 1] = '<p class="summary">' .. inline(summary) .. "</p>" end
     if #steps > 0 then
       body[#body + 1] = '<div class="progress"><progress value="' .. done .. '" max="' .. #steps .. '"></progress>'
         .. '<span class="count">' .. done .. "/" .. #steps .. "</span></div>"
     end
+    body[#body + 1] = "</header>"
   end
-  body[#body + 1] = "</header>"
 
   local aside = {}
   if #sections >= 2 then
@@ -176,9 +181,6 @@ function plancard.html(plan, meta)
     body[#body + 1] = '<div class="layout' .. (#aside == 0 and " solo" or "") .. '" id="plan">'
     if #aside > 0 then body[#body + 1] = "<aside>" .. table.concat(aside) .. "</aside>" end
     body[#body + 1] = "<article>" .. article .. "</article></div>"
-  end
-  if timeline then
-    body[#body + 1] = '<div id="timeline" class="timeline-body"' .. (hasPlan and " hidden" or "") .. ">" .. timeline .. "</div>"
   end
   body[#body + 1] = '<footer><button id="focus">Go to terminal</button><button id="close">Close</button></footer>'
 
@@ -233,16 +235,14 @@ function plancard.html(plan, meta)
     ".method.post { --m: #2e9d4e; } .method.put, .method.patch { --m: #c98a12; } .method.delete { --m: #d0453a; }",
     ".source { margin-top: 4px; font-size: 11px; } .source summary { cursor: pointer; opacity: 0.55; }",
     "[hidden] { display: none !important; }",
-    ".timeline-body { flex: 1; min-height: 0; overflow: auto; padding: 0 14px 10px; }",
     sessioncard.CSS,
     workcard.CSS,
-    ".work.capped { max-height: 45vh; overflow: auto; } body.free { height: auto; min-height: 100vh; }",
-    "body.free footer { position: sticky; bottom: 0; background: Canvas; }",
+    panel.CSS,
     "footer { display: flex; gap: 8px; justify-content: flex-end; padding: 8px 14px; border-top: 1px solid var(--faint); }",
     "footer button { font: inherit; padding: 4px 12px; }",
     "#focus { background: var(--accent); color: white; border: 0; border-radius: 5px; }",
-    "</style></head><body", (meta.work and not hasPlan) and ' class="free"' or "", ">",
-    table.concat(body),
+    "</style></head><body>",
+    panel.fold(table.concat(body), folded),
     '<script nonce="', nonce, '">', plancard.SCRIPT, "</script>",
     "</body></html>",
   })
@@ -260,16 +260,19 @@ plancard.SCRIPT = "function send(m){window.webkit.messageHandlers.deskmates.post
   -- Also: show the ticket chosen (its header and its timeline), hide the others.
   .. "var also=document.querySelector('select.also');if(also)also.onchange=function(){"
   .. "document.querySelectorAll('[data-key]').forEach(function(el){el.hidden=el.getAttribute('data-key')!==also.value})};"
-  -- A phase: with a plan, Plan (or the phase shown, again) shows the plan and the others the timeline of that
-  -- phase; without one, it filters the timeline, and a second click clears it.
+  -- A phase filters the activity (opened, and brought into view); a second click clears it. With a plan, Plan
+  -- clears it and goes to the plan.
   .. "function only(p){document.querySelectorAll('.timeline li').forEach(function(li){"
   .. "li.classList.toggle('out',p!==''&&li.getAttribute('data-phase')!==p)})}"
   .. "document.querySelectorAll('button.phase').forEach(function(b){b.onclick=function(){"
-  .. "var p=b.getAttribute('data-phase'),plan=document.getElementById('plan'),tl=document.getElementById('timeline'),"
-  .. "on=b.classList.contains('on');"
+  .. "var p=b.getAttribute('data-phase'),plan=document.getElementById('plan'),"
+  .. "act=document.querySelector('[data-panel=activity]'),on=b.classList.contains('on');"
   .. "document.querySelectorAll('button.phase').forEach(function(x){x.classList.remove('on')});only('');"
-  .. "if(plan&&(p==='plan'||on)){plan.hidden=false;if(tl)tl.hidden=true;return}"
-  .. "if(on)return;b.classList.add('on');if(plan)plan.hidden=true;if(tl)tl.hidden=false;only(p)}});"
+  .. "if(plan&&p==='plan'){plan.scrollIntoView({block:'start'});return}"
+  .. "if(on)return;b.classList.add('on');only(p);if(act){act.open=true;act.scrollIntoView({block:'nearest'})}}});"
+  -- A panel folded or opened: the Spoon keeps it so for the next drawing of this session's card.
+  .. "document.querySelectorAll('details.panel').forEach(function(d){d.addEventListener('toggle',function(){"
+  .. "send('fold:'+d.getAttribute('data-panel')+':'+(d.open?'open':'closed'))})});"
 
 local PlanCard = {}
 PlanCard.__index = PlanCard
@@ -297,6 +300,9 @@ end
 function PlanCard:show(key, plan, meta)
   self:hide()
   self.key = key
+  -- The folds belong to the session shown: kept while its card is drawn again (and opened again), dropped when
+  -- another session's card opens.
+  if self.foldKey ~= key then self.folded, self.foldKey = {}, key end
   local content = hs.webview.usercontent.new("deskmates")
   content:setCallback(function(message)
     if message.body == "focus" then
@@ -304,6 +310,9 @@ function PlanCard:show(key, plan, meta)
       if shown then self.focusTimer = hs.timer.doAfter(0, function() self.onFocus(shown) end) end
     elseif message.body == "close" then
       self:hide()
+    else
+      local id, isFolded = panel.message(message.body)
+      if id and self.key == key then self.folded[id] = isFolded or nil end
     end
   end)
   local size = plancard.fitSize(self.loadSize and self.loadSize())
@@ -334,7 +343,7 @@ function PlanCard:show(key, plan, meta)
       self.saveSize(plancard.fitSize({ w = state.w - chromeW, h = state.h - chromeH }))
     end
   end)
-  view:html(plancard.html(plan, meta))
+  view:html(plancard.html(plan, meta, self.folded))
   view:show()
   -- Hammerspoon becomes the active app, so the card is the key window: an inactive card loses its first click.
   -- (view:hswindow() would find the window, but it asks macOS about every app's windows: 1.5 s.)
@@ -358,7 +367,7 @@ end
 -- Shows a newer page in the card of session `key`, in the same window; nothing when the card shows another
 -- session, or none.
 function PlanCard:update(key, plan, meta)
-  if self.view and self.key == key then self.view:html(plancard.html(plan, meta)) end
+  if self.view and self.key == key then self.view:html(plancard.html(plan, meta, self.folded)) end
 end
 
 function PlanCard:isShown() return self.view ~= nil end

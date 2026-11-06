@@ -405,6 +405,27 @@ stub.advance(0.2)
 answer(newer, { "3\n", "M\0src/app.js\0", "", "" })
 answer(older, ANSWER)
 check("an older read answering last is dropped", gitCard.html_:find("3 commits, 0 not committed.", 1, true) ~= nil)
+-- A panel folded on the page stays folded when the card is drawn again; junk fold messages change nothing.
+local TURNS_OPEN, TURNS_FOLDED = '<details class="panel turns" data-panel="turns" open>', '<details class="panel turns" data-panel="turns">'
+check("panels open at first", gitCard.html_:find(TURNS_OPEN, 1, true) ~= nil)
+gitCard.content.callback({ body = "fold:turns:closed" })
+for _, junk in ipairs({ "fold:actual:shut", "fold:plan:closed", "fold:actual:closed:x", "fold:ACTUAL:closed", 42 }) do
+  gitCard.content.callback({ body = junk })
+end
+tasks = #stub.tasks
+write("PreToolUse|git1||Bash|||my-app|iTerm.app|test|/dev/ttys009|claude|")
+stub.advance(0.2)
+answer(tasks, { "4\n", "M\0src/app.js\0", "", "" })
+check("a folded panel stays folded on a redraw", gitCard.html_:find("4 commits, 0 not committed.", 1, true) ~= nil
+  and gitCard.html_:find(TURNS_FOLDED, 1, true) ~= nil and not gitCard.html_:find(TURNS_OPEN, 1, true))
+check("junk fold messages fold nothing", gitCard.html_:find('<details class="panel actual" data-panel="actual" open>', 1, true) ~= nil)
+gitCard.content.callback({ body = "fold:turns:open" })
+tasks = #stub.tasks
+write("PostToolUse|git1||Bash|||my-app|iTerm.app|test|/dev/ttys009|claude|")
+stub.advance(0.2)
+answer(tasks, { "5\n", "M\0src/app.js\0", "", "" })
+check("opened again, drawn open", gitCard.html_:find(TURNS_OPEN, 1, true) ~= nil)
+gitCard.content.callback({ body = "fold:turns:closed" })
 closeCard(gitCard)
 
 -- git fails, is too slow, or lost the base: one line in the block, the turns still there.
@@ -440,11 +461,17 @@ write("PreToolUse|tab1||Skill||my-developer|app|iTerm.app|facts|/dev/ttys001|cla
 stub.advance(0.2)
 local other = doubleClickOn("tab1")
 check("a session with no git opens as today: no git read", #stub.tasks == tasks + 1
-  and other.html_:find("ABC-12", 1, true) ~= nil and not other.html_:find('class="actual"', 1, true))
+  and other.html_:find("ABC-12", 1, true) ~= nil and not other.html_:find('data-panel="actual"', 1, true))
 local otherPage = other.html_
 answer(tasks, ANSWER)
 check("git's late answer leaves another session's card alone", other.html_ == otherPage and left.html_:find("Reading git…", 1, true) ~= nil)
 closeCard(other)
+-- Another session's card opened since: the folds were that session's, so this one opens with every panel open.
+tasks = #stub.tasks
+local reopened = doubleClickOn("git1")
+answer(tasks, ANSWER)
+check("another session's card opened since: all open", reopened.html_:find(TURNS_OPEN, 1, true) ~= nil)
+closeCard(reopened)
 hs.fs.attributes = attributes
 os.execute("rm -rf '" .. plansDir .. "' '" .. factsDir .. "'")
 

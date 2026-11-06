@@ -155,8 +155,10 @@ check("page: no summary is clipped", not has(longPage, "line-clamp"))
 check("contents: room to scroll the last section to the top", has(full, "article::after"))
 check("contents: the heading clicked lights up", has(plancard.SCRIPT, "classList.add('here')") and has(full, "h2.here"))
 
--- The session on top: its ticket, strip and NOW in the header; the plan below, or the timeline when there is none.
+-- The session on top: its ticket, strip and NOW in the header; under it the panels (the git blocks, then the
+-- activity), then the plan when there is one.
 local sessioncard = require("puppet.ui.sessioncard")
+local workcard = require("puppet.ui.workcard")
 local facts = { current = "ABC-12", tickets = { ["ABC-12"] = { phase = "dev", phaseAt = 100, phases = { dev = 100 }, seen = 200 } },
   timeline = { { at = 200, ticket = "ABC-12", kind = "reply", text = "Fixed the typo.", phase = "dev" },
                { at = 100, ticket = "ABC-12", kind = "subagent", text = "Implement ABC-12", phase = "dev" } } }
@@ -165,43 +167,61 @@ local only = plancard.html(nil, { title = "my-app", session = view })
 local onlyHeader = only:match("<header>(.-)</header>") or ""
 check("session: the ticket and strip in the header", has(onlyHeader, "ABC-12") and has(onlyHeader, 'data-phase="dev"')
   and has(onlyHeader, "NOW"))
-check("session, no plan: the timeline is the body", has(only, '<div id="timeline" class="timeline-body">')
-  and has(only, "Implement ABC-12") and not has(only, "<article>") and not has(only, ">PLAN<"))
+check("session, no plan: the activity panel fills the card", has(only, '<div class="panels"><details class="panel activity"')
+  and has(only, "<h2>What happened along the way?</h2>") and has(only, "Implement ABC-12")
+  and not has(only, "<article>") and not has(only, ">PLAN<"))
+check("session: the phase filter's rows in the activity panel", has(only, '<li data-phase="dev">')
+  and (only:find('data-panel="activity"', 1, true) or math.huge) < (only:find('<li data-phase="dev">', 1, true) or 0))
 local both = plancard.html({ steps = STEPS, markdown = "# Add a flag\n\n## Files\n\n- a" }, { title = "my-app", session = view })
 check("session and plan: the plan shows", has(both, 'id="plan"') and has(both, "<article>") and has(both, ">PLAN<")
   and has(both, "ABC-12"))
-check("session and plan: the timeline waits, hidden", has(both, '<div id="timeline" class="timeline-body" hidden>'))
-check("no session: the page as before", not has(full, 'id="timeline"') and not has(full, 'class="session"'))
+check("session and plan: the activity shows too, above the plan", has(both, 'data-panel="activity" open>')
+  and (both:find('data-panel="activity"', 1, true) or math.huge) < (both:find(">PLAN<", 1, true) or 0))
+check("no session: no activity panel", not has(full, 'data-panel="activity"') and not has(full, 'class="session"')
+  and not has(full, 'class="panels'))
 check("session: hidden really hides", has(both, "[hidden] { display: none !important; }"))
 local evilView = sessioncard.view({ current = "ABC-1", tickets = { ["ABC-1"] = { seen = 1, phases = {} } },
   timeline = { { at = 1, ticket = "ABC-1", kind = "reply", text = "</script><script>alert(1)</script>" } } }, 1)
 local evilPage = plancard.html(nil, { title = "x", session = evilView })
 check("session: escaped on the page", count(evilPage, "<script") == 1 and has(evilPage, "default-src 'none'"))
 check("script: Also switches tickets", has(plancard.SCRIPT, "select.also") and has(plancard.SCRIPT, "data-key"))
-check("script: a phase click filters, or brings the plan back", has(plancard.SCRIPT, "button.phase")
-  and has(plancard.SCRIPT, "data-phase") and has(plancard.SCRIPT, "getElementById('plan')"))
+check("script: a phase click filters the activity and opens it, or goes to the plan", has(plancard.SCRIPT, "button.phase")
+  and has(plancard.SCRIPT, "data-phase") and has(plancard.SCRIPT, "getElementById('plan')")
+  and has(plancard.SCRIPT, "[data-panel=activity]") and has(plancard.SCRIPT, "act.open=true"))
+check("script: a fold tells the Spoon", has(plancard.SCRIPT, "details.panel")
+  and has(plancard.SCRIPT, "send('fold:'+d.getAttribute('data-panel')+':'+(d.open?'open':'closed'))"))
 
--- The git blocks (meta.work): under the session's header, before the plan; a card on their own without a plan
--- or tickets.
-local WORK = '<section class="actual"><p class="line">Reading git…</p></section>'
+-- The git blocks (meta.work, workcard.html): panels under the session's header, before the activity and the plan.
+local function at(h, m) return os.time({ year = 2026, month = 11, day = 5, hour = h, min = m, sec = 0 }) end
+local WORK = workcard.html(workcard.view({ tickets = {}, timeline = {}, seen = {},
+  git = { root = "/r", base = "a1b2c3d4e5f6", dirtyAtStart = {} },
+  turns = { { at = at(9, 0), endAt = at(9, 4), files = {}, tests = { ran = 0, passed = 0, failed = 0 }, commits = {} } } },
+  { reading = true }, nil, false))
 local workOnly = plancard.html(nil, { title = "my-app", work = WORK })
 check("work, no plan or tickets: the card shows it", has(workOnly, WORK) and not has(workOnly, ">PLAN<")
-  and not has(workOnly, 'class="session"') and not has(workOnly, 'id="timeline"') and has(workOnly, "Go to terminal"))
-check("work: its styles", has(workOnly, ".actual") and has(workOnly, ".unseen"))
+  and not has(workOnly, 'class="session"') and not has(workOnly, 'data-panel="activity"') and has(workOnly, "Go to terminal"))
+check("work: its styles", has(workOnly, ".actual") and has(workOnly, ".unseen") and has(workOnly, ".panel {"))
 local workAll = plancard.html({ steps = STEPS, markdown = "# Add a flag\n\n## Files\n\n- a" },
   { title = "my-app", session = view, work = WORK })
-local wAt, sAt, pAt = workAll:find(WORK, 1, true), workAll:find('class="strip"', 1, true), workAll:find(">PLAN<", 1, true)
-check("work: under the session's strip, before the plan", wAt and sAt and pAt and sAt < wAt and wAt < pAt)
-check("no work: no work block", not has(both, 'class="work"'))
--- Cassio (6 Nov): the git blocks scroll in 45% of the card only when a plan follows them; with no plan they take
--- the card's full height and the page scrolls as usual.
-check("work, no plan: no cap, the page scrolls", has(workOnly, '<div class="work">') and has(workOnly, '<body class="free">'))
-check("work and a plan: capped", has(workAll, '<div class="work capped">') and has(workAll, "<body>")
-  and not has(workAll, 'class="free"'))
-check("work css: the cap only on .capped", has(workAll, ".work.capped { max-height: 45vh; overflow: auto; }")
-  and not has(workAll, ".work { max-height") and has(workAll, "body.free { height: auto; min-height: 100vh; }"))
-check("a ticket card, no work and no plan: its timeline scrolls in a fixed page", has(only, "<body>")
-  and not has(only, 'class="free"'))
-check("work only: the buttons stay in view", has(workOnly, "body.free footer { position: sticky; bottom: 0; background: Canvas; }"))
+local sAt, aAt, tAt, vAt, pAt = workAll:find('class="strip"', 1, true), workAll:find('data-panel="actual"', 1, true),
+  workAll:find('data-panel="turns"', 1, true), workAll:find('data-panel="activity"', 1, true), workAll:find(">PLAN<", 1, true)
+check("panels: strip, plan block, turns, activity, then the plan", sAt and aAt and tAt and vAt and pAt
+  and sAt < aAt and aAt < tAt and tAt < vAt and vAt < pAt)
+check("no work: no git panels", not has(both, 'data-panel="actual"') and not has(both, 'data-panel="turns"'))
+-- Cassio (6 Nov): the panels scroll in 45% of the card only when a plan follows them; with no plan they take the
+-- card's full height, scrolling in it, the buttons always in view.
+check("panels, no plan: no cap", has(workOnly, '<div class="panels">') and has(only, '<div class="panels">'))
+check("panels and a plan: capped", has(workAll, '<div class="panels capped">'))
+check("panels css: fill the card, capped only before a plan", has(workAll, ".panels { flex: 1; min-height: 0; overflow: auto;")
+  and has(workAll, ".panels.capped { flex: none; max-height: 45vh; }"))
+check("a fixed page, the footer always in view", has(workOnly, "<body>") and has(only, "<body>") and not has(workAll, "free"))
+
+-- Folded panels (PlanCard's set for the session shown) are drawn closed; the others open.
+local foldedPage = plancard.html({ steps = STEPS, markdown = "# Add a flag\n\n## Files\n\n- a" },
+  { title = "my-app", session = view, work = WORK }, { turns = true, activity = true })
+check("folded: drawn closed", has(foldedPage, '<details class="panel turns" data-panel="turns"><summary>')
+  and has(foldedPage, '<details class="panel activity" data-panel="activity"><summary>')
+  and has(foldedPage, '<details class="panel actual" data-panel="actual" open>'))
+check("folded: nothing folded, all open", count(workAll, '" open><summary>') == 3)
 
 check.done("plan card")

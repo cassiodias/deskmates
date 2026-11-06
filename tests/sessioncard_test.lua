@@ -85,6 +85,9 @@ check("view: nil facts", sessioncard.view(nil, 1) == nil)
 check("view: facts with no tickets", sessioncard.view({ tickets = {}, timeline = {} }, 1) == nil)
 local failed = sessioncard.view({ current = "ABC-1", tickets = { ["ABC-1"] = { seen = 1, phases = {} } },
   timeline = { { at = 1, ticket = "ABC-1", kind = "tests", text = "failed" } } }, 1)
+check("view: each ticket's activity in a few words", t and t.summary == "5 lines" and v.tickets[2].summary == "1 line")
+check("view: no activity yet", sessioncard.view({ current = "ABC-1", tickets = { ["ABC-1"] = { seen = 1, phases = {} } },
+  timeline = {} }, 1).tickets[1].summary == "Nothing yet")
 check("view: failed tests", failed.tickets[1].rows[1].label == "✗ tests")
 
 -- html: the header part and the timeline part.
@@ -96,6 +99,12 @@ check("html: the other ticket is hidden", has(head, 'data-key="ABC-34" hidden'))
 check("html: Also lists both, current first", has(head, '<select class="also"><option value="ABC-12">ABC-12</option><option value="ABC-34">'))
 check("html: the timeline's rows", has(timeline, 'data-phase="review"') and has(timeline, "QA ABC-12 lens break")
   and has(timeline, 'data-key="ABC-34" hidden'))
+check("html: the timeline is the activity panel, its question and each ticket's summary", has(timeline,
+  '<details class="panel activity" data-panel="activity" open><summary><span class="chev">›</span>'
+  .. '<h2>What happened along the way?</h2><span class="sum"><span data-key="ABC-12">5 lines</span>'
+  .. '<span data-key="ABC-34" hidden>1 line</span></span></summary><div class="panel-body">'))
+check("html: the phase filter's rows are in the panel", (timeline:find('data-panel="activity"', 1, true) or math.huge)
+  < (timeline:find('<li data-phase="review">', 1, true) or 0))
 local single = sessioncard.html(sessioncard.view({ current = "ABC-1", tickets = { ["ABC-1"] = { seen = 1, phases = {} } }, timeline = {} }, 1))
 check("html: one ticket, no Also", not has(single, "<select"))
 
@@ -105,7 +114,7 @@ local eh, et = sessioncard.html(sessioncard.view({ current = "ABC-1", tickets = 
 check("escaped: no script tag", not has(eh, "<script") and not has(et, "<script"))
 check("escaped: no img tag", not has(eh, "<img") and not has(et, "<img"))
 check("escaped: no stray closing div", select(2, eh:gsub("</div>", "")) == select(2, eh:gsub("<div", ""))
-  and not has(et, "</div>"))
+  and select(2, et:gsub("</div>", "")) == select(2, et:gsub("<div", "")))
 check("escaped: quotes and ampersands", has(et, "&quot;alert(1)&quot;") and has(et, "&#39;&amp;"))
 check("escape: the five characters", sessioncard.escape([[<>&"']]) == "&lt;&gt;&amp;&quot;&#39;")
 check("CSS: a string", type(sessioncard.CSS) == "string" and has(sessioncard.CSS, ".timeline"))

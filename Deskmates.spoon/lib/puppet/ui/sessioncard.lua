@@ -3,6 +3,8 @@
 -- timeline); sessioncard.html makes its two parts of the page, the header and the timeline, every text escaped.
 -- It knows no Hammerspoon.
 
+local panel = require("puppet.ui.panel")
+
 local sessioncard = {}
 
 local PHASES = { "plan", "dev", "review" }
@@ -61,6 +63,7 @@ local function ticketView(key, t, timeline, now, isWorking)
         phase = e.phase }
     end
   end
+  v.summary = #v.rows == 0 and "Nothing yet" or #v.rows .. " line" .. (#v.rows == 1 and "" or "s")
   return v
 end
 
@@ -86,10 +89,10 @@ end
 local function hidden(i) return i > 1 and " hidden" or "" end
 
 -- The page's two parts for view `v`: the header (each ticket's key, badge, strip and NOW, and the Also choice)
--- and the timeline (each ticket's rows). Every ticket is there, all but the first hidden; the page's script
+-- and the activity panel, "What happened along the way?" (each ticket's rows and summary). Every ticket is there, all but the first hidden; the page's script
 -- switches them (data-key) and filters rows by phase (data-phase).
 function sessioncard.html(v)
-  local head, rows = { '<section class="session">' }, { '<section class="timelines">' }
+  local head, rows, sums = { '<section class="session">' }, { '<section class="timelines">' }, {}
   if #v.tickets > 1 then
     local options = {}
     for _, t in ipairs(v.tickets) do
@@ -122,11 +125,12 @@ function sessioncard.html(v)
       items[#items + 1] = '<li data-phase="' .. (r.phase or "") .. '"><span class="time">' .. (r.time or "")
         .. '</span><span class="what">' .. escape(r.label) .. '</span><span class="text">' .. escape(r.text) .. "</span></li>"
     end
+    sums[#sums + 1] = '<span data-key="' .. key .. '"' .. hidden(i) .. ">" .. escape(t.summary) .. "</span>"
     rows[#rows + 1] = '<ul class="timeline" data-key="' .. key .. '"' .. hidden(i) .. ">" .. table.concat(items) .. "</ul>"
   end
   head[#head + 1] = "</section>"
   rows[#rows + 1] = "</section>"
-  return table.concat(head), table.concat(rows)
+  return table.concat(head), panel.html("activity", "What happened along the way?", table.concat(sums), table.concat(rows))
 end
 
 -- The styles for the session part, in the page's tokens (--accent, --faint).

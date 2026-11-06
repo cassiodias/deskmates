@@ -58,6 +58,14 @@ check("plan: unplanned, the one no hook named marked", r[4] and r[4].mark == "�
   and r[4].left.say == "not in the plan" and r[4].left.tone == "off"
   and r[4].right.path == "scratch.sh" and r[4].right.tint == "off" and r[4].right.unseen
   and r[5].right.path == "src/new.js" and not r[5].right.unseen)
+check("plan: the summary", a and a.summary == "1 of 3 planned changed · 2 not in the plan")
+check("reading and errors: the line is the summary", workcard.view(factsWith(), { reading = true }, PLAN, false).actual.summary
+  == "Reading git…" and workcard.view(factsWith(), { error = "git did not answer" }, nil, false).actual.summary == "git did not answer")
+local nothing = workcard.view(factsWith(), { commits = "0", diff = "", uncommitted = "", untracked = "" }, nil, false)
+check("nothing changed: the summary says so", nothing and nothing.actual.summary == "Nothing changed")
+local allIn = workcard.view(factsWith(), { commits = "1", diff = "M\0src/app.js\0", uncommitted = "", untracked = "" },
+  { steps = {}, markdown = "# x\n\n## Files\n\n- `src/app.js` — a\n" }, false)
+check("plan, all changed, none unplanned: no unplanned part", allIn and allIn.actual.summary == "1 of 1 planned changed")
 check("plan: dirty at start and never named, left out", a and not has(workcard.html(v), "old.txt"))
 
 -- A planned path changed by something no hook named: tagged on the matched row too.
@@ -80,7 +88,8 @@ check("in a subfolder: the plan's src/app.js is git's packages/web/src/app.js", 
 
 local MARK = '<td class="mark"><span aria-hidden="true">%s</span><span class="vh">%s</span></td>'
 local html = workcard.html(v)
-check("html: the question and what it shows", has(html, '<section class="actual"><h2>Did it change what the plan said?</h2>'
+check("html: a panel, its question and summary, then what it shows", has(html, '<details class="panel actual" data-panel="actual" open><summary><span class="chev">›</span><h2>Did it change what the plan said?</h2>'
+  .. '<span class="sum">1 of 3 planned changed · 2 not in the plan</span></summary><div class="panel-body">'
   .. '<p class="explain">Left, the files the plan named. Right, what git shows changed since <code>a1b2c3d</code>. '
   .. "A gap on either side is the answer.</p>"))
 check("html: the table's header", has(html, '<table class="pva"><thead><tr><th>The plan said</th><th></th>'
@@ -94,7 +103,7 @@ check("html: unchecked", has(html, '<tr class="unchecked"><td class="tint-neutra
 check("html: unplanned, no edit seen", has(html, '<tr class="unplanned"><td class="say say-off">not in the plan</td>'
   .. MARK:format("→", "not in the plan") .. '<td class="tint-off"><code>scratch.sh</code> <span class="unseen">no edit seen</span></td></tr>')
   and count(html, "no edit seen") == 1)
-check("html: the footer after the table", has(html, '</tbody></table><p class="foot">3 commits, 2 not committed.</p></section>'))
+check("html: the footer after the table", has(html, '</tbody></table><p class="foot">3 commits, 2 not committed.</p></div></details>'))
 check("html: no old labels", not has(html, "PLAN VS ACTUAL") and not has(html, "✓") and not has(html, "＋")
   and not has(html, "not seen from the agent"))
 check("html: one commit is one", has(workcard.html(workcard.view(factsWith(), { commits = "1", diff = "", uncommitted = "",
@@ -109,10 +118,13 @@ for name, plan in pairs({ ["no plan"] = false, ["a plan with no file map"] = { s
     and #nl.rows == 3 and nl.rows[1].path == "scratch.sh" and nl.rows[1].unseen
     and nl.rows[2].path == "src/app.js" and nl.rows[3].path == "src/new.js" and nl.more == 0)
   local nh = workcard.html(nv)
-  check(name .. ": drawn", has(nh, '<section class="actual"><h2>What changed?</h2><p class="explain">What git shows changed'
+  check(name .. ": drawn", has(nh, '<details class="panel actual" data-panel="actual" open><summary><span class="chev">›</span>'
+    .. '<h2>What changed?</h2><span class="sum">3 changed · 1 no edit seen</span></summary><div class="panel-body">'
+    .. '<p class="explain">What git shows changed'
     .. ' since <code>a1b2c3d</code>.</p><ul class="changed"><li><code>scratch.sh</code> <span class="unseen">no edit seen'
     .. "</span></li><li><code>src/app.js</code></li><li><code>src/new.js</code></li></ul>"
-    .. '<p class="foot">3 commits, 2 not committed.</p></section>') and not has(nh, "<table"))
+    .. '<p class="foot">3 commits, 2 not committed.</p></div></details>') and not has(nh, "<table"))
+  check(name .. ": its summary", nv and nv.actual.summary == "3 changed · 1 no edit seen")
 end
 
 -- While git reads, and when it cannot answer: one line under the heading.
@@ -120,10 +132,10 @@ local reading = workcard.view(factsWith(), { reading = true }, PLAN, false)
 check("reading: the line", reading and reading.actual.line == "Reading git…" and reading.actual.rows == nil
   and reading.actual.list == nil and reading.actual.heading == "Did it change what the plan said?")
 local rh = workcard.html(reading)
-check("reading: drawn", has(rh, '<section class="actual"><h2>Did it change what the plan said?</h2><p class="line">Reading git…</p>'
-  .. "</section>") and not has(rh, "<table") and not has(rh, 'class="foot"'))
+check("reading: drawn", has(rh, '<h2>Did it change what the plan said?</h2><span class="sum">Reading git…</span></summary>'
+  .. '<div class="panel-body"><p class="line">Reading git…</p></div></details>') and not has(rh, "<table") and not has(rh, 'class="foot"'))
 check("reading, no file map: what changed", has(workcard.html(workcard.view(factsWith(), { reading = true }, nil, false)),
-  '<h2>What changed?</h2><p class="line">Reading git…</p>'))
+  '<h2>What changed?</h2><span class="sum">Reading git…</span></summary><div class="panel-body"><p class="line">Reading git…</p>'))
 local gone = workcard.html(workcard.view(factsWith(), { error = "base a1b2c3d no longer exists" }, PLAN, false))
 check("base gone: the line", has(gone, '<p class="line">base a1b2c3d no longer exists</p>') and not has(gone, "<table"))
 local mute = workcard.view(factsWith(), { commits = "fatal: oops", diff = "", uncommitted = "", untracked = "" }, PLAN, false)
@@ -152,6 +164,8 @@ check("turns: the dots", rows and rows[1].dot == "running" and rows[2].dot == "n
   and rows[4].dot == "ok" and rows[5].dot == "bad")
 check("turns: tests in words", rows and rows[1].tests == "1 test failed (of 2)" and rows[2].tests == "tests ran 3"
   and rows[3].tests == nil and rows[4].tests == "tests passed (2 of 2)" and rows[5].tests == "2 tests failed (of 3)")
+check("turns: the summary", tv and tv.turnsSummary == "5 turns · 2 commits")
+check("turns: one turn, no commits", (workcard.view(factsWith({ turns[2] }), GIT, PLAN, false) or {}).turnsSummary == "1 turn")
 check("turns: the files", rows and #rows[1].files == 2 and rows[1].files[1] == "src/app.js" and #rows[3].files == 0)
 check("turns: the files in words", rows and rows[1].summary == "2 files…" and rows[2].summary == "1 file…"
   and rows[3].summary == "No files edited.")
@@ -159,8 +173,9 @@ check("turns: commits", rows and #rows[1].commits == 2 and rows[1].commits[1].ha
   and rows[1].commits[1].subject == "Fix the typo" and #rows[2].commits == 0)
 
 local th = workcard.html(tv)
-check("turns html: after the plan block", has(th, '<section class="turns"><h2>What did each turn do?</h2><ol class="turnlist">')
-  and (th:find('class="actual"', 1, true) or math.huge) < (th:find('class="turns"', 1, true) or 0))
+check("turns html: a panel after the plan block", has(th, '<details class="panel turns" data-panel="turns" open><summary><span class="chev">›</span><h2>What did each turn do?</h2>'
+  .. '<span class="sum">5 turns · 2 commits</span></summary><div class="panel-body"><ol class="turnlist">')
+  and (th:find('data-panel="actual"', 1, true) or math.huge) < (th:find('data-panel="turns"', 1, true) or 0))
 check("turns html: a running row", has(th, '<li><span class="at">14:05</span><span class="rail"><span class="pip running">'
   .. '</span></span><div class="turnbody"><div class="turnhead"><b>Working now</b><span class="tests"> · 1 test failed (of 2)'
   .. "</span></div>"))
@@ -207,7 +222,7 @@ check("stopped: its start, no end recorded, no commits", stopped and stopped.tur
 check("stopped: drawn with no commits", has(workcard.html(stopped), '<b>No end recorded</b></div><details class="files">'
   .. '<summary><span class="chev">›</span>1 file…</summary><ul><li><code>src/app.js</code></li></ul></details></div></li></ol>'))
 
-check("no turns: no turns block", not has(workcard.html(workcard.view(factsWith(), GIT, PLAN, false)), 'class="turns"'))
+check("no turns: no turns block", not has(workcard.html(workcard.view(factsWith(), GIT, PLAN, false)), 'data-panel="turns"'))
 
 -- The styles: light colours, dark ones for a dark page, sentence-case headings, paths that wrap.
 local CSS = workcard.CSS
@@ -229,11 +244,10 @@ check("css: a path on the warn tint in the warn text colour", has(CSS, ".tint-wa
 check("css: the dots", CSS:match("%.pip%.running {[^}]*border[^}]*var%(%-%-off%)") and CSS:match("%.pip%.ok {[^}]*var%(%-%-ok%)")
   and CSS:match("%.pip%.bad {[^}]*var%(%-%-bad%)") ~= nil)
 check("css: no line after the last dot", has(CSS, ".turnlist > li:last-child .rail::after { content: none; }"))
-check("css: the pill and its chevron", CSS:match("%.turns summary {[^}]*var%(%-%-pill%-bg%)") and has(CSS, "var(--pill)")
-  and CSS:match("details%[open%] > summary %.chev {[^}]*rotate%(90deg%)") ~= nil)
-check("css: open, the files are tinted too", CSS:match("%.turns details%[open%] ul {[^}]*background") ~= nil)
+check("css: the pill and its chevron", CSS:match("%.turns %.files > summary {[^}]*var%(%-%-pill%-bg%)") and has(CSS, "var(--pill)")
+  and CSS:match("%.files%[open%] > summary %.chev {[^}]*rotate%(90deg%)") ~= nil)
+check("css: open, the files are tinted too", CSS:match("%.turns %.files%[open%] ul {[^}]*background") ~= nil)
 check("css: a hash in amber", CSS:match("%.commit code {[^}]*var%(%-%-warn%)") ~= nil)
-check("css: headings", CSS:match("%.actual h2, %.turns h2 {[^}]*15px[^}]*600") ~= nil)
 check("css: paths wrap", CSS:match("overflow%-wrap: anywhere") ~= nil)
 
 -- Escaping: a path from git and a path from a hook.
