@@ -192,9 +192,11 @@ check("script: a phase click scrolls nothing", phaseClick ~= "" and not has(phas
 check("script: a phase click keeps the panels' scroll position", has(phaseClick, "panels.scrollTop=top"))
 check("script: a phase click filters the turns too, their own rows only", has(plancard.SCRIPT, ".turnlist>li"))
 check("script: a picked lane is told to the page", has(plancard.SCRIPT, "classList.toggle('lane'"))
-check("script: a phase click filters the activity and opens it, or goes to the plan", has(plancard.SCRIPT, "button.phase")
+check("script: a phase click filters the activity, or goes to the plan", has(plancard.SCRIPT, "button.phase")
   and has(plancard.SCRIPT, "data-phase") and has(plancard.SCRIPT, "getElementById('plan')")
-  and has(plancard.SCRIPT, "[data-panel=activity]") and has(plancard.SCRIPT, "act.open=true"))
+)
+-- Live (6 Nov): the activity folded, a lane picked, then another, opened it again. A fold is the reader's alone.
+check("script: a phase click opens and folds nothing", phaseClick ~= "" and not has(phaseClick, ".open="))
 -- A <details> drawn open fires toggle on load: only a change from the state drawn is told, so a redraw sends nothing.
 check("script: only a user's fold is told", has(plancard.SCRIPT, "var was=d.open;")
   and has(plancard.SCRIPT, "if(d.open===was)return;was=d.open;"))

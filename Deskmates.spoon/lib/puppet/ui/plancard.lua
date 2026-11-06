@@ -260,19 +260,19 @@ plancard.SCRIPT = "function send(m){window.webkit.messageHandlers.deskmates.post
   -- Also: show the ticket chosen (its header and its timeline), hide the others.
   .. "var also=document.querySelector('select.also');if(also)also.onchange=function(){"
   .. "document.querySelectorAll('[data-key]').forEach(function(el){el.hidden=el.getAttribute('data-key')!==also.value})};"
-  -- A phase filters the activity (opened) and the turns in place, and marks the page (body.lane); a second click clears it. The panels stay where the reader
-  -- left them: nothing is brought into view, and their scroll position is put back after the rows change. With a
-  -- plan, Plan clears it and takes the plan's article (what scrolls: the body never does) back to its top.
+  -- A phase filters the activity and the turns in place and marks the page (body.lane); a second click clears it.
+  -- A folded panel stays folded: folds are the reader's alone. The panels stay where the reader left them: nothing
+  -- is brought into view, and their scroll position is put back after the rows change. With a plan, Plan clears it and takes the plan's article (what scrolls: the body never does) back to its top.
   .. "function only(p){document.body.classList.toggle('lane',p!=='');"
   .. "document.querySelectorAll('.timeline li,.turnlist>li').forEach(function(li){"
   .. "li.classList.toggle('out',p!==''&&li.getAttribute('data-phase')!==p)})}"
   .. "document.querySelectorAll('button.phase').forEach(function(b){b.onclick=function(){"
   .. "var p=b.getAttribute('data-phase'),plan=document.getElementById('plan'),"
-  .. "act=document.querySelector('[data-panel=activity]'),on=b.classList.contains('on'),"
+  .. "on=b.classList.contains('on'),"
   .. "panels=document.querySelector('.panels'),top=panels?panels.scrollTop:0;"
   .. "document.querySelectorAll('button.phase').forEach(function(x){x.classList.remove('on')});only('');"
   .. "if(plan&&p==='plan'){var art=plan.querySelector('article');if(art)art.scrollTop=0;return}"
-  .. "if(!on){b.classList.add('on');only(p);if(act)act.open=true}"
+  .. "if(!on){b.classList.add('on');only(p)}"
   .. "if(panels)panels.scrollTop=top}});"
   -- A panel folded or opened: the Spoon keeps it so for the next drawing of this session's card. A panel drawn
   -- open fires toggle on load too: only a change from the state drawn is told, so a redraw sends nothing.
