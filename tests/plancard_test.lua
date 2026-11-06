@@ -183,7 +183,7 @@ check("script: a phase click filters, or brings the plan back", has(plancard.SCR
 
 -- The git blocks (meta.work): under the session's header, before the plan; a card on their own without a plan
 -- or tickets.
-local WORK = '<section class="actual"><p class="line">reading git…</p></section>'
+local WORK = '<section class="actual"><p class="line">Reading git…</p></section>'
 local workOnly = plancard.html(nil, { title = "my-app", work = WORK })
 check("work, no plan or tickets: the card shows it", has(workOnly, WORK) and not has(workOnly, ">PLAN<")
   and not has(workOnly, 'class="session"') and not has(workOnly, 'id="timeline"') and has(workOnly, "Go to terminal"))

@@ -1,7 +1,7 @@
--- The card's two git blocks, for a session in a git repo: plan vs actual (the plan's file map against what git
--- says changed since the session's base) and its turns. workcard.view does the work (git's texts read and compared
--- by model/actual.lua, rows shaped, lists cut at MAX_PATHS); workcard.html only draws, every text escaped. It
--- knows no agent, and no Hammerspoon.
+-- The card's two git blocks, for a session in a git repo: did it change what the plan said (the plan's file map
+-- beside what git says changed since the session's base; what changed, without a plan) and what each turn did.
+-- workcard.view does the work (git's texts read and compared by model/actual.lua, rows, dots and words chosen,
+-- lists cut at MAX_PATHS); workcard.html only draws, every text escaped. It knows no agent, and no Hammerspoon.
 
 local actual = require("puppet.model.actual")
 local facts = require("puppet.model.facts")
@@ -17,6 +17,13 @@ local MAX_PATHS = 200
 
 local DID_NOT_ANSWER = "git did not answer"
 
+-- The questions the plan block answers: with a plan's file map, and without one (or while that is not known).
+local ASKS_PLAN = "Did it change what the plan said?"
+local ASKS_CHANGED = "What changed?"
+
+-- After a changed path no hook of the session named.
+local UNSEEN = ' <span class="unseen">not by the agent</span>'
+
 -- `n` and the word for it: "1 commit", "3 commits".
 local function counted(n, word) return n .. " " .. word .. (n == 1 and "" or "s") end
 
@@ -27,17 +34,32 @@ local function capped(list)
   return out, #list - #out
 end
 
--- A list of the block: { mark, title, rows, more, total } from rows { path, unseen, unchecked }.
-local function list(mark, title, rows)
-  local shown, more = capped(rows)
-  return { mark = mark, title = title, rows = shown, more = more, total = #rows }
-end
+-- Each kind of table row: its middle mark, the words a screen reader says for it, and its two cells for `path`
+-- (a cell is { path, tint, unseen } or { say, tone }).
+local KINDS = {
+  matched = { mark = "=", label = "same file", cells = function(path, unseen)
+    return { path = path }, { path = path, tint = "ok", unseen = unseen }
+  end },
+  missing = { mark = "←", label = "planned, not changed", cells = function(path)
+    return { path = path, tint = "warn" }, { say = "not changed yet", tone = "warn" }
+  end },
+  unchecked = { mark = "?", label = "not checked", cells = function(path)
+    return { path = path, tint = "neutral" }, { say = "not checked" }
+  end },
+  unplanned = { mark = "→", label = "not in the plan", cells = function(path, unseen)
+    return { say = "not in the plan", tone = "off" }, { path = path, tint = "off", unseen = unseen }
+  end },
+}
 
--- The paths of `paths` as rows, each one no hook of the session named marked `unseen`.
-local function rows(paths, notSeen)
-  local out = {}
-  for _, path in ipairs(paths) do out[#out + 1] = { path = path, unseen = notSeen[path] or nil } end
-  return out
+-- Adds to `out` the rows of `kind` for `paths`: the first MAX_PATHS, then a "more" row counting the rest.
+local function addRows(out, kind, paths, notSeen)
+  local k = KINDS[kind]
+  local shown, more = capped(paths)
+  for _, path in ipairs(shown) do
+    local left, right = k.cells(path, notSeen[path] or nil)
+    out[#out + 1] = { kind = kind, mark = k.mark, label = k.label, left = left, right = right }
+  end
+  if more > 0 then out[#out + 1] = { kind = "more", more = more } end
 end
 
 -- The file map blocks lifted from the plan's markdown, or nil when it has none.
@@ -55,16 +77,18 @@ local function commitCount(raw)
   return tonumber(tostring(raw or ""):match("^%s*(%d+)%s*$"))
 end
 
--- Plan vs actual for facts `f`, git's answer `gitState` and `plan`: { line } while git reads or when it cannot
--- answer; otherwise { header, lists }: ✓ ○ ＋ with a plan's file map, one unmarked "changed" list without.
+-- The plan block for facts `f`, git's answer `gitState` and `plan`: { heading, line } while git reads or when it
+-- cannot answer; otherwise { heading, base, footer } and, with a plan's file map, `rows` (KINDS, in order: matched,
+-- missing, unchecked, unplanned), or without one `list` ({ rows = { path, unseen }, more }).
 local function actualView(f, gitState, plan)
-  gitState = gitState or { reading = true }
-  if gitState.error then return { line = gitState.error } end
-  if gitState.reading then return { line = "reading git…" } end
-  local commits = commitCount(gitState.commits)
-  if not commits then return { line = DID_NOT_ANSWER } end
-
   local maps = filemaps(plan)
+  local heading = maps and ASKS_PLAN or ASKS_CHANGED
+  gitState = gitState or { reading = true }
+  if gitState.error then return { heading = heading, line = gitState.error } end
+  if gitState.reading then return { heading = heading, line = "Reading git…" } end
+  local commits = commitCount(gitState.commits)
+  if not commits then return { heading = heading, line = DID_NOT_ANSWER } end
+
   local c = actual.compare({
     planned = maps and actual.planned(maps, f.git.root, f.git.prefix) or nil,
     diff = actual.parseDiff(gitState.diff),
@@ -73,43 +97,56 @@ local function actualView(f, gitState, plan)
     dirtyAtStart = f.git.dirtyAtStart,
     seen = f.seen,
   })
-  local out = { header = "since " .. f.git.base:sub(1, 7) .. " · " .. counted(commits, "commit") .. " · "
-    .. c.uncommitted .. " uncommitted" }
+  local out = { base = f.git.base:sub(1, 7),
+    footer = counted(commits, "commit") .. ", " .. c.uncommitted .. " not committed." }
   if not c.hasPlan then
-    out.lists = { list(nil, "changed", rows(c.changed, c.notSeen)) }
+    out.heading = ASKS_CHANGED
+    local list = {}
+    for _, path in ipairs(c.changed) do list[#list + 1] = { path = path, unseen = c.notSeen[path] or nil } end
+    local shown, more = capped(list)
+    out.list = { rows = shown, more = more }
     return out
   end
-  local notChanged = rows(c.missing, {})
-  for _, entry in ipairs(c.unchecked) do notChanged[#notChanged + 1] = { path = entry, unchecked = true } end
-  out.lists = {
-    list("✓", "planned and changed", rows(c.matched, c.notSeen)),
-    list("○", "planned, not changed", notChanged),
-    list("＋", "changed, not planned", rows(c.unplanned, c.notSeen)),
-  }
+  out.heading, out.rows = ASKS_PLAN, {}
+  addRows(out.rows, "matched", c.matched, c.notSeen)
+  addRows(out.rows, "missing", c.missing, {})
+  addRows(out.rows, "unchecked", c.unchecked, {})
+  addRows(out.rows, "unplanned", c.unplanned, c.notSeen)
   return out
 end
 
--- A turn's tests in words: "ran 2 · ✓ 1 · ✗ 1", or "ran 2" when none passed or failed; nil when none ran.
+-- A turn's tests in words: "tests passed (2 of 2)", "1 test failed (of 2)", "2 tests failed (of 3)", or
+-- "tests ran 3" when none passed or failed (Codex counts only runs); nil when none ran.
 local function testsText(t)
-  if t.ran == 0 and t.passed == 0 and t.failed == 0 then return nil end
-  local text = "ran " .. t.ran
-  if t.passed == 0 and t.failed == 0 then return text end
-  return text .. " · ✓ " .. t.passed .. " · ✗ " .. t.failed
+  local ran = math.max(t.ran, t.passed + t.failed)
+  if ran == 0 then return nil end
+  if t.failed > 0 then return counted(t.failed, "test") .. " failed (of " .. ran .. ")" end
+  if t.passed > 0 then return "tests passed (" .. t.passed .. " of " .. ran .. ")" end
+  return "tests ran " .. ran
 end
 
--- One turn's row: { time, took, files, more, total, tests, commits }. took is how long it took; for an open turn
--- "running" when `isRunning`, else nil (a turn left open says only when it started).
+-- A turn's dot: "running" (a ring) while it runs; else "bad" when a test failed, "ok" when tests passed, or "none".
+local function dot(t, isRunning)
+  if isRunning then return "running" end
+  if t.failed > 0 then return "bad" end
+  if t.passed > 0 then return "ok" end
+  return "none"
+end
+
+-- One turn's row: { time, dot, head, tests, files, more, total, commits }. head is "Working now" for an open turn
+-- when `isRunning`, how long it took when it ended, else "No end recorded".
 local function turnRow(t, isRunning)
+  isRunning = isRunning and not t.endAt
   local files, more = capped(t.files)
-  local took = t.endAt and sessioncard.took(t.endAt - t.at) or (isRunning and "running" or nil)
-  return { time = os.date("%H:%M", t.at), took = took,
-    files = files, more = more, total = #t.files, tests = testsText(t.tests), commits = t.commits }
+  local head = isRunning and "Working now" or (t.endAt and sessioncard.took(t.endAt - t.at)) or "No end recorded"
+  return { time = os.date("%H:%M", t.at), dot = dot(t.tests, isRunning), head = head, tests = testsText(t.tests),
+    files = files, more = more, total = #t.files, commits = t.commits }
 end
 
 -- What the two blocks show for facts `f`, git's answer `gitState` ({ reading = true }, { error = text }, or
 -- terminals/git.lua's result) and `plan` (model/plans.lua's shape, or nil): { actual = actualView, turns = { turn
 -- rows, newest first } }; nil when the facts know no git base. Only the newest turn, open while the session
--- `isWorking`, says "running".
+-- `isWorking`, is working now.
 function workcard.view(f, gitState, plan, isWorking)
   if not facts.hasGit(f) then return nil end
   local turns = {}
@@ -117,9 +154,9 @@ function workcard.view(f, gitState, plan, isWorking)
   return { actual = actualView(f, gitState, plan), turns = turns }
 end
 
--- One path's `<li>`, escaped, with the labels in `tail` (already HTML) after it.
-local function item(path, tail)
-  return "<li><code>" .. escape(path) .. "</code>" .. (tail or "") .. "</li>"
+-- One path's `<li>`, escaped, tagged when `unseen`.
+local function item(path, unseen)
+  return "<li><code>" .. escape(path) .. "</code>" .. (unseen and UNSEEN or "") .. "</li>"
 end
 
 -- The `<li>` saying how many paths were left out; nothing when none were.
@@ -127,77 +164,138 @@ local function moreItem(more)
   return more > 0 and '<li class="more">and ' .. more .. " more</li>" or ""
 end
 
--- The plan vs actual section: its header and lists, or its one line.
+-- One table cell: a path on its tint (tagged when unseen), or muted words in their tone.
+local function cell(c)
+  if c.path then
+    return "<td" .. (c.tint and ' class="tint-' .. c.tint .. '"' or "") .. "><code>" .. escape(c.path) .. "</code>"
+      .. (c.unseen and UNSEEN or "") .. "</td>"
+  end
+  return '<td class="say' .. (c.tone and " say-" .. c.tone or "") .. '">' .. escape(c.say) .. "</td>"
+end
+
+-- The plan's paths beside git's, one row per path, a mark between (with words for a screen reader).
+local function tableHtml(rows)
+  local out = { '<table class="pva"><thead><tr><th>The plan said</th><th></th><th>It changed</th></tr></thead><tbody>' }
+  for _, r in ipairs(rows) do
+    if r.kind == "more" then
+      out[#out + 1] = '<tr class="more"><td colspan="3">and ' .. r.more .. " more</td></tr>"
+    else
+      out[#out + 1] = '<tr class="' .. r.kind .. '">' .. cell(r.left) .. '<td class="mark"><span aria-hidden="true">'
+        .. r.mark .. '</span><span class="vh">' .. escape(r.label) .. "</span></td>" .. cell(r.right) .. "</tr>"
+    end
+  end
+  out[#out + 1] = "</tbody></table>"
+  return table.concat(out)
+end
+
+-- The plan block: its question, then one line, or what it shows (the table or the list) and the footer.
 local function actualHtml(a)
-  local out = { '<section class="actual"><div class="label">PLAN VS ACTUAL</div>' }
+  local out = { '<section class="actual"><h2>' .. escape(a.heading) .. "</h2>" }
   if a.line then
     out[#out + 1] = '<p class="line">' .. escape(a.line) .. "</p>"
   else
-    out[#out + 1] = '<p class="since">' .. escape(a.header) .. "</p>"
-    for _, l in ipairs(a.lists) do
+    local base = "<code>" .. escape(a.base) .. "</code>"
+    if a.rows then
+      out[#out + 1] = '<p class="explain">Left, the files the plan named. Right, what git shows changed since ' .. base
+        .. ". A gap on either side is the answer.</p>" .. tableHtml(a.rows)
+    else
       local lis = {}
-      for _, r in ipairs(l.rows) do
-        lis[#lis + 1] = item(r.path, (r.unchecked and ' <span class="unchecked">not checked</span>' or "")
-          .. (r.unseen and ' <span class="unseen">not seen from the agent</span>' or ""))
-      end
-      out[#out + 1] = '<div class="list"><div class="name">' .. (l.mark and l.mark .. " " or "") .. escape(l.title)
-        .. " <small>" .. l.total .. "</small></div><ul>" .. table.concat(lis) .. moreItem(l.more) .. "</ul></div>"
+      for _, r in ipairs(a.list.rows) do lis[#lis + 1] = item(r.path, r.unseen) end
+      out[#out + 1] = '<p class="explain">What git shows changed since ' .. base .. '.</p><ul class="changed">'
+        .. table.concat(lis) .. moreItem(a.list.more) .. "</ul>"
     end
+    out[#out + 1] = '<p class="foot">' .. escape(a.footer) .. "</p>"
   end
   out[#out + 1] = "</section>"
   return table.concat(out)
 end
 
--- One turn's `<li>`: time, how long (empty when not known), the file count opening to the paths, tests, commits.
+-- One turn's `<li>`: the time, its dot on the rail, then how long and its tests, the files (a pill that opens to
+-- the paths), the commits.
 local function turnHtml(t)
   local files
   if t.total == 0 then
-    files = '<span class="files">0 files</span>'
+    files = '<div class="nofiles">No files edited.</div>'
   else
     local lis = {}
     for _, path in ipairs(t.files) do lis[#lis + 1] = item(path) end
-    files = '<details class="files"><summary>' .. counted(t.total, "file") .. "</summary><ul>" .. table.concat(lis)
-      .. moreItem(t.more) .. "</ul></details>"
+    files = '<details class="files"><summary><span class="chev">›</span>' .. counted(t.total, "file") .. "…</summary><ul>"
+      .. table.concat(lis) .. moreItem(t.more) .. "</ul></details>"
   end
   local commits = {}
   for _, c in ipairs(t.commits) do
-    commits[#commits + 1] = '<span class="commit"><code>' .. escape(c.hash) .. "</code> " .. escape(c.subject) .. "</span>"
+    commits[#commits + 1] = '<div class="commit"><code>' .. escape(c.hash) .. "</code> " .. escape(c.subject) .. "</div>"
   end
-  return '<li><span class="time">' .. t.time .. '</span><span class="took">' .. escape(t.took or "") .. "</span>" .. files
-    .. (t.tests and '<span class="tests">' .. t.tests .. "</span>" or "")
-    .. (#commits > 0 and '<span class="commits">' .. table.concat(commits) .. "</span>" or "") .. "</li>"
+  return '<li><span class="at">' .. t.time .. '</span><span class="rail"><span class="pip ' .. t.dot .. '"></span></span>'
+    .. '<div class="turnbody"><div class="turnhead"><b>' .. escape(t.head) .. "</b>"
+    .. (t.tests and '<span class="tests"> · ' .. escape(t.tests) .. "</span>" or "") .. "</div>" .. files
+    .. table.concat(commits) .. "</div></li>"
 end
 
--- The two blocks for view `v` (workcard.view): plan vs actual, then the turns when there are any.
+-- The two blocks for view `v` (workcard.view): the plan block, then the turns when there are any.
 function workcard.html(v)
   local out = { actualHtml(v.actual) }
   if #v.turns > 0 then
     local rowsHtml = {}
     for _, t in ipairs(v.turns) do rowsHtml[#rowsHtml + 1] = turnHtml(t) end
-    out[#out + 1] = '<section class="turns"><div class="label">TURNS</div><ul class="turnlist">' .. table.concat(rowsHtml)
-      .. "</ul></section>"
+    out[#out + 1] = '<section class="turns"><h2>What did each turn do?</h2><ol class="turnlist">' .. table.concat(rowsHtml)
+      .. "</ol></section>"
   end
   return table.concat(out)
 end
 
--- The styles for the two blocks, in the page's tokens (--accent, --faint).
+-- The styles for the two blocks: their colours (light, then dark on a dark page), and the page's --faint.
 workcard.CSS = table.concat({
-  ".actual, .turns { padding-top: 8px; border-top: 1px solid var(--faint); margin-bottom: 8px; }",
-  ".since { margin: 0 0 6px; font: 12px Menlo, monospace; opacity: 0.75; } .actual .line { margin: 0; opacity: 0.75; }",
-  ".actual .name { font-weight: 600; margin-top: 6px; } .actual .name small { opacity: 0.55; font-weight: 400; }",
-  ".actual ul, .turns ul { list-style: none; padding: 0; margin: 2px 0; }",
-  ".actual li { padding: 1px 0 1px 18px; } .actual code { overflow-wrap: anywhere; }",
-  ".unseen, .unchecked { font-size: 10px; opacity: 0.55; margin-left: 4px; } .more { opacity: 0.55; }",
-  ".turnlist > li { display: grid; grid-template-columns: 44px 64px 1fr; gap: 2px 8px; padding: 3px 0;",
-  " border-bottom: 1px solid var(--faint); }",
-  ".turnlist .time { font: 12px Menlo, monospace; opacity: 0.6; } .turnlist .took { color: var(--accent); }",
-  ".turnlist .tests, .turnlist .commits { grid-column: 3; } .turnlist .commit { display: block; }",
-  -- The line that opens to the files is tinted, so it is easy to spot; open, its files share the tint.
-  ".turnlist summary { cursor: pointer; display: inline-block; padding: 1px 8px; border-radius: 4px;",
-  " background: color-mix(in srgb, var(--accent) 18%, transparent); }",
-  ".turnlist summary:hover { background: color-mix(in srgb, var(--accent) 30%, transparent); }",
-  ".turnlist details[open] { background: color-mix(in srgb, var(--accent) 8%, transparent); border-radius: 4px;",
-  " padding-bottom: 3px; } .turnlist details li { padding-left: 12px; }",
+  ":root { --ok: #1A7F37; --ok-text: #116329; --ok-bg: rgba(26,127,55,0.10); --pill: #116329;",
+  " --pill-bg: rgba(26,127,55,0.14); --warn: #9A6700; --warn-bg: rgba(154,103,0,0.10); --off: #4A55C8;",
+  " --off-bg: rgba(74,85,200,0.10); --bad: #CF222E; --muted: color-mix(in srgb, CanvasText 60%, transparent); }",
+  "@media (prefers-color-scheme: dark) { :root { --ok: #3FB950; --ok-text: #C8FFC0; --ok-bg: rgba(63,185,80,0.12);",
+  " --pill: #8FD18B; --pill-bg: rgba(63,185,80,0.16); --warn: #F2C14E; --warn-bg: rgba(242,193,78,0.10);",
+  " --off: #9DA6F5; --off-bg: rgba(157,166,245,0.10); --bad: #E5534B; } }",
+  ".actual, .turns { padding-top: 10px; border-top: 1px solid var(--faint); margin-bottom: 12px; }",
+  ".actual h2, .turns h2 { font-size: 15px; font-weight: 600; margin: 0 0 6px; }",
+  ".actual p { margin: 0 0 8px; color: var(--muted); } .actual .foot { font-size: 12px; margin: 8px 0 0; }",
+  ".actual code, .turns code { font: 12px Menlo, monospace; overflow-wrap: anywhere; }",
+  ".vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }",
+  ".pva { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0;",
+  " border: 1px solid var(--faint); border-radius: 8px; overflow: hidden; }",
+  ".pva th, .pva td { border: 0; border-top: 1px solid var(--faint); padding: 6px 10px; text-align: left;",
+  " vertical-align: top; overflow-wrap: anywhere; }",
+  ".pva th { border-top: 0; font-weight: 600; background: color-mix(in srgb, CanvasText 5%, transparent); }",
+  ".pva th:nth-child(2) { width: 28px; padding: 0; } .pva .mark { text-align: center; padding: 6px 0; font-weight: 700; }",
+  ".pva .matched .mark { color: var(--ok); } .pva .missing .mark { color: var(--warn); }",
+  ".pva .unchecked .mark { color: var(--muted); } .pva .unplanned .mark { color: var(--off); }",
+  ".tint-ok { background: var(--ok-bg); color: var(--ok-text); }",
+  ".tint-warn { background: var(--warn-bg); color: var(--warn); }",
+  ".tint-off { background: var(--off-bg); color: var(--off); }",
+  ".tint-neutral { background: color-mix(in srgb, CanvasText 6%, transparent); }",
+  ".pva .say, .pva .more td { color: var(--muted); }",
+  ".pva .say-warn { color: color-mix(in srgb, var(--warn) 70%, transparent); }",
+  ".pva .say-off { color: color-mix(in srgb, var(--off) 70%, transparent); }",
+  ".unseen { font: 11px -apple-system, sans-serif; color: var(--muted); margin-left: 4px; }",
+  ".actual .changed, .turns ul { list-style: none; padding: 0; margin: 0; } .actual .changed li { padding: 1px 0; }",
+  ".actual .more, .turns .more { color: var(--muted); }",
+  ".turnlist { list-style: none; padding: 0; margin: 0; }",
+  ".turnlist > li { display: grid; grid-template-columns: 44px 14px minmax(0, 1fr); gap: 0 10px; }",
+  ".turnlist .at { font-size: 12px; color: var(--muted); padding-top: 1px; }",
+  ".turnlist .rail { display: flex; flex-direction: column; align-items: center; }",
+  ".turnlist .rail::after { content: ''; flex: 1; width: 2px; background: var(--faint); }",
+  ".turnlist > li:last-child .rail::after { content: none; }",
+  ".pip { width: 10px; height: 10px; border-radius: 50%; box-sizing: border-box; margin-top: 4px; flex: none; }",
+  ".pip.running { border: 2px solid var(--off); } .pip.bad { background: var(--bad); }",
+  ".pip.ok { background: var(--ok); } .pip.none { background: color-mix(in srgb, CanvasText 25%, transparent); }",
+  ".turnbody { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; padding-bottom: 14px;",
+  " min-width: 0; } .turnbody > * { max-width: 100%; } .turnlist > li:last-child .turnbody { padding-bottom: 0; }",
+  ".turns .tests, .turns .nofiles { color: var(--muted); }",
+  ".turns summary { list-style: none; cursor: pointer; display: inline-flex; gap: 6px; padding: 2px 9px;",
+  " border-radius: 4px; background: var(--pill-bg); color: var(--pill); font: 12px Menlo, monospace; }",
+  ".turns summary::-webkit-details-marker { display: none; }",
+  ".turns summary:hover { background: color-mix(in srgb, var(--ok) 24%, transparent); }",
+  ".turns .chev { display: inline-block; transition: transform 0.12s; }",
+  ".turns details[open] > summary .chev { transform: rotate(90deg); }",
+  ".turns details[open] ul { margin-top: 4px; padding: 5px 10px; border-radius: 4px; color: var(--ok-text);",
+  " background: color-mix(in srgb, var(--ok-bg) 60%, transparent); }",
+  ".turns .commit { font: 12px Menlo, monospace; overflow-wrap: anywhere; } .commit code { color: var(--warn); }",
 })
 
 return workcard
