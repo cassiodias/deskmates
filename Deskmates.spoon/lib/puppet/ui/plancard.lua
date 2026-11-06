@@ -298,8 +298,6 @@ function PlanCard:show(key, plan, meta)
   local content = hs.webview.usercontent.new("deskmates")
   content:setCallback(function(message)
     if message.body == "focus" then
-      -- The card stays beside the terminal it went to, until it is closed: losing the focus no longer hides it.
-      self.staysOpen = true
       local shown = self.key
       if shown then self.focusTimer = hs.timer.doAfter(0, function() self.onFocus(shown) end) end
     elseif message.body == "close" then
@@ -324,27 +322,27 @@ function PlanCard:show(key, plan, meta)
     if action == "navigationAction" then return details and details.navigationType == "other" end
     return action ~= "newWindow"
   end)
+  -- The card opens beside the terminal the double click's first click brought forward, and stays there until it is
+  -- closed: losing the focus to that terminal (it becomes the active app a moment after the card shows) must not
+  -- hide it.
   view:windowCallback(function(action, _, state)
     if action == "closing" then
       self.view = nil
-    elseif action == "focusChange" and state == false and not self.staysOpen then
-      self:hide()
     elseif action == "frameChange" and type(state) == "table" and self.saveSize then
       self.saveSize(plancard.fitSize({ w = state.w - chromeW, h = state.h - chromeH }))
     end
   end)
   view:html(plancard.html(plan, meta))
   view:show()
-  -- Hammerspoon becomes the active app, so the card is the key window: an inactive card loses its first click
-  -- and hides a moment later when the app in front keeps the focus. (view:hswindow() would find the window,
-  -- but it asks macOS about every app's windows: 1.5 s.)
+  -- Hammerspoon becomes the active app, so the card is the key window: an inactive card loses its first click.
+  -- (view:hswindow() would find the window, but it asks macOS about every app's windows: 1.5 s.)
   hs.focus()
   view:bringToFront(true)
   self.view = view
 end
 
--- Hides the card at once and deletes it a moment later: hide runs inside the card's own callbacks (its
--- buttons, losing focus), and a web view must not be deleted while it is still handling one.
+-- Hides the card at once and deletes it a moment later: hide runs inside the card's own callbacks (its Close
+-- button), and a web view must not be deleted while it is still handling one.
 function PlanCard:hide()
   if self.view then
     local view = self.view
@@ -353,7 +351,6 @@ function PlanCard:hide()
     hs.timer.doAfter(0, function() view:delete() end)
   end
   self.key = nil
-  self.staysOpen = nil
 end
 
 -- Shows a newer page in the card of session `key`, in the same window; nothing when the card shows another

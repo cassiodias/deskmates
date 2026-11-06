@@ -150,6 +150,11 @@ check("the card shows the plan", card and card.html_:find("Fixed the typo.", 1, 
 check("the second click selects no tab again", stub.selected == nil)
 check("the card sits on the screen", card and card.frame_.x >= 0 and card.frame_.y >= 0
   and card.frame_.x + card.frame_.w <= 1440 and card.frame_.y + card.frame_.h <= 900)
+-- Live (6 Nov): the first click brings the terminal forward, and it became the active app a moment after the card
+-- showed: the card lost the focus and hid itself, before anything could be read. It opens beside the terminal and
+-- stays there until it is closed.
+card.windowCallback_("focusChange", card, false)
+check("the terminal coming forward after a double click does not hide the card", card.shown and P.planCard:isShown())
 card.content.callback({ body = "focus" })
 stub.advance(0.2)
 check("the card's Go to terminal selects the tab", stub.selected == "/dev/ttys001")
