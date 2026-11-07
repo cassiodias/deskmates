@@ -87,10 +87,105 @@ backfill_read() {
   for _backfill_f in "${1%.jsonl}"/subagents/agent-*.jsonl; do
     [ -f "$_backfill_f" ] && cat "$_backfill_f" >> "$_backfill_subs"
   done
-  tail -c +"$(($2 + 1))" "$1" | head -c "$(($3 - $2))" |
+  { [ "$3" -gt "$2" ] && tail -c +"$(($2 + 1))" "$1" | head -c "$(($3 - $2))"; } |
     "$PUPPET_JQ" -nRc --rawfile subtext "$_backfill_subs" \
       "$FACTS_DEFS $FACTS_CLAUDE_DEFS (\$subtext | split(\"\\n\") | map(select(. != \"\"))) as \$sub | $BACKFILL_READ"
   _backfill_rc=$?
   rm -f "$_backfill_subs"
   return "$_backfill_rc"
 }
+
+# The transcript of session $1: where Claude Code keeps it, in the folder of the project it ran in.
+backfill_find() {
+  for _backfill_t in "$HOME"/.claude/projects/*/"$1".jsonl; do
+    [ -f "$_backfill_t" ] && { printf '%s\n' "$_backfill_t"; return 0; }
+  done
+  return 1
+}
+
+# The jq that turns a reading into what the facts gain, given $cur (the facts now; {} when none), $real (the
+# indexes of the reading's test candidates that are test runs), $to (the offset read up to) and $gaps (the prompt
+# times that have no turn): { tickets, current, timeline, turns, lastAt, upTo }. Every note is replayed in time
+# order through facts_apply, at its own time.
+BACKFILL_BUILD='
+def apply_at($now; $n): '"$FACTS_DEFS"' facts_apply($n);
+. as $r
+| ($r.tests | to_entries | map(select(.key as $k | any($real[]; . == $k))) | map(.value)) as $tests
+| ($r.prompts | map(.at)) as $starts
+| def turn_of($t): ([range(0; $starts | length) | select($starts[.] <= $t)] | last);
+  ([$r.notes[], ($tests[] | . as $t | {at: $t.at, note: ({} | claude_tests_note(if $t.failed then "failed" else "passed" end))})]
+    | sort_by(.at)) as $notes
+| (reduce $notes[] as $x ({tickets: {}, timeline: []}; . as $f | try ($f | apply_at($x.at; $x.note)) catch $f)) as $replay
+| [range(0; $r.turns | length) as $i | $r.turns[$i] | select(.at as $a | any($gaps[]; . == $a))
+    | {at, files: [], fromTranscript: true, commits: [],
+       tests: ([$tests[] | select(turn_of(.at) == $i)] | {ran: length, passed: map(select(.failed | not)) | length,
+         failed: map(select(.failed)) | length})}
+      + (if .endAt then {endAt} else {} end)] as $turns
+| {tickets: $replay.tickets, current: $replay.current, timeline: $replay.timeline, turns: $turns,
+   lastAt: ([$r.prompts[].at, $r.notes[].at, ($r.turns[] | .endAt // .at)] | max), upTo: $to}
+'
+
+# The facts after a backfill $b: tickets and steps from the replay (when it found any), its timeline lines and
+# the facts' own lines newer than the transcript, the hooks' turns kept and the transcript's added, newest first.
+FACTS_BACKFILL_DEFS='
+def backfill_merge($b; $now):
+  (if ($b.tickets | length) > 0 then .tickets = $b.tickets | .current = $b.current else . end)
+  | .timeline = (($b.timeline + [(.timeline // [])[] | select(.at > $b.lastAt)]) | sort_by(-.at) | .[0:30])
+  | .turns = (((.turns // []) + $b.turns) | sort_by(-.at) | .[0:30])
+  | if .turns == [] then del(.turns) else . end
+  | .backfill = {upTo: $b.upTo, at: $now};
+'
+
+# Fills session $1's facts from its transcript; prints "ok <turns added>", "none" or "error <why>".
+backfill_main() {
+  facts_file "$1" > /dev/null || { echo "error bad session"; return 1; }
+  deskmates_on || { echo "error Deskmates is off"; return 1; }
+  [ -n "$PUPPET_JQ" ] || { echo "error no jq"; return 1; }
+  _backfill_t=$(backfill_find "$1") || { echo none; return 0; }
+  _backfill_facts=$(facts_file "$1")
+  _backfill_cur='{}'
+  [ -s "$_backfill_facts" ] && _backfill_cur=$("$PUPPET_JQ" -c 'if type == "object" then . else {} end' "$_backfill_facts" 2>/dev/null)
+  [ -n "$_backfill_cur" ] || _backfill_cur='{}'
+  _backfill_to=$(backfill_size "$_backfill_t") || { echo "error transcript not readable"; return 1; }
+  _backfill_from=$(printf '%s' "$_backfill_cur" | "$PUPPET_JQ" '.backfill.upTo // 0 | floor')
+  [ "$_backfill_from" -le "$_backfill_to" ] || _backfill_from=0
+  _backfill_work=$(mktemp -d) || { echo "error no temp"; return 1; }
+  if ! backfill_read "$_backfill_t" "$_backfill_from" "$_backfill_to" > "$_backfill_work/part"; then
+    rm -rf "$_backfill_work"; echo "error transcript not readable"; return 1
+  fi
+  _backfill_gaps=$("$PUPPET_JQ" -c --argjson cur "$_backfill_cur" '[.prompts[].at as $a
+    | select(($cur.turns // []) | all(((.at - $a) | fabs) > 5)) | $a]' "$_backfill_work/part")
+  if [ "$_backfill_gaps" = "[]" ]; then
+    rm -rf "$_backfill_work"
+    # Nothing to fill: remember how far it read, when the session has facts to keep it in.
+    [ "$_backfill_cur" = '{}' ] || PUPPET_PAYLOAD='{}' facts_update "$1" '$cur | .backfill = {upTo: $to, at: $now}' \
+      --argjson to "$_backfill_to"
+    echo none
+    return 0
+  fi
+  if [ "$_backfill_from" -gt 0 ]; then
+    backfill_read "$_backfill_t" 0 "$_backfill_to" > "$_backfill_work/full" || { rm -rf "$_backfill_work"; echo "error transcript not readable"; return 1; }
+  else
+    cp "$_backfill_work/part" "$_backfill_work/full"
+  fi
+  # The test candidates the shell's rule counts as test runs.
+  _backfill_real=$("$PUPPET_JQ" -r '.tests | to_entries[] | "\(.key)\t\(.value.command | @base64)"' "$_backfill_work/full" |
+    while IFS="	" read -r _backfill_k _backfill_c; do
+      is_test_command "$(printf '%s' "$_backfill_c" | base64 -D 2>/dev/null || printf '%s' "$_backfill_c" | base64 -d)" && printf '%s\n' "$_backfill_k"
+    done | "$PUPPET_JQ" -sc 'map(tonumber)')
+  "$PUPPET_JQ" -c --argjson real "$_backfill_real" --argjson to "$_backfill_to" --argjson gaps "$_backfill_gaps" \
+    "$FACTS_DEFS $FACTS_CLAUDE_DEFS $BACKFILL_BUILD" "$_backfill_work/full" > "$_backfill_work/b" ||
+    { rm -rf "$_backfill_work"; echo "error transcript not readable"; return 1; }
+  if PUPPET_PAYLOAD='{}' facts_update "$1" "$FACTS_BACKFILL_DEFS \$cur | backfill_merge(\$b[0]; \$now)" \
+      --slurpfile b "$_backfill_work/b"; then
+    echo "ok $(printf '%s' "$_backfill_gaps" | "$PUPPET_JQ" length)"
+    rm -rf "$_backfill_work"
+    return 0
+  fi
+  rm -rf "$_backfill_work"
+  echo "error facts not written"
+  return 1
+}
+
+# Run as a command (not sourced by a test): fill the session named.
+case "$0" in */backfill.sh) [ "$#" -ge 1 ] && backfill_main "$1" ;; esac

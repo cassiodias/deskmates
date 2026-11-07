@@ -27,6 +27,92 @@ done
 expect "size: stops before a line still being written" "$(backfill_size tests/backfill/cut/transcript.jsonl)" \
   "$(head -n 2 tests/backfill/cut/transcript.jsonl | wc -c | tr -d ' ')"
 
+# The script: a home with the session's transcript where Claude Code keeps it, Deskmates on, a fixed clock.
+B=1767225600
+SID=11111111-2222-3333-4444-555555555555
+FACTSF="$HOME/.deskmates/facts/$SID.json"
+# setup <case> [facts json]: a fresh home for case <case>'s transcript (and subagents), with those facts.
+setup() {
+  rm -rf "$HOME/.claude" "$HOME/.deskmates"
+  mkdir -p "$HOME/.claude/projects/-work-my-app" "$HOME/.deskmates/facts"
+  echo "$$" > "$HOME/.deskmates/on"
+  cp "tests/backfill/$1/transcript.jsonl" "$HOME/.claude/projects/-work-my-app/$SID.jsonl"
+  [ -d "tests/backfill/$1/transcript" ] && cp -R "tests/backfill/$1/transcript" "$HOME/.claude/projects/-work-my-app/$SID"
+  [ -n "${2:-}" ] && printf '%s' "$2" > "$FACTSF"
+  return 0
+}
+run() { PUPPET_NOW=$((B + 9000)) sh hook/backfill.sh "$SID"; }
+q() { "$PUPPET_JQ" -c "$1" "$FACTSF" 2>/dev/null; }
+HOOK_TURN='{"at": %d, "endAt": %d, "head": "h%d", "files": ["src/app.js"], "tests": {"ran": 0, "passed": 0, "failed": 0}, "commits": [{"hash": "abc1234", "subject": "Hook"}]}'
+turn() { printf "$HOOK_TURN" "$((B + $1))" "$((B + $1 + 9))" "$1"; }
+
+# A gap between two turns the hooks recorded: only it is added; theirs stay as they are.
+setup three "{\"tickets\": {}, \"timeline\": [], \"turns\": [$(turn 300), $(turn 100)]}"
+before100=$(q '.turns[] | select(.at == '$((B + 100))')')
+expect "gap: the answer" "$(run)" "ok 1"
+expect "gap: turns, newest first" "$(q '[.turns[].at]')" "[$((B + 300)),$((B + 200)),$((B + 100))]"
+expect "gap: the added turn says where it came from" "$(q '.turns[1] | [.fromTranscript, .endAt, .files, .tests]')" \
+  "[true,$((B + 210)),[],{\"ran\":0,\"passed\":0,\"failed\":0}]"
+expect "gap: the hooks' turn unchanged" "$(q '.turns[] | select(.at == '$((B + 100))')')" "$before100"
+expect "gap: read up to the end" "$(q '.backfill.upTo')" "$(wc -c < tests/backfill/three/transcript.jsonl | tr -d ' ')"
+# Again: nothing new to read.
+first=$(q 'del(.backfill.at, .updatedAt)')
+expect "again: the answer" "$(run)" "none"
+expect "again: nothing changed" "$(q 'del(.backfill.at, .updatedAt)')" "$first"
+
+# A hook turn 3 s from the transcript's prompt is that prompt's turn: no gap.
+setup three "{\"tickets\": {}, \"timeline\": [], \"turns\": [$(turn 303), $(turn 203), $(turn 103)]}"
+expect "window: no gap" "$(run)" "none"
+expect "window: the offset kept" "$(q '.backfill.upTo > 0')" true
+
+# Grown: what was read before is not read again for gaps (its missing turn stays missing), the new part is.
+upto=$(head -n 4 tests/backfill/three/transcript.jsonl | wc -c | tr -d ' ')
+setup three "{\"tickets\": {}, \"timeline\": [], \"turns\": [$(turn 200)], \"backfill\": {\"upTo\": $upto, \"at\": 1}}"
+expect "grown: the answer" "$(run)" "ok 1"
+expect "grown: only the new prompt added" "$(q '[.turns[].at]')" "[$((B + 300)),$((B + 200))]"
+
+# No facts at all: everything from the transcript, tickets and steps too.
+setup subagent
+expect "nofacts: the answer" "$(run)" "ok 1"
+expect "nofacts: the ticket" "$(q '.current')" '"ABC-12"'
+expect "nofacts: its step" "$("$PUPPET_JQ" -cS '.tickets["ABC-12"].passes' "$FACTSF")" \
+  "[{\"at\":$((B + 101)),\"by\":\"Implement ABC-12 via my-developer\",\"endAt\":$((B + 150)),\"phase\":\"dev\",\"verdict\":\"CHANGES_REQUESTED\"}]"
+expect "nofacts: the timeline, newest first" "$(q '[.timeline[].kind]')" '["reply","done","tests","subagent","phase"]'
+
+# Test runs: only real ones count, in the turn and the timeline.
+setup tests
+run > /dev/null
+expect "tests: counted in the turn" "$(q '.turns[0].tests')" '{"ran":1,"passed":0,"failed":1}'
+expect "tests: on the timeline" "$(q '[.timeline[] | select(.kind == "tests") | .text]')" '["failed"]'
+
+# No transcript: none, nothing written. Deskmates off: an error, nothing written.
+setup three
+rm "$HOME/.claude/projects/-work-my-app/$SID.jsonl"
+expect "notranscript: none" "$(run)" "none"
+expect "notranscript: no facts" "$(ls "$HOME/.deskmates/facts")" ""
+setup three
+rm "$HOME/.deskmates/on"
+expect "off: an error" "$(run)" "error Deskmates is off"
+expect "off: no facts" "$(ls "$HOME/.deskmates/facts")" ""
+
+# No helper leaves a plain variable behind (run in this shell, as a script would).
+snap_vars() {
+  set | grep -E '^[A-Za-z_][A-Za-z0-9_]*=' |
+    grep -Ev '^(_|BASH[A-Z_]*|RANDOM|SRANDOM|SECONDS|LINENO|PIPESTATUS|OLDPWD|EPOCH[A-Z]*|snap_[a-z]*)='
+}
+leaks() {
+  snap_vars > "$HOME/snap.before"
+  "$@" > /dev/null 2>&1
+  snap_vars > "$HOME/snap.after"
+  cat "$HOME/snap.before" "$HOME/snap.after" | sort | uniq -u | cut -d= -f1 | sort -u |
+    grep -Ev '^(_backfill_|_facts_|_plan_|_puppet_|PUPPET_|DESKMATES_GIT|DESKMATES_GIT_PATH|facts_root|facts_open)' | tr '\n' ' '
+}
+setup three
+expect "leak: backfill_find" "$(leaks backfill_find "$SID")" ""
+expect "leak: backfill_size" "$(leaks backfill_size tests/backfill/three/transcript.jsonl)" ""
+expect "leak: backfill_read" "$(leaks backfill_read tests/backfill/three/transcript.jsonl 0 10)" ""
+expect "leak: backfill_main" "$(PUPPET_NOW=$((B + 9000)); leaks backfill_main "$SID")" ""
+
 rm -rf "$HOME"
 [ "$failed" = 0 ] && echo "backfill: ok"
 exit "$failed"
