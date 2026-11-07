@@ -23,13 +23,20 @@ end
 
 -- The session that started subagent `agentId`: the event's own session `sid` when it did, else the one that did
 -- (a background subagent outlives its session's id: its events and its stop come under the next one); nil for none.
+-- Should two sessions hold the id, the one that started it last has it (then the smaller key), so the answer never
+-- depends on the order the table is walked in.
 local function ownerOf(all, sid, agentId)
   if agentId == "" then return nil end
   if all[sid] and all[sid].agents[agentId] then return sid end
+  local owner, startedAt
   for key, s in pairs(all) do
-    if s.agents[agentId] then return key end
+    local agent = s.agents[agentId]
+    if agent then
+      local at = agent.at or 0
+      if not owner or at > startedAt or (at == startedAt and key < owner) then owner, startedAt = key, at end
+    end
   end
-  return nil
+  return owner
 end
 
 -- The events of a subagent that go to the session that started it.
@@ -239,7 +246,7 @@ function Sessions:apply(e, ctx)
   elseif e.name == "SubagentStart" and e.agentId ~= "" then
     local queued = table.remove(s.queued, 1)
     local label = e.text ~= "" and e.text or queued or (e.agentType ~= "" and e.agentType or "agent")
-    s.agents[e.agentId] = { label = label, hits = 0, done = false }
+    s.agents[e.agentId] = { label = label, hits = 0, done = false, at = at }
     s.order[#s.order + 1] = e.agentId
   elseif e.name == "SubagentStop" and s.agents[e.agentId] then
     s.agents[e.agentId].done = true

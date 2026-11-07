@@ -327,5 +327,21 @@ for _, key in ipairs(seen:stageKeys(100)) do onStage = onStage or key == "s3" en
 check("moved: a session seen only through a subagent gets no puppet", (seen.all.s3 == nil or seen.all.s3.hasPlayed ~= true) and not onStage
   and seen.all.s1.agents.bg3.hits == 1)
 
+-- Two sessions hold one agent id (it started under each): it belongs to the one that started it last, whatever
+-- order the table walks in.
+for _, order in ipairs({ { "s1", "s2" }, { "s2", "s1" } }) do
+  for _, last in ipairs({ "s1", "s2" }) do
+    local twice = Sessions.new(100)
+    local function at(name, t, fields) return twice:apply(event(name, fields), { mapping = mapping, harness = fake, frame = 1, now = t }) end
+    for _, key in ipairs(order) do
+      at("SubagentStart", 0, { at = key == last and 200 or 100, session = key, agentId = "dup", agentType = "general-purpose" })
+    end
+    at("PreToolUse", 300, { at = 300, session = "s3", agentId = "dup", tool = "edit" })
+    local other = last == "s1" and "s2" or "s1"
+    check("twice: started last in " .. last .. " (order " .. order[1] .. "," .. order[2] .. ") takes the tool",
+      twice.all[last].agents.dup.hits == 1 and twice.all[other].agents.dup.hits == 0)
+  end
+end
+
 
 check.done("sessions")
