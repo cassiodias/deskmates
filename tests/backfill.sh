@@ -149,6 +149,14 @@ expect "nogit: the answer" "$(run)" "ok 2"
 expect "nogit: no git facts" "$(q '.git')" null
 expect "nogit: turns, no paths" "$(q '[.turns[] | .files]')" '[[],[]]'
 
+# Live (7 Nov): Hammerspoon runs the script as ~/.hammerspoon/Spoons/Deskmates.spoon/../hook/backfill.sh, where
+# Deskmates.spoon is a link to the clone's: its helpers are found beside the real file.
+mkdir -p "$HOME/hs/Spoons"
+ln -s "$(pwd -P)/Deskmates.spoon" "$HOME/hs/Spoons/Deskmates.spoon"
+setup three
+# Run from another folder, as Hammerspoon does (its own): nothing may depend on where it is started.
+expect "through the Spoon's link: it runs" "$(cd "$HOME/hs" && PUPPET_NOW=$((B + 9000)) sh "$HOME/hs/Spoons/Deskmates.spoon/../hook/backfill.sh" "$SID" 2>&1)" "ok 3"
+
 # No helper leaves a plain variable behind (run in this shell, as a script would).
 snap_vars() {
   set | grep -E '^[A-Za-z_][A-Za-z0-9_]*=' |

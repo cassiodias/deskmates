@@ -4,7 +4,9 @@
 #   hook/backfill.sh <session>   prints "ok <turns added>", "none" or "error <why>"
 # Sourced (tests), it only defines its helpers. See the design: -mem specs/2026-11-07-transcript-backfill-design.md.
 
-_backfill_dir=$(cd "$(dirname "$0")" 2>/dev/null && pwd)
+# Its own folder, through any link (Hammerspoon runs it as …/Spoons/Deskmates.spoon/../hook/backfill.sh, and that
+# Spoon is a link to the clone's): a logical cd would take the .. before the link.
+_backfill_dir=$(cd -P "$(dirname "$0")" 2>/dev/null && pwd -P)
 case "$_backfill_dir" in */hook) ;; *) _backfill_dir=$(pwd)/hook ;; esac
 . "$_backfill_dir/puppet-lib.sh"
 . "$_backfill_dir/plan-lib.sh"
