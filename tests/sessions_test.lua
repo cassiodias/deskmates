@@ -364,5 +364,34 @@ ask("SubagentStart", { session = "s2", agentId = "own", agentType = "general-pur
 prompt = ask("PermissionRequest", { session = "s2", agentId = "own", tool = "Edit" })
 check("asked: its own subagent's permission stays on s2", asked.all.s2.mood == "permission" and prompt[1].key == "s2")
 
+-- Final review: a moved subagent's prompt you deny leaves no puppet asking: its stop, or its next tool, ends it.
+local denied = Sessions.new(100)
+local function deny(name, fields) return denied:apply(event(name, fields), { mapping = mapping, harness = fake, frame = 1, now = 100 }) end
+deny("UserPromptSubmit", { text = "/build" })
+deny("SubagentStart", { agentId = "bg6", agentType = "general-purpose" })
+deny("SubagentStart", { agentId = "bg7", agentType = "general-purpose" })
+deny("Stop", { text = "Started them." })
+deny("UserPromptSubmit", { session = "s2", text = "/build" })
+deny("PermissionRequest", { session = "s2", agentId = "bg6", tool = "Bash" })
+deny("SubagentStop", { session = "s2", agentId = "bg6" })
+check("denied: its stop ends s1's question", denied.all.s1.mood == nil)
+deny("PermissionRequest", { session = "s2", agentId = "bg7", tool = "Bash" })
+deny("PreToolUse", { session = "s2", agentId = "bg7", tool = "edit" })
+check("denied: its next tool ends s1's question", denied.all.s1.mood == nil)
+-- Final review: the notification that comes with a moved subagent's permission has no agent id; the puppet that
+-- asks already says it, so the tab's new session stays quiet.
+local twin = Sessions.new(100)
+local function pair(name, fields) return twin:apply(event(name, fields), { mapping = mapping, harness = fake, frame = 1, now = 100 }) end
+pair("UserPromptSubmit", { text = "/build" })
+pair("SubagentStart", { agentId = "bg8", agentType = "general-purpose" })
+pair("Stop", { text = "Started it." })
+pair("UserPromptSubmit", { session = "s2", text = "/build" })
+pair("Stop", { session = "s2", text = "Answered." })
+pair("PermissionRequest", { session = "s2", agentId = "bg8", tool = "Bash" })
+check("twin: the notification with it says nothing on s2", #pair("Notification", { session = "s2", text = "Fakebot needs your permission" }) == 0)
+pair("PostToolUse", { session = "s2", agentId = "bg8", tool = "Bash" })
+local later = pair("Notification", { session = "s2", text = "Waiting for you" })
+check("twin: once answered, s2's own notifications speak", later[1] and later[1].key == "s2")
+
 
 check.done("sessions")

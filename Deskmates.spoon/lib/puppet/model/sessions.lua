@@ -222,6 +222,8 @@ function Sessions:apply(e, ctx)
     if kind == "skill" and mapping:mappedScene(e.text) then
       s.isListed, s.tag, s.command = true, e.text, e.text
     end
+    -- A subagent that moves on to its next tool had its prompt answered (or denied).
+    if e.agentId ~= "" and s.mood == "permission" and s.moodAgent == e.agentId then s.mood = nil end
     if e.agentId == "" then
       s.isWorking = true
       s.mood = nil
@@ -246,7 +248,9 @@ function Sessions:apply(e, ctx)
       say(nil)
     end
   elseif e.name == "PermissionRequest" then
-    s.mood, s.moodText = "permission", (e.tool ~= "" and e.tool or "OK")
+    s.mood, s.moodText, s.moodAgent = "permission", (e.tool ~= "" and e.tool or "OK"), e.agentId
+    -- Moved here from the tab's new session: that session's notification for it (no agent id) is said already.
+    if sid ~= e.session and self.all[e.session] then self.all[e.session].askedVia = sid end
     if s.isListed then say("May I use " .. s.moodText .. "?") end
   elseif e.name == "SubagentStart" and e.agentId ~= "" then
     local queued = table.remove(s.queued, 1)
@@ -255,9 +259,13 @@ function Sessions:apply(e, ctx)
     s.order[#s.order + 1] = e.agentId
   elseif e.name == "SubagentStop" and s.agents[e.agentId] then
     s.agents[e.agentId].done = true
+    -- A prompt you denied gets no tool result: the subagent's stop ends it, or the puppet would ask for hours.
+    if s.mood == "permission" and s.moodAgent == e.agentId then s.mood = nil end
     finish(intents, sid, s)
   elseif e.name == "Notification" then
     local isShown = s.mood == "permission" or s.mood == "asking"
+    local via = s.askedVia and self.all[s.askedVia]
+    if e.agentId == "" and via and via.mood == "permission" then isShown = true end
     if s.isListed and not isShown then say(e.text ~= "" and e.text or (harness.name .. " needs you")) end
   elseif e.name == "Stop" then
     s.isWorking, s.mood, s.summary = false, nil, e.text
