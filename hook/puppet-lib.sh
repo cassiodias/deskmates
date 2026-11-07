@@ -304,10 +304,10 @@ puppet_tty() {
 }
 
 # Removes what sessions left in $PUPPET_DIR (tty caches, a translator's state like Cursor's turns: every file but
-# the events file) once untouched for the Spoon's 2 hours (config.STALE_SECONDS): Codex and Cursor often end a
-# session without SessionEnd.
+# the events file and the Spoon's `on` marker, which it writes once at start) once untouched for the Spoon's 2 hours
+# (config.STALE_SECONDS): Codex and Cursor often end a session without SessionEnd.
 puppet_expire() {
-  find "$PUPPET_DIR" -maxdepth 1 -type f ! -name events -mmin +120 -delete 2>/dev/null
+  find "$PUPPET_DIR" -maxdepth 1 -type f ! -name events ! -name on -mmin +120 -delete 2>/dev/null
   return 0
 }
 

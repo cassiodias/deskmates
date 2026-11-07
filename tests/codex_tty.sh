@@ -81,7 +81,7 @@ rm "$work/none"
 # What sessions leave behind expires after the Spoon's 2 hours: Codex and Cursor often skip SessionEnd.
 rm "$work/home/.deskmates/tty-"*
 old=$(date -v-3H +%Y%m%d%H%M)
-for name in tty-gone cursor-gone.turn cursor-gone.g1.reply myagent-gone.state events; do
+for name in tty-gone cursor-gone.turn cursor-gone.g1.reply myagent-gone.state events on; do
   echo /dev/ttys011 > "$work/home/.deskmates/$name"
   touch -t "$old" "$work/home/.deskmates/$name"
 done
@@ -96,6 +96,9 @@ for name in tty-gone cursor-gone.turn cursor-gone.g1.reply myagent-gone.state; d
 done
 check "a recent cache stays" "$(cat "$work/home/.deskmates/tty-recent")" /dev/ttys005
 check "the events file stays, however old" "$(head -n 1 "$work/home/.deskmates/events")" /dev/ttys011
+# Found 7 Nov: the Spoon writes its marker once, at start; two hours on, a hook deleted it and every hook after
+# took Deskmates for off (no facts, no plans, no card on a double click).
+check "the marker that says Deskmates runs stays, however old" "$(cat "$work/home/.deskmates/on" 2>/dev/null)" /dev/ttys011
 check "a file inside src stays" "$(cat "$work/home/.deskmates/src/bin/deskmates")" old
 check "a file at the top of src stays" "$(ls "$work/home/.deskmates/src/README.md")" "$work/home/.deskmates/src/README.md"
 
