@@ -89,49 +89,27 @@ facts_change() {
   facts_note "$session" "$@" 2>/dev/null && [ "$flag" != test ] && flag="facts"
 }
 case "$event:$tool" in
-  PreToolUse:Skill)
-    facts_change '(.tool_input.skill // "" | tostring) as $s | if $s == "" then null
-      else {kind: "skill", text: $s, from: ($s + " " + (.tool_input.args // "" | tostring)), phaseFrom: $s,
-        moves: true} end' ;;
+  PreToolUse:Skill) facts_change "$FACTS_CLAUDE_DEFS claude_skill_note" ;;
   UserPromptSubmit:*)
     # A /command typed by the user runs a skill too: the ticket from what follows it, the phase from its name.
-    [ -n "$text" ] && facts_change '{kind: "skill", text: $c, from: (.prompt // "" | tostring | .[0:300]),
-      phaseFrom: $c, moves: true}' --arg c "${text#/}" ;;
-  PreToolUse:Agent|PreToolUse:Task)
-    facts_change '(.tool_input.description // "" | tostring) as $d | if $d == "" then null
-      else {kind: "subagent", text: $d, from: $d, moves: true} end' ;;
-  PostToolUse:mcp__*Jira*)
-    # Its result: an object, {"content": [text blocks]}, text blocks, or a string; text only when it is JSON.
-    facts_change '(.tool_input.issueIdOrKey // "" | tostring) as $key
-      | .tool_response as $raw
-      | ($raw | type == "object" and (.isError == true or .success == false)) as $failed
-      | ($raw | if type == "object" and (.content | type) == "array" then .content else . end
-        | if type == "array" then (map(select(type == "object" and .type == "text") | .text) | first) else . end
-        | if type == "string" then (try fromjson catch null) else . end) as $r
-      | (if ($failed | not) and ($r | type) == "object" and $r.success != false and $r.isError != true
-         then ($r.statusName // $r.fields.status.name) else null end) as $s
-      | if ($key | tickets) != [$key] then null
-        elif ($s | type) == "string" and $s != "" then {kind: "jira", text: $s, jira: $s, ticket: $key, from: "", moves: true}
-        else {kind: null, ticket: $key, from: "", moves: true} end' ;;
-  PostToolUse:ExitPlanMode)
-    # You approved the plan: Plan has ended.
-    facts_change '{kind: "done", text: "Plan approved", from: "", phaseFrom: "plan", ends: true, moves: false}' ;;
+    [ -n "$text" ] && facts_change "$FACTS_CLAUDE_DEFS claude_command_note(\$c)" --arg c "${text#/}" ;;
+  PreToolUse:Agent|PreToolUse:Task) facts_change "$FACTS_CLAUDE_DEFS claude_agent_note" ;;
+  PostToolUse:mcp__*Jira*) facts_change "$FACTS_CLAUDE_DEFS claude_jira_note" ;;
+  # You approved the plan: Plan has ended.
+  PostToolUse:ExitPlanMode) facts_change "$FACTS_CLAUDE_DEFS claude_plan_note" ;;
   PostToolUse:*|PostToolUseFailure:*)
     if [ "$flag" = test ]; then
       result=passed
       [ "$event" = PostToolUseFailure ] && result=failed
-      facts_change '{kind: "tests", text: $result, from: "", moves: false}' --arg result "$result"
+      facts_change "$FACTS_CLAUDE_DEFS claude_tests_note(\$result)" --arg result "$result"
     fi ;;
   Stop:*)
-    [ -n "$text" ] && facts_change '{kind: "reply", text: $reply, from: $reply, moves: false}' --arg reply "$text" ;;
+    [ -n "$text" ] && facts_change "$FACTS_CLAUDE_DEFS claude_reply_note(\$reply)" --arg reply "$text" ;;
   SubagentStop:*)
     # A subagent's end ends the lane its description names: its last message's first sentence, and a verdict
     # only when it wrote one ("Verdict: CHANGES_REQUESTED").
     description=$(subagent_description "$(path_field transcript_path)" "$(field agent_id)")
-    [ -n "$description" ] && facts_change '{kind: "done", text: (if $s != "" then $s else "done" end), from: $d,
-      phaseFrom: $d, ends: true, moves: false,
-      verdict: ((.last_assistant_message // "" | tostring
-        | capture("Verdict:\\**\\s*\\**(?<v>[A-Za-z][A-Za-z_-]+)") | .v) // null)}' \
+    [ -n "$description" ] && facts_change "$FACTS_CLAUDE_DEFS claude_done_note(\$d; \$s)" \
       --arg d "$description" --arg s "$(first_sentence last_assistant_message)" ;;
 esac
 

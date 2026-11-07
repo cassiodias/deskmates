@@ -476,6 +476,28 @@ if [ -n "$found_jq" ] && command -v git > /dev/null; then
   expect "leak: facts_delete" "$(leaks facts_delete s21)" ""
 fi
 
+# Claude's note filters as named defs (FACTS_CLAUDE_DEFS), for the translator and the backfill: each on a
+# payload-shaped object gives the note the translator's hook would.
+if [ -n "$found_jq" ]; then
+  note() { "$found_jq" -nc "$FACTS_DEFS $FACTS_CLAUDE_DEFS $1" "${@:2}" 2>&1; }
+  expect "claude_skill_note" "$(note '{tool_input: {skill: "my-coding-skill", args: "ABC-12"}} | claude_skill_note')" \
+    '{"kind":"skill","text":"my-coding-skill","from":"my-coding-skill ABC-12","phaseFrom":"my-coding-skill","moves":true}'
+  expect "claude_skill_note: no skill" "$(note '{tool_input: {}} | claude_skill_note')" null
+  expect "claude_command_note" "$(note '{prompt: "/my-coding-skill ABC-12"} | claude_command_note("my-coding-skill")')" \
+    '{"kind":"skill","text":"my-coding-skill","from":"/my-coding-skill ABC-12","phaseFrom":"my-coding-skill","moves":true}'
+  expect "claude_agent_note" "$(note '{tool_input: {description: "Implement ABC-12 via my-developer"}} | claude_agent_note')" \
+    '{"kind":"subagent","text":"Implement ABC-12 via my-developer","from":"Implement ABC-12 via my-developer","moves":true}'
+  expect "claude_jira_note: a transition" "$(note '{tool_input: {issueIdOrKey: "ABC-12"}, tool_response: {content: [{type: "text", text: "{\"success\":true,\"statusName\":\"In Dev\"}"}]}} | claude_jira_note')" \
+    '{"kind":"jira","text":"In Dev","jira":"In Dev","ticket":"ABC-12","from":"","moves":true}'
+  expect "claude_plan_note" "$(note '{} | claude_plan_note')" \
+    '{"kind":"done","text":"Plan approved","from":"","phaseFrom":"plan","ends":true,"moves":false}'
+  expect "claude_tests_note" "$(note '{} | claude_tests_note("failed")')" '{"kind":"tests","text":"failed","from":"","moves":false}'
+  expect "claude_reply_note" "$(note '{} | claude_reply_note("Fixed the typo.")')" \
+    '{"kind":"reply","text":"Fixed the typo.","from":"Fixed the typo.","moves":false}'
+  expect "claude_done_note" "$(note '{last_assistant_message: "Done. **Verdict: CHANGES_REQUESTED**"} | claude_done_note("QA ABC-12"; "Done.")')" \
+    '{"kind":"done","text":"Done.","from":"QA ABC-12","phaseFrom":"QA ABC-12","ends":true,"moves":false,"verdict":"CHANGES_REQUESTED"}'
+fi
+
 rm -rf "$HOME"
 [ "$failed" = 0 ] && echo "facts-lib: ok"
 exit "$failed"

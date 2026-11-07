@@ -134,6 +134,46 @@ def facts_apply($n):
     else . end;
 '
 
+# Claude Code's notes, each from a payload-shaped object (the hook's payload, or one the backfill builds from a
+# transcript record): a note for facts_apply, or null. The Claude translator and hook/backfill.sh both use them, so
+# a card filled from the transcript says what a live one would.
+#   claude_skill_note:        a Skill call (its name, and its args for the ticket).
+#   claude_command_note($c):  a /command typed by the user ($c without the slash; .prompt for the ticket).
+#   claude_agent_note:        an Agent (Task) call, by its description.
+#   claude_jira_note:         a Jira MCP call's result: its status when it moved, else only the ticket.
+#   claude_plan_note:         ExitPlanMode answered: Plan has ended.
+#   claude_tests_note($r):    a test run's result ("passed" or "failed").
+#   claude_reply_note($r):    the reply's first sentence.
+#   claude_done_note($d; $s): a subagent's end: its description $d, its last message's first sentence $s, and a
+#                             verdict only when it wrote one (.last_assistant_message).
+FACTS_CLAUDE_DEFS='
+def claude_skill_note: (.tool_input.skill // "" | tostring) as $s | if $s == "" then null
+  else {kind: "skill", text: $s, from: ($s + " " + (.tool_input.args // "" | tostring)), phaseFrom: $s,
+    moves: true} end;
+def claude_command_note($c): {kind: "skill", text: $c, from: (.prompt // "" | tostring | .[0:300]),
+  phaseFrom: $c, moves: true};
+def claude_agent_note: (.tool_input.description // "" | tostring) as $d | if $d == "" then null
+  else {kind: "subagent", text: $d, from: $d, moves: true} end;
+def claude_jira_note: (.tool_input.issueIdOrKey // "" | tostring) as $key
+  | .tool_response as $raw
+  | ($raw | type == "object" and (.isError == true or .success == false)) as $failed
+  | ($raw | if type == "object" and (.content | type) == "array" then .content else . end
+    | if type == "array" then (map(select(type == "object" and .type == "text") | .text) | first) else . end
+    | if type == "string" then (try fromjson catch null) else . end) as $r
+  | (if ($failed | not) and ($r | type) == "object" and $r.success != false and $r.isError != true
+     then ($r.statusName // $r.fields.status.name) else null end) as $s
+  | if ($key | tickets) != [$key] then null
+    elif ($s | type) == "string" and $s != "" then {kind: "jira", text: $s, jira: $s, ticket: $key, from: "", moves: true}
+    else {kind: null, ticket: $key, from: "", moves: true} end;
+def claude_plan_note: {kind: "done", text: "Plan approved", from: "", phaseFrom: "plan", ends: true, moves: false};
+def claude_tests_note($result): {kind: "tests", text: $result, from: "", moves: false};
+def claude_reply_note($reply): {kind: "reply", text: $reply, from: $reply, moves: false};
+def claude_done_note($d; $s): {kind: "done", text: (if $s != "" then $s else "done" end), from: $d,
+  phaseFrom: $d, ends: true, moves: false,
+  verdict: ((.last_assistant_message // "" | tostring
+    | capture("Verdict:\\**\\s*\\**(?<v>[A-Za-z][A-Za-z_-]+)") | .v) // null)};
+'
+
 # Applies the note jq filter $2 makes from the payload to session $1's facts (more jq arguments may follow). A
 # note is { kind, text, from, moves, ticket?, jira? }: kind is the timeline line's kind ("skill", "subagent",
 # "jira", "tests", "reply", or null for none), text its text, from the text tickets and the phase are looked for
