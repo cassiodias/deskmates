@@ -378,6 +378,13 @@ check "update: Spoon linked to the clone" '[ "$(readlink "$(spoon_link)")" = "$(
 echo '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"~/.deskmates/src/harnesses/claude/translate.sh"}]}]}}' > "$(settings)"
 "$HOME/clone/bin/deskmates" update > /dev/null
 check "update: hooks on reinstalled" '[ "$(count "$(settings)" "$OURS")" = 10 ]'
+# Found 7 Nov: update said "Hammerspoon reloaded" and nothing reloaded. A timer made inside an `hs -c` call and kept
+# nowhere is collected when the call ends; the reload's timer lives in a global.
+mkdir -p "$HOME/fakehs"
+printf '#!/bin/sh\nprintf "%%s" "$2" > "%s/hs.lua"\n' "$HOME" > "$HOME/fakehs/hs"
+chmod +x "$HOME/fakehs/hs"
+PATH="$HOME/fakehs:$PATH" DESKMATES_NO_RELOAD= "$HOME/clone/bin/deskmates" update > /dev/null
+check "update: the reload's timer is kept in a global" 'grep -q "^_G\.[A-Za-z_]* = hs\.timer\.doAfter(.*hs\.reload)" "$HOME/hs.lua"'
 
 # A user's own ClaudePuppet settings in init.lua carry over: renamed, not dropped, no defaults added on top.
 fresh_home

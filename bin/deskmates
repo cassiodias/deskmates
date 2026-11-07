@@ -285,7 +285,8 @@ update() {
   for id in $(harnesses); do hooks_on "$id" && ids="$ids $id"; done
   install_with "$ids" reload
   failed=$?
-  if [ "${DESKMATES_NO_RELOAD:-}" != 1 ] && hs_run 'hs.timer.doAfter(0.2, hs.reload)'; then
+  # The timer lives in a global: one kept nowhere is collected when the hs -c call ends, and nothing reloads.
+  if [ "${DESKMATES_NO_RELOAD:-}" != 1 ] && hs_run '_G.deskmatesReload = hs.timer.doAfter(0.2, hs.reload)'; then
     say "Hammerspoon reloaded"
   else
     todo "Hammerspoon menu: Reload Config"
