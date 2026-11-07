@@ -261,6 +261,13 @@ is_daemon_pty() {
   [ -n "$_puppet_ppids" ] && ps -o command= -p "$_puppet_ppids" 2>/dev/null | grep -q -e '--bg-pty-host'
 }
 
+# Whether the session on daemon pty $1 goes on with the tab's conversation: a worker claimed for it (bg-spare), or a
+# session resumed or forked from it (--resume). A session the daemon starts afresh (a background agent: --agent,
+# no --resume) is not the tab's.
+daemon_continues_tab() {
+  ps -o command= -t "${1#/dev/}" 2>/dev/null | grep -q -e '--bg-spare' -e '--resume' -e '--continue'
+}
+
 # The terminal of the claude that started the daemon this hook runs under: the daemon names it in
 # `--spawned-by {…"pid":N}`. Nothing when N no longer runs in a terminal (never the worker's pty).
 daemon_owner_tty() {
@@ -291,8 +298,11 @@ puppet_tty() {
   # A daemon's session has the tab's terminal or none: its ancestors only lead to the worker's pty, and a terminal
   # remembered for it may be that pty (which still runs claude while the idle worker lives) or a tab its claude left.
   _puppet_daemon=""
-  [ -n "$_puppet_tty" ] && is_daemon_pty "$_puppet_tty" &&
-    _puppet_daemon=1 && _puppet_tty=$(daemon_owner_tty) && _puppet_pid=""
+  if [ -n "$_puppet_tty" ] && is_daemon_pty "$_puppet_tty"; then
+    _puppet_daemon=1
+    _puppet_pid=""
+    if daemon_continues_tab "$_puppet_tty"; then _puppet_tty=$(daemon_owner_tty); else _puppet_tty=""; fi
+  fi
   if [ -z "$_puppet_tty" ] && [ -z "$_puppet_daemon" ] && [ -n "$1" ] && [ -f "$_puppet_cache" ]; then
     _puppet_tty=$(cat "$_puppet_cache")
     terminal_runs "$_puppet_tty" "${PUPPET_PROGRAM:-}" || _puppet_tty=""

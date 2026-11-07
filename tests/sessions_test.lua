@@ -423,5 +423,14 @@ check("tab: a session whose subagent still works stays", busy.all.s1.isClosed ~=
 on("PreToolUse", { session = "s2", agentId = "bg9", tool = "edit", tty = "/dev/ttys001" })
 check("tab: a moved subagent's tool closes nobody", busy.all.s2.isClosed ~= true and busy.all.s1.isClosed ~= true)
 
+-- Final review: a closed session that works again without a prompt (a background task ended) comes back.
+local back = Sessions.new(100)
+local function again(name, fields) return back:apply(event(name, fields), { mapping = mapping, harness = fake, frame = 1, now = 100 }) end
+again("UserPromptSubmit", { text = "/build", tty = "/dev/ttys001" })
+again("Stop", { text = "Waiting on it." })
+again("UserPromptSubmit", { session = "s2", text = "/build", tty = "/dev/ttys001" })
+again("PreToolUse", { tool = "edit", tty = "/dev/ttys001" })
+check("back: working again without a prompt, it comes back", back.all.s1.isClosed ~= true)
+
 
 check.done("sessions")

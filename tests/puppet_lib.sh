@@ -178,6 +178,7 @@ fake_tree() {
         case "$tree_mode" in
           plain) echo "100 -zsh" ;;
           direct) echo "400 /Users/me/.local/share/claude/versions/2.1.319 --session-id f1 --fork-session --resume /x.jsonl" ;;
+          agent) echo "400 /Users/me/.local/share/claude/versions/2.1.319 --session-id a1 --agent claude --inherit-permission-mode auto" ;;
           *) echo "400 claude bg-spare --bg-spare /tmp/cc/spare/a.claim.sock" ;;
         esac ;;
       *"ppid=,command= -t ttys002"*) echo "1 -zsh"; echo "150 claude" ;;
@@ -185,6 +186,7 @@ fake_tree() {
         case "$tree_mode" in
           plain) echo -zsh ;;
           direct) echo "/Users/me/.local/share/claude/versions/2.1.319 --session-id f1 --fork-session --resume /x.jsonl" ;;
+          agent) echo "/Users/me/.local/share/claude/versions/2.1.319 --session-id a1 --agent claude --inherit-permission-mode auto" ;;
           *) echo "claude bg-spare --bg-spare /tmp/cc/spare/a.claim.sock" ;;
         esac ;;
       *"-t ttys002"*) echo -zsh; echo claude ;;
@@ -198,7 +200,7 @@ fake_tree() {
           echo "400 claude bg-spare --bg-spare /tmp/cc/spare/a.claim.sock" ;;
       *"ppid=,command= -p 400") echo "300 claude bg-pty-host --bg-pty-host /tmp/cc/spare/a.pty.sock 200 50" ;;
       *"ppid=,command= -p 300") echo '1 /Users/me/.local/bin/claude daemon run --origin transient --spawned-by {"label":"claude","cwd":"/Users/me/my-app","pid":200}' ;;
-      *" command= -p 400") [ "$tree_mode" = direct ] &&
+      *" command= -p 400") [ "$tree_mode" = direct ] || [ "$tree_mode" = agent ] &&
           echo "/Applications/ClaudeCode.app/Contents/MacOS/claude --bg-pty-host /tmp/cc/pty/f1.sock 171 44 -- /x" ||
           echo "claude bg-pty-host --bg-pty-host /tmp/cc/spare/a.pty.sock 200 50" ;;
       *" command= -p 100"|*" command= -p 150"|*" command= -p 1") echo "-zsh" ;;
@@ -229,6 +231,9 @@ expect "a plain tab: its own terminal" "$(fake_tree plain; puppet_tty d3)" /dev/
 expect "a session the daemon runs itself: the terminal of the claude that started the daemon" \
   "$(fake_tree direct; puppet_tty d6)" /dev/ttys002
 expect "is_daemon_pty: the daemon's own session" "$(fake_tree direct; is_daemon_pty /dev/ttys001 && echo yes)" yes
+# Final review (7 Nov): the same daemon also ran a background agent of its own (`--agent claude`, no --resume): not
+# the tab's conversation, so not the tab's terminal, or the two puppets would close each other.
+expect "a daemon's own agent, not the tab's conversation: no terminal" "$(fake_tree agent; puppet_tty d7)" ""
 expect "is_daemon_pty: a plain tab" "$(fake_tree plain; is_daemon_pty /dev/ttys002 && echo yes)" ""
 
 # No helper leaves a variable behind: the shell's variables before and after each public helper (run in this
