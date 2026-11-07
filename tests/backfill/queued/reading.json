@@ -1,0 +1,50 @@
+{
+ "cwd": "/work/my-app",
+ "notes": [
+  {
+   "at": 1767225701,
+   "note": {
+    "from": "QA ABC-12 via my-reviewer",
+    "kind": "subagent",
+    "moves": true,
+    "text": "QA ABC-12 via my-reviewer"
+   }
+  },
+  {
+   "at": 1767225704,
+   "note": {
+    "from": "Started the review.",
+    "kind": "reply",
+    "moves": false,
+    "text": "Started the review."
+   }
+  },
+  {
+   "at": 1767225750,
+   "note": {
+    "ends": true,
+    "from": "QA ABC-12 via my-reviewer",
+    "kind": "done",
+    "moves": false,
+    "phaseFrom": "QA ABC-12 via my-reviewer",
+    "text": "Reviewed it.",
+    "verdict": "APPROVED"
+   }
+  }
+ ],
+ "prompts": [
+  {
+   "at": 1767225700,
+   "command": null
+  }
+ ],
+ "tests": [],
+ "turns": [
+  {
+   "at": 1767225700,
+   "edits": [],
+   "endAt": 1767225704,
+   "reply": "Started the review."
+  }
+ ]
+}

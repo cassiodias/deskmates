@@ -1,0 +1,11 @@
+{"type": "user", "timestamp": "2026-01-01T00:01:40.123Z", "isSidechain": false, "cwd": "/work/my-app", "message": {"role": "user", "content": "Hello"}}
+{"type": "assistant", "timestamp": "2026-01-01T00:01:41.123Z", "isSidechain": false, "cwd": "/work/my-app", "message": {"role": "assistant", "content": [{"type": "text", "text": "Hi."}]}}
+{"type": "user", "timestamp": "2026-01-01T00:02:30.123Z", "isSidechain": false, "cwd": "/work/my-app", "message": {"role": "user", "content": "This session is being continued from a previous conversation."}, "isCompactSummary": true}
+{"type": "user", "timestamp": "2026-01-01T00:02:40.123Z", "isSidechain": false, "cwd": "/work/my-app", "message": {"role": "user", "content": "<bash-input>ls</bash-input>"}}
+{"type": "user", "timestamp": "2026-01-01T00:02:41.123Z", "isSidechain": false, "cwd": "/work/my-app", "message": {"role": "user", "content": "<bash-stdout>a b</bash-stdout><bash-stderr></bash-stderr>"}}
+{"type": "user", "timestamp": "2026-01-01T00:02:50.123Z", "isSidechain": false, "cwd": "/work/my-app", "message": {"role": "user", "content": "[Request interrupted by user]"}}
+{"type": "user", "timestamp": "2026-01-01T00:03:00.123Z", "isSidechain": false, "cwd": "/work/my-app", "message": {"role": "user", "content": "<command-name>/clear</command-name>\n<command-message>clear</command-message>\n<command-args></command-args>"}}
+{"type": "system", "subtype": "local_command", "timestamp": "2026-01-01T00:03:00.123Z", "content": "<local-command-stdout></local-command-stdout>"}
+{"type": "user", "timestamp": "2026-01-01T00:03:01.123Z", "isSidechain": false, "cwd": "/work/my-app", "message": {"role": "user", "content": "<local-command-stdout>Done</local-command-stdout>"}}
+{"type": "user", "timestamp": "2026-01-01T00:03:20.123Z", "isSidechain": false, "cwd": "/work/my-app", "message": {"role": "user", "content": "Next one"}}
+{"type": "assistant", "timestamp": "2026-01-01T00:03:21.123Z", "isSidechain": false, "cwd": "/work/my-app", "message": {"role": "assistant", "content": [{"type": "text", "text": "Done next."}]}}

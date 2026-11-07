@@ -11,7 +11,15 @@ local config = require("puppet.config")
 
 -- find: the first project folder holding <session>.jsonl.
 local listing = { "-work-other", "-work-my-app", ".", ".." }
-local function dir() local i = 0 return function() i = i + 1 return listing[i] end end
+-- As hs.fs.dir: an iterator that needs the folder object handed back to it on each call.
+local function dir()
+  local folder, i = {}, 0
+  return function(d)
+    if d ~= folder then error("bad argument #1 to 'for iterator' (directory metatable expected, got nil)") end
+    i = i + 1
+    return listing[i]
+  end, folder
+end
 local present = { ["/h/.claude/projects/-work-my-app/s1.jsonl"] = true }
 local function exists(path) return present[path] == true end
 check("find: the transcript", backfill.find("/h", "s1", dir, exists) == "/h/.claude/projects/-work-my-app/s1.jsonl")

@@ -95,6 +95,22 @@ rm "$HOME/.deskmates/on"
 expect "off: an error" "$(run)" "error Deskmates is off"
 expect "off: no facts" "$(ls "$HOME/.deskmates/facts")" ""
 
+# A long session no hook saw: only the newest 30 gaps get turns (and git calls); the answer counts those kept.
+mkdir -p "$HOME/long"
+: > "$HOME/long/t.jsonl"
+i=1
+while [ "$i" -le 35 ]; do
+  t=$(date -u -r $((B + i * 100)) +%Y-%m-%dT%H:%M:%S.000Z)
+  printf '{"type":"user","timestamp":"%s","cwd":"/work/my-app","message":{"content":"Prompt %d"}}\n' "$t" "$i" >> "$HOME/long/t.jsonl"
+  i=$((i + 1))
+done
+rm -rf "$HOME/.claude" "$HOME/.deskmates"
+mkdir -p "$HOME/.claude/projects/-work-my-app" "$HOME/.deskmates/facts"
+echo "$$" > "$HOME/.deskmates/on"
+cp "$HOME/long/t.jsonl" "$HOME/.claude/projects/-work-my-app/$SID.jsonl"
+expect "long: the answer counts the turns kept" "$(run)" "ok 30"
+expect "long: the newest 30" "$(q '[.turns | length, .[-1].at]')" "[30,$((B + 600))]"
+
 # Git for backfilled turns, from git log by time: a repo with commits at set times, the transcript run in it.
 gitrepo() {
   rm -rf "$HOME/repo"; mkdir -p "$HOME/repo"

@@ -1,0 +1,48 @@
+{
+ "cwd": "/work/my-app",
+ "notes": [
+  {
+   "at": 1767225701,
+   "note": {
+    "from": "Hi.",
+    "kind": "reply",
+    "moves": false,
+    "text": "Hi."
+   }
+  },
+  {
+   "at": 1767225801,
+   "note": {
+    "from": "Done next.",
+    "kind": "reply",
+    "moves": false,
+    "text": "Done next."
+   }
+  }
+ ],
+ "prompts": [
+  {
+   "at": 1767225700,
+   "command": null
+  },
+  {
+   "at": 1767225800,
+   "command": null
+  }
+ ],
+ "tests": [],
+ "turns": [
+  {
+   "at": 1767225700,
+   "edits": [],
+   "endAt": 1767225701,
+   "reply": "Hi."
+  },
+  {
+   "at": 1767225800,
+   "edits": [],
+   "endAt": 1767225801,
+   "reply": "Done next."
+  }
+ ]
+}

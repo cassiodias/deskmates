@@ -142,8 +142,13 @@ hs = {
       for name in p:lines() do names[#names + 1] = name end
       p:close()
       if #names == 0 then error("no such folder: " .. path) end
-      local i = 0
-      return function() i = i + 1 return names[i] end
+      -- As hs.fs.dir: an iterator and the folder object it must be handed back (for name in iter, folder).
+      local folder, i = { names = names }, 0
+      return function(d)
+        if d ~= folder then error("bad argument #1 to 'for iterator' (directory metatable expected, got nil)") end
+        i = i + 1
+        return names[i]
+      end, folder
     end,
     mkdir = function(path) return os.execute("mkdir '" .. path:gsub("'", "'\\''") .. "' 2>/dev/null") end,
     attributes = function(path, field)

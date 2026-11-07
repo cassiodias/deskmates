@@ -29,10 +29,19 @@ def ts: (.timestamp // "") | tostring | sub("\\.[0-9]+Z$"; "Z") | (try fromdatei
 def text_of: if type == "string" then . elif type == "array" then map(select(type == "object" and .type == "text") | .text) | join("\n") else "" end;
 def sentence: split("\n") | map(select(test("^\\s*$") | not) | select(test("^\\s*#") | not)) | (.[0] // "")
   | gsub("[#*`|]"; "") | sub("^[\\s>-]*"; "") | sub("(?<p>[.!?])\\s.*$"; "\(.p)") | .[0:90];
+# What Claude Code writes as a user record but no one typed to the agent: a compaction summary, a ! command and
+# its output, a local command'"'"'s output, an interruption note.
+def not_typed: (.message.content | text_of) as $t | .isCompactSummary == true
+  or ($t | test("^\\s*<(bash-input|bash-stdout|bash-stderr|local-command-stdout|local-command-stderr|local-command-caveat)>"))
+  or ($t | test("^\\[Request interrupted"));
 def is_prompt: .type == "user" and (.isMeta != true) and (.isSidechain != true)
   and ((.message.content | type) == "string"
     or ((.message.content | type) == "array" and (.message.content | any(.type == "tool_result") | not)
-      and (.message.content | any(.type == "text"))));
+      and (.message.content | any(.type == "text"))))
+  and (not_typed | not);
+# A record of the agent'"'"'s own work in a turn: what it said, or what a tool gave back to it.
+def is_work: .type == "assistant" or (.type == "user" and (.message.content | type) == "array"
+  and (.message.content | any(.type == "tool_result")));
 def command: (.message.content | text_of) as $t
   | (($t | capture("<command-name>/?(?<c>[^<]+)</command-name>") | .c)
     // ($t | capture("^/(?<c>[A-Za-z0-9:_-]+)(\\s|$)") | .c) // null);
@@ -42,7 +51,11 @@ def prompt_text: (.message.content | text_of) as $t
 [inputs | fromjson? | select(type == "object")] as $all
 | [$sub[] | fromjson? | select(type == "object")] as $subs
 | [$all[] | select(ts != null)] as $recs
-| [$recs[] | select(is_prompt) | {at: ts, command: command, prompt: prompt_text}] as $p
+# A /command run by Claude Code itself (/clear, /plugin…) is followed by its local_command record: no prompt.
+| [range(0; $recs | length) as $i | $recs[$i] | select(is_prompt)
+    | select((command != null and ($recs[$i + 1:$i + 3] | any(.type == "system" and .subtype == "local_command"))) | not)
+    | {at: ts, command: command, prompt: prompt_text,
+       notice: (((.message.content | text_of) | capture("<task-notification>[\\s\\S]*<tool-use-id>(?<id>[^<]+)</tool-use-id>") | .id) // null)}] as $p
 | ([$recs[], $subs[] | select(.type == "user" and (.message.content | type) == "array") | ts as $t
     | .toolUseResult as $tur | .message.content[] | select(.type == "tool_result")
     | {key: .tool_use_id, value: {at: $t, text: (.content | text_of), error: (.is_error == true),
@@ -56,19 +69,31 @@ def prompt_text: (.message.content | text_of) as $t
     | [$recs[] | ts as $t | select($t > $a and $t < $b)] as $in
     | ([$in[] | select(.type == "system" and .subtype == "turn_duration") | ts] | first) as $done
     | ([$in[] | select(.type == "assistant" and (.isSidechain != true)) | .message.content | text_of | select(. != "")] | last) as $last
-    | {at: $a, endAt: ($done // ([$in[] | ts] | last)), reply: (if $last then ($last | sentence) else null end),
+    | {at: $a, endAt: ($done // ([$in[] | select(is_work) | ts] | last)), reply: (if $last then ($last | sentence) else null end),
        edits: [$uses[] | select(.name == "Write" or .name == "Edit" or .name == "MultiEdit" or .name == "NotebookEdit")
          | select(turn_of(.at) == $i) | (.input.file_path // .input.notebook_path // empty) | tostring] | unique}] as $turns
 | {cwd: ([$recs[] | .cwd | strings] | first),
-   prompts: [$p[] | {at, command}],
+   prompts: [$p[] | {at, command: (if .notice then null else .command end)}],
    turns: $turns,
    notes: ([
-     ($p[] | select(.command != null) | . as $x | {at: $x.at, note: ({prompt: $x.prompt} | claude_command_note($x.command))}),
+     ($p[] | select(.command != null and .notice == null) | . as $x | {at: $x.at, note: ({prompt: $x.prompt} | claude_command_note($x.command))}),
+     # A background agent ends when its task notification comes (its result at launch only said it started): as a
+     # prompt, or queued as an attachment (newer Claude Code).
+     ([($p[] | select(.notice != null) | {at, id: .notice, text: .prompt}),
+       ($recs[] | select(.type == "attachment" and .attachment.type? == "queued_command")
+         | (.attachment.prompt // "" | tostring) as $t
+         | ($t | capture("<task-notification>[\\s\\S]*<tool-use-id>(?<id>[^<]+)</tool-use-id>") | .id) as $id
+         | {at: ts, id: $id, text: $t})][]
+       | . as $x | ($uses[] | select(.id == $x.id and (.name == "Agent" or .name == "Task"))) as $u
+       | ($u.input.description // "" | tostring) as $d | select($d != "")
+       | (($x.text | capture("<result>(?<r>[\\s\\S]*?)</result>") | .r) // ($x.text | capture("<summary>(?<r>[\\s\\S]*?)</summary>") | .r) // "") as $text
+       | {at: $x.at, note: ({last_assistant_message: $text} | claude_done_note($d; ($text | sentence)))}),
      ($uses[] | select(.side | not) | . as $u | $results[$u.id] as $r
        | if $u.name == "Skill" then {at: $u.at, note: ({tool_input: $u.input} | claude_skill_note)}
          elif $u.name == "Agent" or $u.name == "Task" then
            {at: $u.at, note: ({tool_input: $u.input} | claude_agent_note)},
            (($u.input.description // "" | tostring) as $d | select($d != "" and $r != null)
+             | select(($r.response | type) != "object" or $r.response.status != "async_launched")
              | {at: $r.at, note: ({last_assistant_message: $r.text} | claude_done_note($d; ($r.text | sentence)))})
          elif ($u.name | test("^mcp__.*Jira")) and $r != null then
            {at: $r.at, note: ({tool_input: $u.input, tool_response: $r.response} | claude_jira_note)}
@@ -105,7 +130,8 @@ backfill_find() {
 
 # The jq that turns a reading into what the facts gain, given $cur (the facts now; {} when none), $real (the
 # indexes of the reading's test candidates that are test runs), $to (the offset read up to) and $gaps (the prompt
-# times that have no turn): { tickets, current, timeline, turns, lastAt, upTo }. Every note is replayed in time
+# times that have no turn, the newest 30 only: the facts keep 30 turns): { tickets, current, timeline, turns,
+# lastAt, upTo }. Every note is replayed in time
 # order through facts_apply, at its own time.
 BACKFILL_BUILD='
 def apply_at($now; $n): '"$FACTS_DEFS"' facts_apply($n);
@@ -197,7 +223,7 @@ backfill_main() {
     rm -rf "$_backfill_work"; echo "error transcript not readable"; return 1
   fi
   _backfill_gaps=$("$PUPPET_JQ" -c --argjson cur "$_backfill_cur" '[.prompts[].at as $a
-    | select(($cur.turns // []) | all(((.at - $a) | fabs) > 5)) | $a]' "$_backfill_work/part")
+    | select(($cur.turns // []) | all(((.at - $a) | fabs) > 5)) | $a] | sort | .[-30:]' "$_backfill_work/part")
   if [ "$_backfill_gaps" = "[]" ]; then
     rm -rf "$_backfill_work"
     # Nothing to fill: remember how far it read, when the session has facts to keep it in.
@@ -224,7 +250,8 @@ backfill_main() {
     { rm -rf "$_backfill_work"; echo "error transcript not readable"; return 1; }
   if PUPPET_PAYLOAD='{}' facts_update "$1" "$FACTS_BACKFILL_DEFS \$cur | backfill_merge(\$b[0]; \$now)" \
       --slurpfile b "$_backfill_work/b"; then
-    echo "ok $(printf '%s' "$_backfill_gaps" | "$PUPPET_JQ" length)"
+    # The turns it added that the facts kept (the newest 30 turns are).
+    echo "ok $("$PUPPET_JQ" --argjson gaps "$_backfill_gaps" '[.turns[]? | select(.fromTranscript and (.at as $a | any($gaps[]; . == $a)))] | length' "$(facts_file "$1")")"
     rm -rf "$_backfill_work"
     return 0
   fi

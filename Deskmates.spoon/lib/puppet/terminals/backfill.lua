@@ -9,20 +9,23 @@ local backfill = {}
 local NOT_READABLE, TOO_LONG = "transcript not readable", "transcript took too long"
 
 -- The transcript of session `session` under home `home`: ~/.claude/projects/<project>/<session>.jsonl, the first
--- found; nil when there is none. dir(path) iterates a folder's names (hs.fs.dir; it may throw), exists(path) says
--- whether a file is there.
+-- found; nil when there is none. dir(path) is hs.fs.dir: it returns an iterator and the folder object the
+-- iterator must be handed on each call, and throws for a folder that is not there; exists(path) says whether a file
+-- is there.
 function backfill.find(home, session, dir, exists)
   if type(session) ~= "string" or not session:match("^[%w._-]+$") then return nil end
   local projects = home .. "/.claude/projects"
-  local ok, names = pcall(dir, projects)
-  if not ok or not names then return nil end
-  for name in names do
-    if name ~= "." and name ~= ".." then
-      local path = projects .. "/" .. name .. "/" .. session .. ".jsonl"
-      if exists(path) then return path end
+  local ok, found = pcall(function()
+    local iterate, folder = dir(projects)
+    for name in iterate, folder do
+      if name ~= "." and name ~= ".." then
+        local path = projects .. "/" .. name .. "/" .. session .. ".jsonl"
+        if exists(path) then return path end
+      end
     end
-  end
-  return nil
+    return nil
+  end)
+  return ok and found or nil
 end
 
 -- Runs `script` for session `session`. Calls done exactly once: done("ok", turns added), done("none"), or
