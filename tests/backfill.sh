@@ -95,6 +95,44 @@ rm "$HOME/.deskmates/on"
 expect "off: an error" "$(run)" "error Deskmates is off"
 expect "off: no facts" "$(ls "$HOME/.deskmates/facts")" ""
 
+# Git for backfilled turns, from git log by time: a repo with commits at set times, the transcript run in it.
+gitrepo() {
+  rm -rf "$HOME/repo"; mkdir -p "$HOME/repo"
+  REPO=$(cd -P "$HOME/repo" && pwd -P)
+  git -C "$REPO" init -q
+  for c in "50 Start" "104 Fix the typo" "205 Docs"; do
+    echo "${c#* }" > "$REPO/README.md"
+    git -C "$REPO" add -A
+    GIT_AUTHOR_DATE="@$((B + ${c%% *})) +0000" GIT_COMMITTER_DATE="@$((B + ${c%% *})) +0000" \
+      git -C "$REPO" -c user.email=t@t -c user.name=t commit -q -m "${c#* }"
+  done
+}
+sha_at() { git -C "$REPO" log --format=%H --grep="^$1\$"; }
+short_at() { git -C "$REPO" log --format=%h --grep="^$1\$"; }
+# setup_git <facts json>: case simple, its paths in the repo.
+setup_git() {
+  setup simple "${1:-}"
+  sed -i '' "s|/work/my-app|$REPO|g" "$HOME/.claude/projects/-work-my-app/$SID.jsonl"
+}
+gitrepo
+setup_git
+expect "git: the answer" "$(run)" "ok 2"
+expect "git: the repo, its base when the session started" "$("$PUPPET_JQ" -cS .git "$FACTSF")" \
+  "{\"base\":\"$(sha_at Start)\",\"dirtyAtStart\":[],\"folder\":\"$REPO\",\"fromTranscript\":true,\"prefix\":\"\",\"root\":\"$REPO\",\"top\":null}"
+expect "git: the first turn" "$(q '.turns[1] | [.head, .files, .commits]')" \
+  "[\"$(sha_at Start)\",[\"README.md\"],[{\"hash\":\"$(short_at "Fix the typo")\",\"subject\":\"Fix the typo\"}]]"
+expect "git: the second turn" "$(q '.turns[0] | [.head, .commits]')" \
+  "[\"$(sha_at "Fix the typo")\",[{\"hash\":\"$(short_at Docs)\",\"subject\":\"Docs\"}]]"
+# Git facts the hooks recorded stay.
+setup_git '{"tickets": {}, "timeline": [], "git": {"root": "/kept", "base": "k1", "dirtyAtStart": [], "folder": "/kept", "prefix": "", "top": null}}'
+run > /dev/null
+expect "git: the hooks' git facts kept" "$(q '.git.base')" '"k1"'
+# A folder that is no repo: no git facts, the turns still added.
+setup simple
+expect "nogit: the answer" "$(run)" "ok 2"
+expect "nogit: no git facts" "$(q '.git')" null
+expect "nogit: turns, no paths" "$(q '[.turns[] | .files]')" '[[],[]]'
+
 # No helper leaves a plain variable behind (run in this shell, as a script would).
 snap_vars() {
   set | grep -E '^[A-Za-z_][A-Za-z0-9_]*=' |

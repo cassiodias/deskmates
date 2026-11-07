@@ -117,12 +117,16 @@ def apply_at($now; $n): '"$FACTS_DEFS"' facts_apply($n);
     | sort_by(.at)) as $notes
 | (reduce $notes[] as $x ({tickets: {}, timeline: []}; . as $f | try ($f | apply_at($x.at; $x.note)) catch $f)) as $replay
 | [range(0; $r.turns | length) as $i | $r.turns[$i] | select(.at as $a | any($gaps[]; . == $a))
-    | {at, files: [], fromTranscript: true, commits: [],
+    | ($gitturns[.at | tostring] // {}) as $g
+    | {at, fromTranscript: true, commits: ($g.commits // []),
+       files: (if $git then [.edits[] | rel($git.root; $git.folder; $git.prefix; $git.top) | select(. != null)] | unique
+         else [] end),
        tests: ([$tests[] | select(turn_of(.at) == $i)] | {ran: length, passed: map(select(.failed | not)) | length,
          failed: map(select(.failed)) | length})}
-      + (if .endAt then {endAt} else {} end)] as $turns
+      + (if .endAt then {endAt} else {} end) + (if $g.head then {head: $g.head} else {} end)] as $turns
 | {tickets: $replay.tickets, current: $replay.current, timeline: $replay.timeline, turns: $turns,
-   lastAt: ([$r.prompts[].at, $r.notes[].at, ($r.turns[] | .endAt // .at)] | max), upTo: $to}
+   lastAt: ([$r.prompts[].at, $r.notes[].at, ($r.turns[] | .endAt // .at)] | max), upTo: $to,
+   git: (if $git and $git.fromTranscript then $git else null end)}
 '
 
 # The facts after a backfill $b: tickets and steps from the replay (when it found any), its timeline lines and
@@ -133,8 +137,47 @@ def backfill_merge($b; $now):
   | .timeline = (($b.timeline + [(.timeline // [])[] | select(.at > $b.lastAt)]) | sort_by(-.at) | .[0:30])
   | .turns = (((.turns // []) + $b.turns) | sort_by(-.at) | .[0:30])
   | if .turns == [] then del(.turns) else . end
+  | if $b.git and (.git | not) then .git = $b.git else . end
   | .backfill = {upTo: $b.upTo, at: $now};
 '
+
+# Git for a backfill, from reading $1 (a file), the facts now $2 and the gap prompt times $3, into the files
+# $4.git (the repo: the facts' own, or one found from the transcript's folder with its base when the session
+# started, marked fromTranscript; null for none) and $4.turns ({ "<turn start>": { head, commits } } for the gap
+# turns: the commit at their start and the commits made between their start and end, by git log).
+backfill_git() {
+  printf 'null' > "$4.git"
+  printf '{}' > "$4.turns"
+  facts_git_ready || return 0
+  _backfill_g=$(printf '%s' "$2" | "$PUPPET_JQ" -c '.git // empty')
+  if [ -z "$_backfill_g" ]; then
+    _backfill_cwd=$("$PUPPET_JQ" -r '.cwd // empty' "$1")
+    _backfill_first=$("$PUPPET_JQ" -r '.prompts[0].at // empty' "$1")
+    [ -n "$_backfill_cwd" ] && [ -n "$_backfill_first" ] || return 0
+    _backfill_out=$(facts_run_git "$_facts_git" -C "$_backfill_cwd" rev-parse --show-toplevel --show-prefix) || return 0
+    _backfill_root=${_backfill_out%%"$FACTS_NL"*}
+    _backfill_prefix=${_backfill_out#*"$FACTS_NL"}
+    [ "$_backfill_prefix" = "$_backfill_out" ] && _backfill_prefix=
+    _backfill_base=$(facts_run_git "$_facts_git" -C "$_backfill_root" rev-list -1 --before="@$_backfill_first" HEAD)
+    [ -n "$_backfill_base" ] || return 0
+    _backfill_g=$("$PUPPET_JQ" -nc '{root: $root, base: $base, dirtyAtStart: [], folder: $folder, prefix: $prefix,
+      top: null, fromTranscript: true}' --arg root "$_backfill_root" --arg base "$_backfill_base"       --arg folder "$_backfill_cwd" --arg prefix "$_backfill_prefix")
+  fi
+  printf '%s' "$_backfill_g" > "$4.git"
+  _backfill_root=$(printf '%s' "$_backfill_g" | "$PUPPET_JQ" -r .root)
+  "$PUPPET_JQ" -r --argjson gaps "$3" '.turns[] | select(.at as $a | any($gaps[]; . == $a)) | "\(.at) \(.endAt // .at)"' "$1" |
+    while read -r _backfill_at _backfill_end; do
+      _backfill_head=$(facts_run_git "$_facts_git" -C "$_backfill_root" rev-list -1 --before="@$_backfill_at" HEAD)
+      facts_run_git "$_facts_git" -C "$_backfill_root" log -z --format='%h%x09%s' -n 20 --since="@$_backfill_at" \
+        --until="@$_backfill_end" HEAD > "$4.log"
+      "$PUPPET_JQ" -nc "$FACTS_GIT_DEFS {key: \$at, value: ({commits: (\$log | commits)}
+        + (if \$head == \"\" then {} else {head: \$head} end))}" --arg at "$_backfill_at" --arg head "$_backfill_head" \
+        --rawfile log "$4.log"
+    done | "$PUPPET_JQ" -sc 'from_entries' > "$4.turns"
+  rm -f "$4.log"
+  [ -s "$4.turns" ] || printf '{}' > "$4.turns"
+  return 0
+}
 
 # Fills session $1's facts from its transcript; prints "ok <turns added>", "none" or "error <why>".
 backfill_main() {
@@ -173,8 +216,11 @@ backfill_main() {
     while IFS="	" read -r _backfill_k _backfill_c; do
       is_test_command "$(printf '%s' "$_backfill_c" | base64 -D 2>/dev/null || printf '%s' "$_backfill_c" | base64 -d)" && printf '%s\n' "$_backfill_k"
     done | "$PUPPET_JQ" -sc 'map(tonumber)')
+  backfill_git "$_backfill_work/full" "$_backfill_cur" "$_backfill_gaps" "$_backfill_work/g"
   "$PUPPET_JQ" -c --argjson real "$_backfill_real" --argjson to "$_backfill_to" --argjson gaps "$_backfill_gaps" \
-    "$FACTS_DEFS $FACTS_CLAUDE_DEFS $BACKFILL_BUILD" "$_backfill_work/full" > "$_backfill_work/b" ||
+    --slurpfile gitf "$_backfill_work/g.git" --slurpfile gitturnsf "$_backfill_work/g.turns" \
+    "$FACTS_DEFS $FACTS_CLAUDE_DEFS $FACTS_GIT_DEFS \$gitf[0] as \$git | \$gitturnsf[0] as \$gitturns | $BACKFILL_BUILD" \
+    "$_backfill_work/full" > "$_backfill_work/b" ||
     { rm -rf "$_backfill_work"; echo "error transcript not readable"; return 1; }
   if PUPPET_PAYLOAD='{}' facts_update "$1" "$FACTS_BACKFILL_DEFS \$cur | backfill_merge(\$b[0]; \$now)" \
       --slurpfile b "$_backfill_work/b"; then
