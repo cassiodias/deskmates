@@ -1,0 +1,29 @@
+{
+ "cwd": "/work/my-app",
+ "notes": [
+  {
+   "at": 1767225705,
+   "note": {
+    "from": "Listed them.",
+    "kind": "reply",
+    "moves": false,
+    "text": "Listed them."
+   }
+  }
+ ],
+ "prompts": [
+  {
+   "at": 1767225700,
+   "command": null
+  }
+ ],
+ "tests": [],
+ "turns": [
+  {
+   "at": 1767225700,
+   "edits": [],
+   "endAt": 1767225705,
+   "reply": "Listed them."
+  }
+ ]
+}

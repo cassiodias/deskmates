@@ -1,0 +1,50 @@
+{
+ "cwd": "/work/my-app",
+ "notes": [
+  {
+   "at": 1767225706,
+   "note": {
+    "from": "Fixed the typo.",
+    "kind": "reply",
+    "moves": false,
+    "text": "Fixed the typo."
+   }
+  },
+  {
+   "at": 1767225810,
+   "note": {
+    "from": "Updated the docs!",
+    "kind": "reply",
+    "moves": false,
+    "text": "Updated the docs!"
+   }
+  }
+ ],
+ "prompts": [
+  {
+   "at": 1767225700,
+   "command": null
+  },
+  {
+   "at": 1767225800,
+   "command": null
+  }
+ ],
+ "tests": [],
+ "turns": [
+  {
+   "at": 1767225700,
+   "edits": [
+    "/work/my-app/README.md"
+   ],
+   "endAt": 1767225706,
+   "reply": "Fixed the typo."
+  },
+  {
+   "at": 1767225800,
+   "edits": [],
+   "endAt": 1767225810,
+   "reply": "Updated the docs!"
+  }
+ ]
+}

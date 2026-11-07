@@ -1,0 +1,2 @@
+{"type": "user", "timestamp": "2026-01-01T00:01:40.123Z", "isSidechain": false, "cwd": "/work/my-app", "message": {"role": "user", "content": "Hello"}}
+{"type": not json

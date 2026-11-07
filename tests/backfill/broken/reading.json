@@ -1,0 +1,19 @@
+{
+ "cwd": "/work/my-app",
+ "notes": [],
+ "prompts": [
+  {
+   "at": 1767225700,
+   "command": null
+  }
+ ],
+ "tests": [],
+ "turns": [
+  {
+   "at": 1767225700,
+   "edits": [],
+   "endAt": null,
+   "reply": null
+  }
+ ]
+}

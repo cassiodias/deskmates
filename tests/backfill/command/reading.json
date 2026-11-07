@@ -1,0 +1,39 @@
+{
+ "cwd": "/work/my-app",
+ "notes": [
+  {
+   "at": 1767225700,
+   "note": {
+    "from": "/my-coding-skill ABC-12",
+    "kind": "skill",
+    "moves": true,
+    "phaseFrom": "my-coding-skill",
+    "text": "my-coding-skill"
+   }
+  },
+  {
+   "at": 1767225711,
+   "note": {
+    "from": "Started ABC-12.",
+    "kind": "reply",
+    "moves": false,
+    "text": "Started ABC-12."
+   }
+  }
+ ],
+ "prompts": [
+  {
+   "at": 1767225700,
+   "command": "my-coding-skill"
+  }
+ ],
+ "tests": [],
+ "turns": [
+  {
+   "at": 1767225700,
+   "edits": [],
+   "endAt": 1767225711,
+   "reply": "Started ABC-12."
+  }
+ ]
+}

@@ -1,0 +1,5 @@
+{"type": "user", "timestamp": "2026-01-01T00:01:40.123Z", "isSidechain": false, "cwd": "/work/my-app", "message": {"role": "user", "content": "Build ABC-12"}}
+{"type": "assistant", "timestamp": "2026-01-01T00:01:41.123Z", "isSidechain": false, "cwd": "/work/my-app", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "a1", "name": "Agent", "input": {"description": "Implement ABC-12 via my-developer", "subagent_type": "general-purpose", "prompt": "x"}}]}}
+{"type": "user", "timestamp": "2026-01-01T00:02:30.123Z", "isSidechain": false, "cwd": "/work/my-app", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "a1", "content": [{"type": "text", "text": "Built it. **Verdict: CHANGES_REQUESTED**"}], "is_error": false}]}}
+{"type": "assistant", "timestamp": "2026-01-01T00:02:31.123Z", "isSidechain": false, "cwd": "/work/my-app", "message": {"role": "assistant", "content": [{"type": "text", "text": "The developer built it."}]}}
+{"type": "system", "subtype": "turn_duration", "timestamp": "2026-01-01T00:02:32.123Z", "durationMs": 1000}

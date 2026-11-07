@@ -1,0 +1,6 @@
+{"type": "user", "timestamp": "2026-01-01T00:01:40.123Z", "isSidechain": false, "cwd": "/work/my-app", "message": {"role": "user", "content": "Run it"}}
+{"type": "user", "timestamp": "2026-01-01T00:01:41.123Z", "isSidechain": false, "cwd": "/work/my-app", "message": {"role": "user", "content": [{"type": "text", "text": "A reminder"}]}, "isMeta": true}
+{"type": "assistant", "timestamp": "2026-01-01T00:01:42.123Z", "isSidechain": false, "cwd": "/work/my-app", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "t1", "name": "Bash", "input": {"command": "ls"}}]}}
+{"type": "user", "timestamp": "2026-01-01T00:01:43.123Z", "isSidechain": false, "cwd": "/work/my-app", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "t1", "content": "a b", "is_error": false}]}}
+{"type": "user", "timestamp": "2026-01-01T00:01:44.123Z", "isSidechain": true, "cwd": "/work/my-app", "message": {"role": "user", "content": [{"type": "text", "text": "side prompt"}]}}
+{"type": "assistant", "timestamp": "2026-01-01T00:01:45.123Z", "isSidechain": false, "cwd": "/work/my-app", "message": {"role": "assistant", "content": [{"type": "text", "text": "Listed them."}]}}
