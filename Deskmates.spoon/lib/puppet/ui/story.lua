@@ -131,10 +131,14 @@ end
 local function turnHtml(t)
   local body = {}
   if t.reply then body[#body + 1] = '<div class="reply">' .. escape(t.reply) .. "</div>" end
-  if t.head or t.tests then
-    body[#body + 1] = '<div class="turnhead">' .. (t.head and "<b>" .. escape(t.head) .. "</b>" or "")
-      .. (t.head and t.tests and " · " or "") .. (t.tests and '<span class="tests">' .. escape(t.tests) .. "</span>" or "")
-      .. "</div>"
+  -- A turn filled from the transcript (the hooks did not record it) says so, muted, after the rest of its head.
+  local from = t.fromTranscript and '<span class="from">from the transcript</span>' or nil
+  if t.head or t.tests or from then
+    local parts = {}
+    if t.head then parts[#parts + 1] = "<b>" .. escape(t.head) .. "</b>" end
+    if t.tests then parts[#parts + 1] = '<span class="tests">' .. escape(t.tests) .. "</span>" end
+    if from then parts[#parts + 1] = from end
+    body[#body + 1] = '<div class="turnhead">' .. table.concat(parts, " · ") .. "</div>"
   end
   if t.total and t.total > 0 then
     local lis = {}
@@ -195,7 +199,7 @@ story.CSS = table.concat({
   ".pip.ok { background: var(--ok); } .pip.none { background: color-mix(in srgb, CanvasText 25%, transparent); }",
   ".turnbody { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; padding-bottom: 14px;",
   " min-width: 0; } .turnbody > * { max-width: 100%; } .storylist > li:last-child .turnbody { padding-bottom: 0; }",
-  ".story .reply { overflow-wrap: anywhere; } .story .tests { color: var(--muted); }",
+  ".story .reply { overflow-wrap: anywhere; } .story .tests, .story .from { color: var(--muted); }",
   -- A marker: one thin line between the turns, its label in the phase colour.
   ".storylist > li.marker { font-size: 12px; } .storylist > li.marker .at { font: 11px Menlo, monospace; }",
   ".markline { padding: 0 0 8px; color: var(--muted); overflow-wrap: anywhere; }",

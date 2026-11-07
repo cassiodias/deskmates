@@ -100,7 +100,7 @@ local function actualView(f, gitState, plan)
     dirtyAtStart = f.git.dirtyAtStart,
     seen = f.seen,
   })
-  local out = { base = f.git.base:sub(1, 7),
+  local out = { base = f.git.base:sub(1, 7), baseFromTranscript = f.git.fromTranscript == true or nil,
     footer = counted(commits, "commit") .. ", " .. c.uncommitted .. " not committed." }
   if not c.hasPlan then
     out.heading = ASKS_CHANGED
@@ -157,7 +157,7 @@ local function turnRow(t, isRunning)
   elseif t.endAt - t.at >= 60 then head = sessioncard.took(t.endAt - t.at) end
   return { at = t.at, endAt = t.endAt, time = os.date("%H:%M", t.at), dot = dot(t.tests, isRunning), head = head,
     tests = testsText(t.tests), summary = #t.files > 0 and counted(#t.files, "file") .. "…" or nil,
-    files = files, more = more, total = #t.files, commits = t.commits }
+    files = files, more = more, total = #t.files, commits = t.commits, fromTranscript = t.fromTranscript == true or nil }
 end
 
 -- What the git part shows for facts `f`, git's answer `gitState` ({ reading = true }, { error = text }, or
@@ -216,7 +216,8 @@ local function actualHtml(a)
   if a.line then
     out[#out + 1] = '<p class="line">' .. escape(a.line) .. "</p>"
   else
-    local base = "<code>" .. escape(a.base) .. "</code>"
+    -- A base read from the transcript (the session ran before Deskmates watched) says so.
+    local base = "<code>" .. escape(a.base) .. "</code>" .. (a.baseFromTranscript and " (read from the transcript)" or "")
     if a.rows then
       out[#out + 1] = '<p class="explain">Left, the files the plan named. Right, what git shows changed since ' .. base
         .. ". A gap on either side is the answer.</p>" .. tableHtml(a.rows)

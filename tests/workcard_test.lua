@@ -274,4 +274,12 @@ check("cap: the table's rows too", #pr == 202 and pr[1].kind == "missing" and pr
   and pr[201].right.path == "src/f200.js" and pr[202].kind == "more" and pr[202].more == 1)
 check("cap: the table's and 1 more", has(workcard.html(pv), '<tr class="more"><td colspan="3">and 1 more</td></tr></tbody>'))
 
+-- A base read from the transcript (the session ran before Deskmates watched) says so.
+local fromT = factsWith({})
+fromT.git.fromTranscript = true
+check("transcript: the base says where it came from", has(workcard.html(workcard.view(fromT, GIT, nil, false)),
+  "<code>a1b2c3d</code> (read from the transcript)"))
+check("hooks: a base the hooks recorded says nothing more", not has(workcard.html(workcard.view(factsWith({}), GIT, nil, false)),
+  "read from the transcript"))
+
 check.done("work card")

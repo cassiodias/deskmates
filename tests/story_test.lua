@@ -178,4 +178,15 @@ check("css: rows outside the step hidden, and a word when none is left", has(sto
   and has(story.CSS, "body.lane .storylist:not(:has(> li:not(.out))) + .nolane { display: block; }"))
 check("css: no line after the last dot", has(story.CSS, ".storylist > li:last-child .rail::after { content: none; }"))
 
+-- A turn filled from the transcript says so; a turn the hooks recorded does not.
+local filled = workcard.view({ tickets = {}, timeline = {}, seen = {}, git = facts.git,
+  turns = { { at = at(14, 5), endAt = at(14, 6), files = {}, tests = NONE, fromTranscript = true,
+              commits = { { hash = "b2c3d4e", subject = "Fixed the typo." } } },
+            { at = at(13, 0), endAt = at(13, 1), files = {}, tests = NONE,
+              commits = { { hash = "a1b2c3d", subject = "Start." } } } } }, { reading = true }, nil, false)
+local filledHtml = story.html(story.view(nil, filled, at(15, 0)) or { tickets = {} })
+check("transcript: its turn says so, once", count(filledHtml, '<span class="from">from the transcript</span>') == 1)
+check("transcript: in the turn it came from", filledHtml:find('data%-at="' .. at(14, 5) .. '"[^>]*>.-from the transcript') ~= nil
+  and not filledHtml:find('data%-at="' .. at(13, 0) .. '"[^>]*>[^\n]-from the transcript'))
+
 check.done("story")
