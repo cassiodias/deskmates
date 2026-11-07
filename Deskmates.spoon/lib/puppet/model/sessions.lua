@@ -191,6 +191,15 @@ function Sessions:apply(e, ctx)
   if e.app ~= "" then s.app = e.app end
   if e.tty:match("^/dev/ttys%d+$") then s.tty = e.tty end
   if s.tag == "" then s.tag = s.folder end
+  -- One puppet per terminal: a session whose own main thread works in it (a prompt, a tool) closes the others there
+  -- that rest, as a closed tab would (a tab can go on in another session: Claude Code's daemon forks one). One typed
+  -- into again comes back with its prompt.
+  local isOwnWork = sid == e.session and e.agentId == "" and (e.name == "UserPromptSubmit" or e.name == "PreToolUse")
+  if isOwnWork and s.tty then
+    for key, other in pairs(self.all) do
+      if key ~= sid and other.tty == s.tty and isAtRest(other) then other.isClosed = true end
+    end
+  end
   if e.title and e.title ~= "" then s.title = e.title end
   local kind = harness.toolKind(e.tool)
   local function say(text, seconds) intents[#intents + 1] = { key = sid, text = text, seconds = seconds } end

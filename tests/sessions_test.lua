@@ -393,5 +393,35 @@ pair("PostToolUse", { session = "s2", agentId = "bg8", tool = "Bash" })
 local later = pair("Notification", { session = "s2", text = "Waiting for you" })
 check("twin: once answered, s2's own notifications speak", later[1] and later[1].key == "s2")
 
+-- Seen 7 Nov: Claude Code forked a tab's session into its daemon and the tab went on in the fork: two puppets for
+-- one tab. A session working in a terminal closes the others there that rest; one typed into again comes back.
+local tab = Sessions.new(100)
+local function at(name, fields) return tab:apply(event(name, fields), { mapping = mapping, harness = fake, frame = 1, now = 100 }) end
+at("UserPromptSubmit", { text = "/build", tty = "/dev/ttys001" })
+at("Stop", { text = "Planned." })
+at("UserPromptSubmit", { session = "s3", text = "/build", tty = "/dev/ttys002" })
+at("Stop", { session = "s3", text = "Elsewhere." })
+at("UserPromptSubmit", { session = "s2", text = "/build", tty = "/dev/ttys001" })
+local function onStage(key)
+  for _, k in ipairs(tab:stageKeys(100)) do if k == key then return true end end
+  return false
+end
+check("tab: the session the tab went on in plays", onStage("s2"))
+check("tab: the one it left, resting, leaves", not onStage("s1"))
+check("tab: a session in another terminal stays", onStage("s3"))
+at("Stop", { session = "s2", text = "Built." })
+at("UserPromptSubmit", { text = "/build", tty = "/dev/ttys001" })
+check("tab: typed into again, the old one comes back", onStage("s1"))
+check("tab: and the other, resting, leaves", not onStage("s2"))
+local busy = Sessions.new(100)
+local function on(name, fields) return busy:apply(event(name, fields), { mapping = mapping, harness = fake, frame = 1, now = 100 }) end
+on("UserPromptSubmit", { text = "/build", tty = "/dev/ttys001" })
+on("SubagentStart", { agentId = "bg9", agentType = "general-purpose" })
+on("Stop", { text = "Started it." })
+on("UserPromptSubmit", { session = "s2", text = "/build", tty = "/dev/ttys001" })
+check("tab: a session whose subagent still works stays", busy.all.s1.isClosed ~= true)
+on("PreToolUse", { session = "s2", agentId = "bg9", tool = "edit", tty = "/dev/ttys001" })
+check("tab: a moved subagent's tool closes nobody", busy.all.s2.isClosed ~= true and busy.all.s1.isClosed ~= true)
+
 
 check.done("sessions")
