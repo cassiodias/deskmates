@@ -207,6 +207,42 @@ printf '%s' /dev/ttys002 > "$PUPPET_DIR/tty-d5"
 expect "a daemon whose claude is gone: not a tab remembered for it either" "$(fake_tree gone; puppet_tty d5)" ""
 expect "a plain tab: its own terminal" "$(fake_tree plain; puppet_tty d3)" /dev/ttys002
 
+# No helper leaves a variable behind: the shell's variables before and after each public helper (run in this
+# shell, as a translator runs them) differ only in the helper-private names (_puppet_…) and the documented PUPPET_*.
+snap_vars() {
+  set | grep -E '^[A-Za-z_][A-Za-z0-9_]*=' |
+    grep -Ev '^(_|BASH[A-Z_]*|RANDOM|SRANDOM|SECONDS|LINENO|PIPESTATUS|OLDPWD|EPOCH[A-Z]*|snap_[a-z]*)='
+}
+# leaks command…: runs the command here; nothing, or the names of the variables it changed that it should not.
+leaks() {
+  snap_vars > "$HOME/snap.before"
+  "$@" > /dev/null 2>&1
+  snap_vars > "$HOME/snap.after"
+  cat "$HOME/snap.before" "$HOME/snap.after" | sort | uniq -u | cut -d= -f1 | sort -u |
+    grep -Ev '^(_puppet_|PUPPET_)' | tr '\n' ' '
+}
+printf '{"cwd":"%s","text":"Fixed the typo. Then more.","session_id":"s1"}' "$HOME" > "$HOME/payload.json"
+expect "leak: puppet_find_jq" "$(leaks puppet_find_jq)" ""
+expect "leak: puppet_read_payload" "$(leaks puppet_read_payload < "$HOME/payload.json")" ""
+puppet_read_payload < "$HOME/payload.json"
+expect "leak: payload_value" "$(leaks payload_value cwd)" ""
+expect "leak: json_value" "$(echo '{"a":1}' | { leaks json_value a; })" ""
+expect "leak: field" "$(leaks field cwd)" ""
+expect "leak: path_field" "$(leaks path_field cwd)" ""
+expect "leak: first_sentence" "$(leaks first_sentence text)" ""
+expect "leak: leading_command" "$(leaks leading_command "/build now")" ""
+expect "leak: terminal_of" "$(leaks terminal_of $$)" ""
+expect "leak: daemon_owner_tty" "$(leaks daemon_owner_tty)" ""
+expect "leak: puppet_tty" "$(unset PUPPET_TTY; leaks puppet_tty s1)" ""
+expect "leak: puppet_tty, cached" "$(unset PUPPET_TTY; printf '%s' /dev/ttys999 > "$PUPPET_DIR/tty-s9"; leaks puppet_tty s9)" ""
+expect "leak: tty_from_program" "$(leaks tty_from_program zsh)" ""
+expect "leak: claimed_by_other" "$(printf '%s' /dev/ttys998 > "$PUPPET_DIR/tty-s8"; leaks claimed_by_other /dev/ttys997)" ""
+expect "leak: write_event" "$(PUPPET_NOW=0; unset PUPPET_TTY; leaks write_event claude Stop s1 "" "" "" "" "$HOME/x" "" "")" ""
+# A translator's own names survive the helpers it calls directly.
+expect "a translator's tty, app and folder survive" \
+  "$(tty=keep app=keep folder=keep; unset PUPPET_TTY; write_event claude Stop s1 "" "" "" "" "$HOME/x" "" ""
+     tty_from_program zsh > /dev/null; printf '%s %s %s' "$tty" "$app" "$folder")" "keep keep keep"
+
 rm -rf "$HOME"
 [ "$failed" = 0 ] && echo "puppet-lib: ok"
 exit "$failed"

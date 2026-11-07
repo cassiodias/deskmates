@@ -16,8 +16,8 @@ PUPPET_EVENTS="$PUPPET_DIR/events"
 # PUPPET_JQ (empty: no jq).
 puppet_find_jq() {
   command -v jq 2>/dev/null && return 0
-  for jq in /usr/bin/jq /opt/homebrew/bin/jq /usr/local/bin/jq; do
-    [ -x "$jq" ] && { printf '%s\n' "$jq"; return 0; }
+  for _puppet_jq in /usr/bin/jq /opt/homebrew/bin/jq /usr/local/bin/jq; do
+    [ -x "$_puppet_jq" ] && { printf '%s\n' "$_puppet_jq"; return 0; }
   done
   return 0
 }
@@ -56,8 +56,8 @@ payload_value() {
     return 0
   fi
   # plutil prints its error on stdout.
-  value=$(printf '%s' "$PUPPET_PAYLOAD" | plutil -extract "$1" raw -o - - 2>/dev/null) || return 0
-  printf '%s\n' "$value"
+  _puppet_value=$(printf '%s' "$PUPPET_PAYLOAD" | plutil -extract "$1" raw -o - - 2>/dev/null) || return 0
+  printf '%s\n' "$_puppet_value"
 }
 
 # The first $1 characters of each line of stdin, never cutting one in two: hooks may run with the C locale (from
@@ -75,12 +75,12 @@ one_line() {
 # One value from the JSON on stdin by key path, on one line, without "|"; for a file of the agent's.
 json_value() {
   if [ -n "$PUPPET_JQ" ]; then
-    value=$("$PUPPET_JQ" -r --arg key "$1" 'getpath($key | split(".") | map(tonumber? // .))?
+    _puppet_value=$("$PUPPET_JQ" -r --arg key "$1" 'getpath($key | split(".") | map(tonumber? // .))?
       | if type == "object" or type == "array" or . == null then empty else tostring end' 2>/dev/null) || return 0
   else
-    value=$(plutil -extract "$1" raw -o - - 2>/dev/null) || return 0
+    _puppet_value=$(plutil -extract "$1" raw -o - - 2>/dev/null) || return 0
   fi
-  one_line "$value"
+  one_line "$_puppet_value"
 }
 
 # One value from the payload by key path (like tool_input.command), on one line, without "|", cut to 120
@@ -103,11 +103,11 @@ first_sentence() {
 # A prompt's leading /command, or nothing: a slash and a name of letters, digits and ":_-". A prompt that starts
 # with a path ("/Users/me/notes.pdf summarise") has no command.
 leading_command() {
-  word=${1%%[[:space:]]*}
-  name=${word#/}
-  case "$word" in /*) ;; *) return 0 ;; esac
-  case "$name" in ""|*[!A-Za-z0-9:_-]*) return 0 ;; esac
-  printf '/%s' "$name"
+  _puppet_word=${1%%[[:space:]]*}
+  _puppet_name=${_puppet_word#/}
+  case "$_puppet_word" in /*) ;; *) return 0 ;; esac
+  case "$_puppet_name" in ""|*[!A-Za-z0-9:_-]*) return 0 ;; esac
+  printf '/%s' "$_puppet_name"
 }
 
 # True when a shell command runs tests, so the puppet shows a progress bar and the result. It reads the command
@@ -231,8 +231,8 @@ is_test_command() {
 
 # The terminal of process $1 (/dev/ttys004), or nothing.
 terminal_of() {
-  name=$(ps -o tty= -p "$1" 2>/dev/null | tr -d ' ')
-  case "$name" in ""|"??") ;; *) printf '/dev/%s' "$name" ;; esac
+  _puppet_name=$(ps -o tty= -p "$1" 2>/dev/null | tr -d ' ')
+  case "$_puppet_name" in ""|"??") ;; *) printf '/dev/%s' "$_puppet_name" ;; esac
 }
 
 # Names the program, or programs, the agent runs as in its terminal (the last part of ps -o comm, like the
@@ -260,15 +260,15 @@ is_daemon_pty() {
 # The terminal of the claude that started the daemon this hook runs under: the daemon names it in
 # `--spawned-by {…"pid":N}`. Nothing when N no longer runs in a terminal (never the worker's pty).
 daemon_owner_tty() {
-  pid=$$
-  while [ -n "$pid" ] && [ "$pid" -gt 1 ]; do
-    line=$(ps -o ppid=,command= -p "$pid" 2>/dev/null)
-    case "$line" in
+  _puppet_pid=$$
+  while [ -n "$_puppet_pid" ] && [ "$_puppet_pid" -gt 1 ]; do
+    _puppet_line=$(ps -o ppid=,command= -p "$_puppet_pid" 2>/dev/null)
+    case "$_puppet_line" in
       *" daemon run "*'"pid":'*)
-        terminal_of "$(printf '%s' "$line" | sed -n 's/.*"pid":\([0-9][0-9]*\).*/\1/p')"
+        terminal_of "$(printf '%s' "$_puppet_line" | sed -n 's/.*"pid":\([0-9][0-9]*\).*/\1/p')"
         return 0 ;;
     esac
-    pid=$(printf '%s' "$line" | awk '{ print $1 }')
+    _puppet_pid=$(printf '%s' "$_puppet_line" | awk '{ print $1 }')
   done
 }
 
@@ -281,25 +281,26 @@ daemon_owner_tty() {
 # event can still find it.
 puppet_tty() {
   if [ -n "${PUPPET_TTY+set}" ]; then printf '%s' "$PUPPET_TTY"; return; fi
-  cache="$PUPPET_DIR/tty-$1"
-  tty=$(terminal_of $$)
-  pid=$(ps -o ppid= -p $$ | tr -d ' ')
+  _puppet_cache="$PUPPET_DIR/tty-$1"
+  _puppet_tty=$(terminal_of $$)
+  _puppet_pid=$(ps -o ppid= -p $$ | tr -d ' ')
   # A daemon's session has the tab's terminal or none: its ancestors only lead to the worker's pty, and a terminal
   # remembered for it may be that pty (which still runs claude while the idle worker lives) or a tab its claude left.
-  daemon=""
-  [ -n "$tty" ] && is_daemon_pty "$tty" && daemon=1 && tty=$(daemon_owner_tty) && pid=""
-  if [ -z "$tty" ] && [ -z "$daemon" ] && [ -n "$1" ] && [ -f "$cache" ]; then
-    tty=$(cat "$cache")
-    terminal_runs "$tty" "${PUPPET_PROGRAM:-}" || tty=""
+  _puppet_daemon=""
+  [ -n "$_puppet_tty" ] && is_daemon_pty "$_puppet_tty" &&
+    _puppet_daemon=1 && _puppet_tty=$(daemon_owner_tty) && _puppet_pid=""
+  if [ -z "$_puppet_tty" ] && [ -z "$_puppet_daemon" ] && [ -n "$1" ] && [ -f "$_puppet_cache" ]; then
+    _puppet_tty=$(cat "$_puppet_cache")
+    terminal_runs "$_puppet_tty" "${PUPPET_PROGRAM:-}" || _puppet_tty=""
   fi
-  while [ -z "$tty" ] && [ -n "$pid" ] && [ "$pid" -gt 1 ]; do
-    tty=$(terminal_of "$pid")
-    pid=$(ps -o ppid= -p "$pid" | tr -d ' ')
+  while [ -z "$_puppet_tty" ] && [ -n "$_puppet_pid" ] && [ "$_puppet_pid" -gt 1 ]; do
+    _puppet_tty=$(terminal_of "$_puppet_pid")
+    _puppet_pid=$(ps -o ppid= -p "$_puppet_pid" | tr -d ' ')
   done
-  [ -z "$tty" ] && command -v puppet_tty_fallback > /dev/null && tty=$(puppet_tty_fallback)
+  [ -z "$_puppet_tty" ] && command -v puppet_tty_fallback > /dev/null && _puppet_tty=$(puppet_tty_fallback)
   # Written each time, so the cache of a session still at work never expires.
-  [ -n "$1" ] && [ -n "$tty" ] && printf '%s' "$tty" > "$cache"
-  printf '%s' "$tty"
+  [ -n "$1" ] && [ -n "$_puppet_tty" ] && printf '%s' "$_puppet_tty" > "$_puppet_cache"
+  printf '%s' "$_puppet_tty"
 }
 
 # Removes what sessions left in $PUPPET_DIR (tty caches, a translator's state like Cursor's turns: every file but
@@ -313,22 +314,22 @@ puppet_expire() {
 # The terminal of a process named $1 (pgrep -x) working in the payload's cwd, for agents whose hooks run in a
 # background process. With several there, the first one no other session has claimed.
 tty_from_program() {
-  folder=$(cd "$(path_field cwd)" 2>/dev/null && pwd -P) || return 0
-  first=""
-  for pid in $(pgrep -x "$1"); do
-    name=$(ps -o tty= -p "$pid" | tr -d ' ')
-    case "$name" in ""|"??") continue ;; esac
-    [ "$(lsof -a -d cwd -p "$pid" -Fn 2>/dev/null | sed -n 's/^n//p')" = "$folder" ] || continue
-    [ -n "$first" ] || first="/dev/$name"
-    claimed_by_other "/dev/$name" || { printf '/dev/%s' "$name"; return 0; }
+  _puppet_folder=$(cd "$(path_field cwd)" 2>/dev/null && pwd -P) || return 0
+  _puppet_first=""
+  for _puppet_pid in $(pgrep -x "$1"); do
+    _puppet_name=$(ps -o tty= -p "$_puppet_pid" | tr -d ' ')
+    case "$_puppet_name" in ""|"??") continue ;; esac
+    [ "$(lsof -a -d cwd -p "$_puppet_pid" -Fn 2>/dev/null | sed -n 's/^n//p')" = "$_puppet_folder" ] || continue
+    [ -n "$_puppet_first" ] || _puppet_first="/dev/$_puppet_name"
+    claimed_by_other "/dev/$_puppet_name" || { printf '/dev/%s' "$_puppet_name"; return 0; }
   done
-  printf '%s' "$first"
+  printf '%s' "$_puppet_first"
 }
 
 # Whether a session other than the payload's already has terminal $1.
 claimed_by_other() {
-  for cache in "$PUPPET_DIR"/tty-*; do
-    [ -f "$cache" ] && [ "$cache" != "$PUPPET_DIR/tty-$(field session_id)" ] && [ "$(cat "$cache")" = "$1" ] && return 0
+  for _puppet_cache in "$PUPPET_DIR"/tty-*; do
+    [ -f "$_puppet_cache" ] && [ "$_puppet_cache" != "$PUPPET_DIR/tty-$(field session_id)" ] && [ "$(cat "$_puppet_cache")" = "$1" ] && return 0
   done
   return 1
 }
@@ -352,12 +353,12 @@ puppet_app() {
 write_event() {
   mkdir -p "$PUPPET_DIR"
   puppet_expire
-  tty=$(puppet_tty "$3")
-  app=${TERM_PROGRAM:-}
-  [ -z "$tty" ] && [ -n "${PUPPET_APP:-}" ] && app=$PUPPET_APP
+  _puppet_tty=$(puppet_tty "$3")
+  _puppet_app=${TERM_PROGRAM:-}
+  [ -z "$_puppet_tty" ] && [ -n "${PUPPET_APP:-}" ] && _puppet_app=$PUPPET_APP
   [ "$2" = "SessionEnd" ] && rm -f "$PUPPET_DIR/tty-$3"
   printf '%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s\n' "${PUPPET_NOW:-$(date +%s)}" "$2" "$3" "$4" "$5" "$6" "$7" \
-    "$(printf '%s' "${8##*/}" | cut_chars 120)" "$app" "$9" "$tty" "$1" "${10}" >> "$PUPPET_EVENTS"
+    "$(printf '%s' "${8##*/}" | cut_chars 120)" "$_puppet_app" "$9" "$_puppet_tty" "$1" "${10}" >> "$PUPPET_EVENTS"
   # Keeps the file small; the puppets start reading again from the top.
   [ "$(wc -c < "$PUPPET_EVENTS")" -gt 1000000 ] && : > "$PUPPET_EVENTS"
   return 0
