@@ -343,5 +343,26 @@ for _, order in ipairs({ { "s1", "s2" }, { "s2", "s1" } }) do
   end
 end
 
+-- A moved subagent's permission prompt and notification show on the puppet that started it; prompts with no agent
+-- id, or from a subagent of the event's own session, stay where they came.
+local asked = Sessions.new(100)
+local function ask(name, fields) return asked:apply(event(name, fields), { mapping = mapping, harness = fake, frame = 1, now = 100 }) end
+ask("UserPromptSubmit", { text = "/build" })
+ask("SubagentStart", { agentId = "bg5", agentType = "general-purpose" })
+ask("Stop", { text = "Started it." })
+ask("UserPromptSubmit", { session = "s2", text = "/build" })
+ask("Stop", { session = "s2", text = "Answered." })
+local prompt = ask("PermissionRequest", { session = "s2", agentId = "bg5", tool = "Bash" })
+check("asked: a moved subagent's permission shows on s1", asked.all.s1.mood == "permission" and asked.all.s2.mood == nil)
+check("asked: and its bubble is s1's", prompt[1] and prompt[1].key == "s1" and prompt[1].text == "May I use Bash?")
+ask("PostToolUse", { session = "s2", agentId = "bg5", tool = "Bash" })
+local note = ask("Notification", { session = "s2", agentId = "bg5", text = "Waiting" })
+check("asked: a moved subagent's notification shows on s1", note[1] and note[1].key == "s1" and note[1].text == "Waiting")
+note = ask("Notification", { session = "s2", agentId = "", text = "Main" })
+check("asked: a notification with no agent id stays on s2", note[1] and note[1].key == "s2")
+ask("SubagentStart", { session = "s2", agentId = "own", agentType = "general-purpose" })
+prompt = ask("PermissionRequest", { session = "s2", agentId = "own", tool = "Edit" })
+check("asked: its own subagent's permission stays on s2", asked.all.s2.mood == "permission" and prompt[1].key == "s2")
+
 
 check.done("sessions")

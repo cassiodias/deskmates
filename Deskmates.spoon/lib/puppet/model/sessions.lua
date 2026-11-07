@@ -39,8 +39,12 @@ local function ownerOf(all, sid, agentId)
   return owner
 end
 
--- The events of a subagent that go to the session that started it.
-local ROUTED = { PreToolUse = true, PostToolUse = true, PostToolUseFailure = true, SubagentStop = true }
+-- The events of a subagent that go to the session that started it: its tools, its stop, and what it asks of you
+-- (an event with no agent id stays where it came).
+local ROUTED = {
+  PreToolUse = true, PostToolUse = true, PostToolUseFailure = true, SubagentStop = true,
+  PermissionRequest = true, Notification = true,
+}
 
 local function isAtRest(s)
   return not s.isWorking and s.mood == nil and liveAgents(s) == 0
@@ -156,8 +160,9 @@ end
 function Sessions:apply(e, ctx)
   local intents = {}
   local sid, harness, mapping = e.session, ctx.harness, ctx.mapping
-  -- A subagent's tools and its stop belong to the session that started it, whichever id they come under: its
-  -- puppet taps while the subagent works and rests when it stops; the session they came under is left alone.
+  -- A subagent's tools, its stop and its prompts belong to the session that started it, whichever id they come
+  -- under: its puppet taps while the subagent works, asks when it asks and rests when it stops; the session they
+  -- came under is left alone.
   if ROUTED[e.name] then sid = ownerOf(self.all, sid, e.agentId) or sid end
   local at = e.at or ctx.now
   if ctx.replayFrom and at < ctx.replayFrom then return intents end
