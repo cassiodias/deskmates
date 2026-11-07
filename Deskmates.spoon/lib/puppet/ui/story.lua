@@ -177,6 +177,11 @@ function story.html(v)
   return panel.html("story", "What happened?", table.concat(sums), table.concat(lists))
 end
 
+-- The story's panel holding only `text` (the transcript being read, or why it could not be).
+function story.lineHtml(text)
+  return panel.html("story", "What happened?", "", '<p class="line">' .. escape(text) .. "</p>")
+end
+
 -- The styles for the story, in the page's tokens (--accent, --faint) and workcard's colours (--ok, --off, --bad).
 story.CSS = table.concat({
   ".storylist { list-style: none; padding: 0; margin: 0; }",

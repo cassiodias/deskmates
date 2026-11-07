@@ -135,6 +135,16 @@ hs = {
     secondsSinceEpoch = function() return stub.clock end,
   },
   fs = {
+    -- The names in folder `path`, as hs.fs.dir iterates them; an error for a folder that is not there.
+    dir = function(path)
+      local names = {}
+      local p = io.popen("ls -a '" .. path:gsub("'", "'\\''") .. "' 2>/dev/null")
+      for name in p:lines() do names[#names + 1] = name end
+      p:close()
+      if #names == 0 then error("no such folder: " .. path) end
+      local i = 0
+      return function() i = i + 1 return names[i] end
+    end,
     mkdir = function(path) return os.execute("mkdir '" .. path:gsub("'", "'\\''") .. "' 2>/dev/null") end,
     attributes = function(path, field)
       local file = io.open(path, "r")

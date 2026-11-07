@@ -528,5 +528,56 @@ closeCard(reopened)
 hs.fs.attributes = attributes
 os.execute("rm -rf '" .. plansDir .. "' '" .. factsDir .. "'")
 
+-- Backfill: a Claude session with no facts, whose transcript is where Claude Code keeps it. Its card opens at once
+-- and reads the transcript; the answer fills it.
+os.execute("mkdir -p '" .. stub.home .. "/.claude/projects/-work-my-app' '" .. factsDir .. "'")
+for _, sid in ipairs({ "bf1", "bf2", "bf3", "cx1" }) do
+  io.open(stub.home .. "/.claude/projects/-work-my-app/" .. sid .. ".jsonl", "w"):close()
+end
+-- Each in a terminal of its own (an iTerm tab): a session working in a terminal closes the others resting there.
+stub.tabs = stub.tabs .. "/dev/ttys021=3/1;/dev/ttys022=3/2;/dev/ttys023=3/3;/dev/ttys024=3/4;"
+for i, sid in ipairs({ "bf1", "bf2", "bf3" }) do
+  write("UserPromptSubmit|" .. sid .. "||||/dev-skill|my-app|iTerm.app||/dev/ttys02" .. i .. "|claude|")
+  write("Stop|" .. sid .. "||||Hi.|my-app|iTerm.app||/dev/ttys02" .. i .. "|claude|")
+end
+write("UserPromptSubmit|cx1||||/dev-skill|my-app|iTerm.app||/dev/ttys024|codex|")
+write("Stop|cx1||||Hi.|my-app|iTerm.app||/dev/ttys024|codex|")
+stub.advance(0.2)
+tasks = #stub.tasks
+local views0 = #stub.webviews
+local bf = doubleClickOn("bf1")
+check("backfill: a card with no facts opens", #stub.webviews == views0 + 1 and bf.shown
+  and bf.html_:find("Reading the transcript…", 1, true) ~= nil)
+local bfTask = stub.tasks[tasks + 1]
+check("backfill: one run of the script, for the session", #stub.tasks == tasks + 1 and bfTask.path == "/bin/sh"
+  and bfTask.args[1]:match("/hook/backfill%.sh$") ~= nil and bfTask.args[2] == "bf1")
+doubleClickOn("bf1")
+check("backfill: one at a time", #stub.tasks == tasks + 1)
+local file = io.open(factsDir .. "/bf1.json", "w")
+file:write('{"updatedAt": 1, "current": "ABC-12", "tickets": {"ABC-12": {"phase": "dev", "phaseAt": 1, "phases": {"dev": 1}, "seen": 2}},'
+  .. ' "timeline": [{"at": 2, "ticket": "ABC-12", "kind": "reply", "text": "Filled from the transcript.", "phase": "dev"}]}')
+file:close()
+stub.finishTask(tasks + 1, 0, "ok 1\n", "")
+local filled = stub.webviews[#stub.webviews]
+check("backfill: its answer fills the card", filled.html_:find("Filled from the transcript.", 1, true) ~= nil
+  and not filled.html_:find("Reading the transcript…", 1, true))
+closeCard(filled)
+tasks = #stub.tasks
+local failing = doubleClickOn("bf2")
+stub.finishTask(tasks + 1, 1, "error transcript not readable\n", "")
+check("backfill: an error says so", failing.html_:find("transcript not readable", 1, true) ~= nil)
+closeCard(failing)
+tasks = #stub.tasks
+local gone = doubleClickOn("bf3")
+local page = gone.html_
+closeCard(gone)
+stub.finishTask(tasks + 1, 0, "ok 1\n", "")
+check("backfill: a card closed before the answer gets nothing", gone.html_ == page)
+tasks = #stub.tasks
+views0 = #stub.webviews
+doubleClickOn("cx1")
+check("backfill: a Codex session reads none and, with no facts, opens no card", #stub.tasks == tasks
+  and #stub.webviews == views0)
+
 os.remove(eventsFile)
 check.done("click")

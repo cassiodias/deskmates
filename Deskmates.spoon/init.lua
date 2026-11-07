@@ -27,6 +27,7 @@ local facts = require("puppet.model.facts")
 local scenes = require("puppet.render.scenes")
 local Stage = require("puppet.stage.stage")
 local git = require("puppet.terminals.git")
+local backfill = require("puppet.terminals.backfill")
 local Iterm = require("puppet.terminals.iterm")
 local Liveness = require("puppet.terminals.liveness")
 local newTerminals = require("puppet.terminals.focus")
@@ -87,6 +88,11 @@ obj.plansDir = os.getenv("HOME") .. "/.deskmates/plans"
 --- Variable
 --- The folder the hooks keep each session's facts in: its tickets, phases and timeline (hook/facts-lib.sh).
 obj.factsDir = os.getenv("HOME") .. "/.deskmates/facts"
+
+--- Deskmates.backfillScript
+--- Variable
+--- The script that fills a Claude session's facts from its transcript when its card opens (beside the hooks).
+obj.backfillScript = root .. "../hook/backfill.sh"
 
 --- Deskmates.onFile
 --- Variable
@@ -222,7 +228,14 @@ function obj:cardContent(key)
   local state = self:gitState(key)
   local work = workcard.view(s.facts, state, s.plan, s.isWorking)
   local told = story.view(session, work, now)
-  if not plan and not session and not work then return nil end
+  if not plan and not session and not work then
+    -- Nothing yet, but the transcript is being read (or could not be): the card says so.
+    local filling = self:backfillState(key)
+    if not filling then return nil end
+    local line = filling.reading and "Reading the transcript…" or filling.error or "Nothing more in the transcript"
+    return nil, { title = (s.title and s.title ~= "") and s.title or s.tag, color = puppet.color,
+      story = story.lineHtml(line) }, "backfill|" .. line
+  end
   local version
   if (not plan or plan.updatedAt) and (not (session or work) or s.facts.updatedAt) then
     version = tostring(plan and plan.updatedAt) .. "|" .. tostring((session or work) and s.facts.updatedAt)
@@ -271,6 +284,52 @@ function obj:readGit(key)
   end)
 end
 
+-- What the transcript backfill of session `key`'s card is doing: { reading = true }, { error = why },
+-- { done = true }, or nil when none ran for it.
+function obj:backfillState(key)
+  local kept = self.cardBackfill
+  return kept and kept.key == key and kept.state or nil
+end
+
+-- Starts filling session `key`'s facts from its transcript, for the card opening on it: only for Claude sessions
+-- with a transcript, one run at a time per card. The answer reloads the facts and redraws the card, unless the card
+-- no longer shows that session. Returns at once; false when nothing started.
+function obj:backfill(key)
+  local s = self.sessions.all[key]
+  if not (s and s.harness == "claude") then return false end
+  local kept = self.cardBackfill
+  if kept and kept.key == key and kept.busy then return false end
+  local home = os.getenv("HOME") or ""
+  if not backfill.find(home, key, hs.fs.dir, function(p) return hs.fs.attributes(p, "mode") ~= nil end) then
+    return false
+  end
+  kept = { key = key, busy = true, state = { reading = true } }
+  self.cardBackfill = kept
+  return true
+end
+
+-- Runs the backfill started for the card on `key` (obj:backfill), once the card shows.
+function obj:runBackfill(key)
+  local kept = self.cardBackfill
+  if not (kept and kept.key == key and kept.busy and not kept.running) then return end
+  kept.running = true
+  backfill.run(self.backfillScript, key, function(status, detail)
+    kept.busy, kept.running = false, false
+    if self.cardBackfill ~= kept or self.planCard.key ~= key then return end
+    if status == "error" then
+      kept.state = { error = detail }
+    else
+      kept.state = { done = true }
+      if status == "ok" then
+        local path = facts.path(self.factsDir, key)
+        self.sessions:setFacts(key, path and facts.load(path))
+      end
+    end
+    self:refreshCard(key)
+    if status == "ok" then self:readGit(key) end
+  end)
+end
+
 --- Deskmates:click(key)
 --- Method
 --- A click on a session's puppet goes to its terminal; the second click of a double click opens its card when its
@@ -288,12 +347,14 @@ function obj:click(key)
     local path = facts.path(self.factsDir, key)
     self.sessions:setFacts(key, path and facts.load(path))
     self.cardGit = nil
+    self:backfill(key)
     plan, meta, version = self:cardContent(key)
   end
   if meta then
     self.cardVersion = version
     self.planCard:show(key, plan, meta)
     self:readGit(key)
+    self:runBackfill(key)
   else
     self:focus(key)
     -- The gap to a second click counts from here: a click waiting while the terminal came forward is still the

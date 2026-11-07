@@ -13,6 +13,7 @@ local config = {
   CLICK_DISTANCE = 4,
   TABS_SECONDS = 3,
   GIT_PATHS = { "/opt/homebrew/bin/git", "/usr/local/bin/git", "/usr/bin/git" }, -- where git is looked for, in order
+  BACKFILL_SECONDS = 10, -- how long a card waits for hook/backfill.sh to read a transcript
   GIT_SECONDS = 3, -- how long a card waits for git before it says git did not answer
   POSITION_KEY = "Deskmates.position",
   CHOICE_KEY = "Deskmates.choice",
