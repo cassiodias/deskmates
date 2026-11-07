@@ -243,8 +243,8 @@ function obj:refreshCard(key)
 end
 
 -- Asks git, off the main thread, what changed in session `key`'s repo since its base, for the card open on it;
--- the answer is kept in self.cardGit and shown, unless the card no longer shows that session or a newer read
--- started. Nothing for a session not in a git repo.
+-- the answer is kept in self.cardGit and shown, unless the card no longer shows that session (a card opened again
+-- starts afresh). One read at a time per card. Nothing for a session not in a git repo.
 function obj:readGit(key)
   local s = self.sessions.all[key]
   if not (s and facts.hasGit(s.facts)) then return end
@@ -253,12 +253,21 @@ function obj:readGit(key)
     kept = { key = key, state = { reading = true } }
     self.cardGit = kept
   end
-  local read = (kept.reads or 0) + 1
-  kept.reads = read
+  -- One read at a time: a change while git reads asks for one more read, after it, which sees them all.
+  if kept.busy then
+    kept.again = true
+    return
+  end
+  kept.busy = true
   git.read(s.facts.git.root, s.facts.git.base, function(result, message)
-    if self.cardGit ~= kept or kept.reads ~= read or self.planCard.key ~= key then return end
+    kept.busy = false
+    if self.cardGit ~= kept or self.planCard.key ~= key then return end
     kept.state = result or { error = message }
     self:refreshCard(key)
+    if kept.again then
+      kept.again = false
+      self:readGit(key)
+    end
   end)
 end
 

@@ -431,16 +431,30 @@ stub.advance(0.2)
 draws = 0
 answer(tasks, { "2\n", "M\0src/app.js\0", "src/app.js\0", "" })
 check("a new answer redraws", draws == 1 and gitCard.html_:find("2 commits, 1 not committed.", 1, true) ~= nil)
--- Two reads at once: the older one answering last does not undo the newer.
-local older = #stub.tasks
+-- One read at a time: lines while git reads start none; one more read follows it, and shows the newest state.
+local inFlight = #stub.tasks
 write("PreToolUse|git1||Bash|||my-app|iTerm.app|test|/dev/ttys009|claude|")
 stub.advance(0.2)
-local newer = #stub.tasks
 write("PostToolUse|git1||Bash|||my-app|iTerm.app|test|/dev/ttys009|claude|")
 stub.advance(0.2)
-answer(newer, { "3\n", "M\0src/app.js\0", "", "" })
-answer(older, ANSWER)
-check("an older read answering last is dropped", gitCard.html_:find("3 commits, 0 not committed.", 1, true) ~= nil)
+write("PreToolUse|git1||Bash|||my-app|iTerm.app|test|/dev/ttys009|claude|")
+stub.advance(0.2)
+check("one read at a time: lines meanwhile start no git", #stub.tasks == inFlight + 1)
+answer(inFlight, ANSWER)
+local again = #stub.tasks
+check("one read at a time: one more read after it", again == inFlight + 5 and stub.tasks[again].args[3] == "rev-list")
+answer(again - 1, { "3\n", "M\0src/app.js\0", "", "" })
+check("one read at a time: the read after shows the newest", gitCard.html_:find("3 commits, 0 not committed.", 1, true) ~= nil)
+check("one read at a time: then nothing more", #stub.tasks == again + 3)
+-- A read that fails still lets the one waiting run.
+local failing = #stub.tasks
+write("PostToolUse|git1||Bash|||my-app|iTerm.app|test|/dev/ttys009|claude|")
+stub.advance(0.2)
+write("PreToolUse|git1||Bash|||my-app|iTerm.app|test|/dev/ttys009|claude|")
+stub.advance(0.2)
+stub.finishTask(failing + 1, 128, "", "fatal: something")
+check("a failed read: the one waiting runs", #stub.tasks == failing + 2 and stub.tasks[failing + 2].args[3] == "rev-list")
+answer(failing + 1, { "3\n", "M\0src/app.js\0", "", "" })
 -- A panel folded on the page stays folded when the card is drawn again; junk fold messages change nothing.
 local TURNS_OPEN, TURNS_FOLDED = '<details class="panel story" data-panel="story" open>', '<details class="panel story" data-panel="story">'
 check("panels open at first", gitCard.html_:find(TURNS_OPEN, 1, true) ~= nil)
@@ -487,9 +501,12 @@ closeCard(gone)
 -- A card closed before git answers gets nothing; nor does another session's card opened since.
 tasks = #stub.tasks
 local closed = doubleClickOn("git1")
+write("PreToolUse|git1||Bash|||my-app|iTerm.app|test|/dev/ttys009|claude|")
+stub.advance(0.2)
 closeCard(closed)
 answer(tasks, ANSWER)
 check("a card closed before git answers: no update", closed.html_:find("Reading git…", 1, true) ~= nil)
+check("a card closed before git answers: the read waiting is dropped", #stub.tasks == tasks + 4)
 tasks = #stub.tasks
 local left = doubleClickOn("git1")
 writeFacts("Fixed the typo.")
