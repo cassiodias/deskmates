@@ -171,6 +171,7 @@ fi
 # claude 200 still runs (else it has no terminal). In a plain tab (`plain`), the hook's parent is the claude 200.
 fake_tree() {
   tree_mode=$1
+  hook_tty=${2:-}
   hook=$$
   ps() {
     case "$*" in
@@ -190,7 +191,7 @@ fake_tree() {
           *) echo "claude bg-spare --bg-spare /tmp/cc/spare/a.claim.sock" ;;
         esac ;;
       *"-t ttys002"*) echo -zsh; echo claude ;;
-      *"tty= -p $hook") [ "$tree_mode" = plain ] && echo ttys002 || echo ttys001 ;;
+      *"tty= -p $hook") if [ "$hook_tty" = notty ]; then echo '??'; elif [ "$tree_mode" = plain ]; then echo ttys002; else echo ttys001; fi ;;
       *"tty= -p 500") echo ttys001 ;;
       *"tty= -p 200") [ "$tree_mode" = gone ] && echo '??' || echo ttys002 ;;
       *"tty= -p "*) echo '??' ;;
@@ -233,6 +234,13 @@ expect "a session the daemon runs itself: the terminal of the claude that starte
 expect "is_daemon_pty: the daemon's own session" "$(fake_tree direct; is_daemon_pty /dev/ttys001 && echo yes)" yes
 # Final review (7 Nov): the same daemon also ran a background agent of its own (`--agent claude`, no --resume): not
 # the tab's conversation, so not the tab's terminal, or the two puppets would close each other.
+# Live (7 Nov): in the daemon, Claude Code runs hooks with no terminal of their own. The session's pty came from the
+# terminal remembered for it, or from an ancestor (the session itself), and no one asked whether it was the daemon's.
+expect "a hook with no terminal, under the daemon: the tab's terminal" "$(fake_tree direct notty; puppet_tty d8)" /dev/ttys002
+printf '%s' /dev/ttys001 > "$PUPPET_DIR/tty-d9"
+expect "a hook with no terminal, the daemon's pty remembered: the tab's terminal" \
+  "$(fake_tree direct notty; puppet_tty d9)" /dev/ttys002
+expect "and the tab's is remembered instead" "$(cat "$PUPPET_DIR/tty-d9")" /dev/ttys002
 expect "a daemon's own agent, not the tab's conversation: no terminal" "$(fake_tree agent; puppet_tty d7)" ""
 expect "is_daemon_pty: a plain tab" "$(fake_tree plain; is_daemon_pty /dev/ttys002 && echo yes)" ""
 

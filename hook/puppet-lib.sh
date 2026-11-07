@@ -295,15 +295,7 @@ puppet_tty() {
   _puppet_cache="$PUPPET_DIR/tty-$1"
   _puppet_tty=$(terminal_of $$)
   _puppet_pid=$(ps -o ppid= -p $$ | tr -d ' ')
-  # A daemon's session has the tab's terminal or none: its ancestors only lead to the worker's pty, and a terminal
-  # remembered for it may be that pty (which still runs claude while the idle worker lives) or a tab its claude left.
-  _puppet_daemon=""
-  if [ -n "$_puppet_tty" ] && is_daemon_pty "$_puppet_tty"; then
-    _puppet_daemon=1
-    _puppet_pid=""
-    if daemon_continues_tab "$_puppet_tty"; then _puppet_tty=$(daemon_owner_tty); else _puppet_tty=""; fi
-  fi
-  if [ -z "$_puppet_tty" ] && [ -z "$_puppet_daemon" ] && [ -n "$1" ] && [ -f "$_puppet_cache" ]; then
+  if [ -z "$_puppet_tty" ] && [ -n "$1" ] && [ -f "$_puppet_cache" ]; then
     _puppet_tty=$(cat "$_puppet_cache")
     terminal_runs "$_puppet_tty" "${PUPPET_PROGRAM:-}" || _puppet_tty=""
   fi
@@ -311,6 +303,12 @@ puppet_tty() {
     _puppet_tty=$(terminal_of "$_puppet_pid")
     _puppet_pid=$(ps -o ppid= -p "$_puppet_pid" | tr -d ' ')
   done
+  # A daemon's session has the tab's terminal or none, wherever its pty was found: the hook's own (a worker's), the
+  # one remembered for it, or an ancestor's (in the daemon Claude Code runs hooks with no terminal of their own). A
+  # pty the daemon runs is never a tab, and while its idle worker lives it still runs claude.
+  if [ -n "$_puppet_tty" ] && is_daemon_pty "$_puppet_tty"; then
+    if daemon_continues_tab "$_puppet_tty"; then _puppet_tty=$(daemon_owner_tty); else _puppet_tty=""; fi
+  fi
   [ -z "$_puppet_tty" ] && command -v puppet_tty_fallback > /dev/null && _puppet_tty=$(puppet_tty_fallback)
   # Written each time, so the cache of a session still at work never expires.
   [ -n "$1" ] && [ -n "$_puppet_tty" ] && printf '%s' "$_puppet_tty" > "$_puppet_cache"
