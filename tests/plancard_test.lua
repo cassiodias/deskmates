@@ -311,8 +311,9 @@ check("no work: no plan block", not has(both, 'data-panel="actual"') and not has
 -- Review (6 Nov): with a plan, what changed (35vh), the story (45vh), the headers and the footer left the plan no
 -- room at 600×560 and pushed the footer out of the window. With a plan, both boxes are smaller and give way, and
 -- the plan always shows some lines.
-check("with a plan: what changed in 22vh, giving way", workAll:match("%.result%.capped {[^}]*max%-height: 22vh") ~= nil
-  and workAll:match("%.result%.capped {[^}]*flex: 0 1 auto") ~= nil)
+-- On a small card, what changed gives way first (four times as fast), so what happened keeps room to read.
+check("with a plan: what changed in 22vh, giving way first", workAll:match("%.result%.capped {[^}]*max%-height: 22vh") ~= nil
+  and workAll:match("%.result%.capped {[^}]*flex: 0 4 auto") ~= nil)
 check("with a plan: the story in 30vh, giving way", workAll:match("%.panels%.capped {[^}]*max%-height: 30vh") ~= nil
   and workAll:match("%.panels%.capped {[^}]*flex: 0 1 auto") ~= nil)
 -- The page's top border is inside its 100vh, so the footer ends at the window's bottom, not 4px under it.
