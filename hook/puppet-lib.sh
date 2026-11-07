@@ -251,10 +251,14 @@ terminal_runs() {
     END { exit !found }'
 }
 
-# Claude Code's daemon (`claude daemon run`) runs a session in a worker (`claude bg-spare`) on a pty of its own,
-# which no tab shows. Whether terminal $1 is such a pty: one ps, so a hook in a plain tab pays only that.
+# Claude Code's daemon (`claude daemon run`) runs a session on a pty of its own, which no tab shows: in a worker
+# (`claude bg-spare`), or itself under a pty host (`--bg-pty-host`; a session forked from a tab's, seen with
+# 2.1.319). Whether terminal $1 is such a pty: what runs on it, then their parents; two ps in a plain tab.
 is_daemon_pty() {
-  ps -o command= -t "${1#/dev/}" 2>/dev/null | grep -q -e '--bg-spare'
+  _puppet_ps=$(ps -o ppid=,command= -t "${1#/dev/}" 2>/dev/null)
+  case "$_puppet_ps" in *--bg-spare*) return 0 ;; "") return 1 ;; esac
+  _puppet_ppids=$(printf '%s\n' "$_puppet_ps" | awk '$1 ~ /^[0-9]+$/ { print $1 }' | sort -u | paste -sd , -)
+  [ -n "$_puppet_ppids" ] && ps -o command= -p "$_puppet_ppids" 2>/dev/null | grep -q -e '--bg-pty-host'
 }
 
 # The terminal of the claude that started the daemon this hook runs under: the daemon names it in

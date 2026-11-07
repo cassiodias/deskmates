@@ -174,16 +174,34 @@ fake_tree() {
   hook=$$
   ps() {
     case "$*" in
-      *"-t ttys001"*) [ "$tree_mode" = plain ] && echo -zsh || echo "claude bg-spare --bg-spare /tmp/cc/spare/a.claim.sock" ;;
+      *"ppid=,command= -t ttys001"*)
+        case "$tree_mode" in
+          plain) echo "100 -zsh" ;;
+          direct) echo "400 /Users/me/.local/share/claude/versions/2.1.319 --session-id f1 --fork-session --resume /x.jsonl" ;;
+          *) echo "400 claude bg-spare --bg-spare /tmp/cc/spare/a.claim.sock" ;;
+        esac ;;
+      *"ppid=,command= -t ttys002"*) echo "1 -zsh"; echo "150 claude" ;;
+      *"-t ttys001"*)
+        case "$tree_mode" in
+          plain) echo -zsh ;;
+          direct) echo "/Users/me/.local/share/claude/versions/2.1.319 --session-id f1 --fork-session --resume /x.jsonl" ;;
+          *) echo "claude bg-spare --bg-spare /tmp/cc/spare/a.claim.sock" ;;
+        esac ;;
       *"-t ttys002"*) echo -zsh; echo claude ;;
       *"tty= -p $hook") [ "$tree_mode" = plain ] && echo ttys002 || echo ttys001 ;;
       *"tty= -p 500") echo ttys001 ;;
       *"tty= -p 200") [ "$tree_mode" = gone ] && echo '??' || echo ttys002 ;;
       *"tty= -p "*) echo '??' ;;
       *"ppid=,command= -p $hook") [ "$tree_mode" = plain ] && echo "200 /bin/sh translate.sh" || echo "500 /bin/sh translate.sh" ;;
-      *"ppid=,command= -p 500") echo "400 claude bg-spare --bg-spare /tmp/cc/spare/a.claim.sock" ;;
+      *"ppid=,command= -p 500") [ "$tree_mode" = direct ] &&
+          echo "400 /Users/me/.local/share/claude/versions/2.1.319 --session-id f1 --fork-session --resume /x.jsonl" ||
+          echo "400 claude bg-spare --bg-spare /tmp/cc/spare/a.claim.sock" ;;
       *"ppid=,command= -p 400") echo "300 claude bg-pty-host --bg-pty-host /tmp/cc/spare/a.pty.sock 200 50" ;;
       *"ppid=,command= -p 300") echo '1 /Users/me/.local/bin/claude daemon run --origin transient --spawned-by {"label":"claude","cwd":"/Users/me/my-app","pid":200}' ;;
+      *" command= -p 400") [ "$tree_mode" = direct ] &&
+          echo "/Applications/ClaudeCode.app/Contents/MacOS/claude --bg-pty-host /tmp/cc/pty/f1.sock 171 44 -- /x" ||
+          echo "claude bg-pty-host --bg-pty-host /tmp/cc/spare/a.pty.sock 200 50" ;;
+      *" command= -p 100"|*" command= -p 150"|*" command= -p 1") echo "-zsh" ;;
       *"ppid= -p $hook") [ "$tree_mode" = plain ] && echo 200 || echo 500 ;;
       *"ppid= -p 500") echo 400 ;;
       *"ppid= -p 400") echo 300 ;;
@@ -206,6 +224,12 @@ expect "a daemon whose claude is gone: not the worker's pty remembered for it" "
 printf '%s' /dev/ttys002 > "$PUPPET_DIR/tty-d5"
 expect "a daemon whose claude is gone: not a tab remembered for it either" "$(fake_tree gone; puppet_tty d5)" ""
 expect "a plain tab: its own terminal" "$(fake_tree plain; puppet_tty d3)" /dev/ttys002
+# Live (7 Nov, Claude Code 2.1.319): the daemon also runs a session itself on its pty, under a `--bg-pty-host`
+# (a session forked from a tab's): no bg-spare there, and the tab went on in that session.
+expect "a session the daemon runs itself: the terminal of the claude that started the daemon" \
+  "$(fake_tree direct; puppet_tty d6)" /dev/ttys002
+expect "is_daemon_pty: the daemon's own session" "$(fake_tree direct; is_daemon_pty /dev/ttys001 && echo yes)" yes
+expect "is_daemon_pty: a plain tab" "$(fake_tree plain; is_daemon_pty /dev/ttys002 && echo yes)" ""
 
 # No helper leaves a variable behind: the shell's variables before and after each public helper (run in this
 # shell, as a translator runs them) differ only in the helper-private names (_puppet_…) and the documented PUPPET_*.
