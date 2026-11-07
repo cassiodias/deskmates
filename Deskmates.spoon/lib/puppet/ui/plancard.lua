@@ -244,7 +244,7 @@ function plancard.html(plan, meta, folded, step)
     ".result { flex: none; max-height: 35vh; overflow: auto; padding: 10px 14px 0; border-bottom: 1px solid var(--faint);",
     " padding-bottom: 8px; }",
     -- With a plan below, what changed and the story give way to it, and the plan always shows some lines. What
-    -- changed gives way first (4 to the story's 1): on a small card the story kept ~64px.
+    -- changed gives way first (4 to the story's 1), so on the default card the story reaches its cap.
     ".result.capped { flex: 0 4 auto; min-height: 44px; max-height: 22vh; } #plan { min-height: 120px; }",
     "footer { display: flex; gap: 8px; justify-content: flex-end; padding: 8px 14px; border-top: 1px solid var(--faint); }",
     "footer button { font: inherit; padding: 4px 12px; }",
