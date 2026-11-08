@@ -432,5 +432,17 @@ again("UserPromptSubmit", { session = "s2", text = "/build", tty = "/dev/ttys001
 again("PreToolUse", { tool = "edit", tty = "/dev/ttys001" })
 check("back: working again without a prompt, it comes back", back.all.s1.isClosed ~= true)
 
+-- A session whose turn is mapped off (no puppet to show) closes no resting puppet in its terminal; once it plays,
+-- it does. A listed skill called mid-turn makes it play from that tool on.
+local off = Sessions.new(100)
+local function o(name, fields) return off:apply(event(name, fields), { mapping = mapping, harness = fake, frame = 1, now = 100 }) end
+o("UserPromptSubmit", { text = "/build", tty = "/dev/ttys001" })
+o("Stop", { text = "Built." })
+o("UserPromptSubmit", { session = "s2", text = "hello", tty = "/dev/ttys001" })
+check("off: a turn mapped off closes no resting puppet", off.all.s1.isClosed ~= true)
+o("PreToolUse", { session = "s2", tool = "edit", tty = "/dev/ttys001" })
+check("off: nor do its tools", off.all.s1.isClosed ~= true)
+o("PreToolUse", { session = "s2", tool = "run_skill", text = "build", tty = "/dev/ttys001" })
+check("off: a listed skill makes it play: it closes the resting one", off.all.s1.isClosed == true)
 
 check.done("sessions")
