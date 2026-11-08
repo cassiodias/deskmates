@@ -350,7 +350,8 @@ check("junk facts and no plan: a double click selects the tab", stub.selected ==
 local attributes = hs.fs.attributes
 hs.fs.attributes = function(path, field)
   if path == "/opt/homebrew/bin/git" then return { mode = "file" } end
-  if path:find("git", 1, true) then return nil end
+  -- No other git (the facts of session git1 are a file like any other).
+  if path:match("/git$") then return nil end
   -- No gh in this part, whatever this machine has (the PR's own part below has one).
   if path:match("/gh$") then return nil end
   return attributes(path, field)
@@ -430,6 +431,23 @@ check("a facts line reads git again", #stub.tasks == tasks + 1 and stub.tasks[ta
 draws = 0
 answer(tasks, ANSWER)
 check("the same answer again does not redraw", draws == 0)
+-- An edit mid-turn: the hooks write the facts but flag no line. Any line of the card's session that finds its facts
+-- file changed redraws the card and reads git again; a line that finds it the same does neither.
+writeGitFacts(3, '[{"at": 1400, "files": ["src/b.js", "src/edited-mid-turn.js"], "head": "' .. BASE .. '", "tests": '
+  .. '{"failed": 0, "passed": 0, "ran": 0}}, ' .. TURN1 .. "]")
+tasks = #stub.tasks
+draws = 0
+write("PreToolUse|git1||Edit|||my-app|iTerm.app||/dev/ttys009|claude|")
+stub.advance(0.2)
+check("an edit mid-turn: the open card shows its file", draws == 1
+  and gitCard.html_:find("src/edited-mid-turn.js", 1, true) ~= nil)
+check("an edit mid-turn: git read again", #stub.tasks == tasks + 1 and stub.tasks[tasks + 1].args[3] == "rev-list")
+answer(tasks, ANSWER)
+tasks = #stub.tasks
+draws = 0
+write("PostToolUse|git1||Edit|||my-app|iTerm.app||/dev/ttys009|claude|")
+stub.advance(0.2)
+check("facts unchanged: no redraw, no git", draws == 0 and #stub.tasks == tasks)
 tasks = #stub.tasks
 write("PostToolUse|git1||Bash|||my-app|iTerm.app|test|/dev/ttys009|claude|")
 stub.advance(0.2)

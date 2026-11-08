@@ -124,11 +124,30 @@ function obj:handle(line)
   if self.replayFrom then return end
   -- The card open on this session shows the change at once, and what git says now.
   if (event.flag == "plan" or event.flag == "facts" or event.flag == "test") and self.planCard.key == event.session then
+    self:cardFactsChanged(event.session)
     self:refreshCard(event.session)
     self:readGit(event.session)
     self:readPr(event.session)
+  elseif self.planCard.key == event.session and self:cardFactsChanged(event.session) then
+    -- The hooks wrote the facts without flagging a line (an edit mid-turn): any line of the session shows it.
+    local path = facts.path(self.factsDir, event.session)
+    self.sessions:setFacts(event.session, path and facts.load(path))
+    self:refreshCard(event.session)
+    self:readGit(event.session)
   end
   for _, intent in ipairs(intents) do self:say(intent.key, intent.text, intent.seconds) end
+end
+
+-- Whether session `key`'s facts file changed (its time or size) since the card on it last looked; looking
+-- remembers it. True the first time for a session.
+function obj:cardFactsChanged(key)
+  local path = facts.path(self.factsDir, key)
+  local a = path and hs.fs.attributes(path)
+  local stamp = a and (tostring(a.modification) .. ":" .. tostring(a.size)) or "none"
+  local kept = self.cardFactsStamp
+  if kept and kept.key == key and kept.stamp == stamp then return false end
+  self.cardFactsStamp = { key = key, stamp = stamp }
+  return true
 end
 
 -- Deletes the plans and facts no session needs: those of sessions it no longer knows, once they are hours old.
@@ -394,6 +413,7 @@ function obj:click(key)
     -- The facts as they are now, the hooks may have written them since the last line said so; git not read yet.
     local path = facts.path(self.factsDir, key)
     self.sessions:setFacts(key, path and facts.load(path))
+    self:cardFactsChanged(key)
     self.cardGit, self.cardPr = nil, nil
     self:backfill(key)
     plan, meta, version = self:cardContent(key)
