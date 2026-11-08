@@ -37,7 +37,9 @@ end
 -- Runs, one after another, the commits since `base`, the diff from it, what is not committed and what git does
 -- not track, in the repo at `root`. Calls done exactly once: done({ commits, diff, uncommitted, untracked }) with
 -- git's -z texts; done(nil, "base a1b2c3d no longer exists") when base is gone; done(nil, "git did not answer")
--- when there is no git, a command fails, or config.GIT_SECONDS pass (the running command is then stopped).
+-- when there is no git, a command fails, or config.GIT_SECONDS pass (the running command is then stopped). With
+-- `own` (the session's commits), a fifth command names the files they touched (result.committed), within
+-- config.GIT_SHOW_SECONDS of its own; failing or too slow, the result comes without them.
 function git.read(root, base, done, own)
   local path = git.find(function(p) return hs.fs.attributes(p) ~= nil end)
   if not path then return done(nil, DID_NOT_ANSWER) end
@@ -65,11 +67,17 @@ function git.read(root, base, done, own)
     if not running:start() then finish(nil, DID_NOT_ANSWER) end
   end
 
-  timer = hs.timer.doAfter(config.GIT_SECONDS, function()
-    if finished then return end
-    if running and running:isRunning() then running:terminate() end
-    finish(nil, DID_NOT_ANSWER)
-  end)
+  -- Gives the commands from here `seconds`; when they pass, the running one is stopped and finish(...) says so.
+  local function budget(seconds, ...)
+    local said = table.pack(...)
+    if timer then timer:stop() end
+    timer = hs.timer.doAfter(seconds, function()
+      if finished then return end
+      if running and running:isRunning() then running:terminate() end
+      finish(table.unpack(said, 1, said.n))
+    end)
+  end
+  budget(config.GIT_SECONDS, nil, DID_NOT_ANSWER)
 
   local result = {}
   run({ "rev-list", "--count", base .. "..HEAD" }, function(count)
@@ -86,6 +94,8 @@ function git.read(root, base, done, own)
           local args = { "show", "--name-only", "-z", "--format=" }
           for _, hash in ipairs(own) do args[#args + 1] = hash end
           args[#args + 1] = "--"
+          -- Their own time: what git said so far stands without them.
+          budget(config.GIT_SHOW_SECONDS, result)
           run(args, function(committed)
             result.committed = committed
             finish(result)

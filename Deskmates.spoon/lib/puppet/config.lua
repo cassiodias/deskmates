@@ -15,6 +15,7 @@ local config = {
   GIT_PATHS = { "/opt/homebrew/bin/git", "/usr/local/bin/git", "/usr/bin/git" }, -- where git is looked for, in order
   BACKFILL_SECONDS = 30, -- how long a card waits for hook/backfill.sh to read a transcript (68 MB took 7 s)
   GIT_SECONDS = 3, -- how long a card waits for git before it says git did not answer
+  GIT_SHOW_SECONDS = 3, -- then how long it waits for the files of the session's own commits (left out after)
   GH_PATHS = { "/opt/homebrew/bin/gh", "/usr/local/bin/gh" }, -- where gh is looked for, in order
   PR_SECONDS = 10, -- how long a card waits for gh to say the branch's PR (it asks GitHub)
   PR_EVERY = 60, -- the least seconds between two reads of one card's PR

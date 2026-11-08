@@ -279,8 +279,8 @@ if [ -n "$found_jq" ] && command -v git > /dev/null; then
   tgit "$repo" commit -q -m "Fix the typo" -- src/app.js
   expect "a turn ends" "$(PUPPET_NOW=200 facts_turn_end g1; echo "|$?")" "|0"
   expect "its end and commits" "$(got g1 '.turns[0] | [.endAt, (.commits | map(.subject)), (.commits[0].hash | length)]')" \
-    '[200,["Fix the typo"],7]'
-  expect "the commit's hash" "$(got g1 '.turns[0].commits[0].hash')" "\"$(git -C "$repo" rev-parse --short=7 HEAD)\""
+    '[200,["Fix the typo"],40]'
+  expect "the commit's hash" "$(got g1 '.turns[0].commits[0].hash')" "\"$(git -C "$repo" rev-parse HEAD)\""
   expect "no open turn: an end writes nothing" "$(facts_turn_end g1; echo "|$?")" "|1"
   expect "no open turn: a test count writes nothing" "$(facts_turn_test g1 ran; echo "|$?")" "|1"
   facts_edit g1 "$repo" "docs/ção.md"

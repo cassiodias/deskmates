@@ -237,7 +237,8 @@ facts_git_ready() {
 # The jq defs of git facts.
 #   nul_list:  NUL-separated git output as a list of its parts, the empty ones left out.
 #   porcelain: `git status --porcelain -z` output as its paths; a rename or copy gives both.
-#   commits:   `git log -z --format='%h%x09%s'` output as [{hash, subject}], subjects of 120 characters at most.
+#   commits:   `git log -z --format='%H%x09%s'` output as [{hash, subject}] (the whole hash: a short one can grow
+#              ambiguous), subjects of 120 characters at most.
 #   open_turn: true when the newest turn is still open.
 #   end_turn($commits): the newest turn ended now with those commits.
 #   rel($root; $folder; $prefix; $top): a path an edit names, relative to the root and normalised; null when it
@@ -328,7 +329,7 @@ facts_turn_change() {
   _facts_session=$1 _facts_filter=$2 _facts_git=$3
   shift 3
   _facts_log=$(mktemp) || return 1
-  [ -z "$facts_open" ] || facts_run_git "$_facts_git" -C "$facts_root" log -z --format='%h%x09%s' -n 20 "$facts_open..HEAD" > "$_facts_log"
+  [ -z "$facts_open" ] || facts_run_git "$_facts_git" -C "$facts_root" log -z --format='%H%x09%s' -n 20 "$facts_open..HEAD" > "$_facts_log"
   facts_update "$_facts_session" "$FACTS_GIT_DEFS (\$log | commits) as \$commits | \$cur | $_facts_filter" \
     --rawfile log "$_facts_log" "$@"
   _facts_written=$?

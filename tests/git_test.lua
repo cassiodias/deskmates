@@ -137,4 +137,23 @@ startOwn({})
 for i = 1, 4 do stub.finishTask(i, 0, i == 1 and "1\n" or "", "") end
 check("own: none, four commands as before", #stub.tasks == 4 and calls[1] and calls[1].result ~= nil)
 
+-- The own commits' show gets its own 3 s: the four commands taking most of theirs does not starve it, and a show
+-- that does not answer leaves the rest of the answer as it is.
+startOwn({ "e4f5a6b" })
+stub.advance(1)
+stub.finishTask(1, 0, "1\n", "")
+stub.advance(1)
+stub.finishTask(2, 0, "", "")
+stub.finishTask(3, 0, "", "")
+stub.advance(0.9)
+stub.finishTask(4, 0, "", "")
+stub.advance(2.9)
+check("own: the show's own budget, not the rest of the first", #calls == 0)
+stub.advance(0.2)
+check("own: a show too slow: the rest answers", #calls == 1 and calls[1].result and calls[1].result.commits == 1
+  and calls[1].result.committed == nil)
+check("own: a show too slow is stopped", stub.tasks[5].terminated)
+stub.finishTask(5, 0, "README.md\0", "")
+check("own: its late answer calls nothing", #calls == 1)
+
 check.done("git")

@@ -189,4 +189,12 @@ check("transcript: its turn says so, once", count(filledHtml, '<span class="from
 check("transcript: in the turn it came from", filledHtml:find('data%-at="' .. at(14, 5) .. '"[^>]*>.-from the transcript') ~= nil
   and not filledHtml:find('data%-at="' .. at(13, 0) .. '"[^>]*>[^\n]-from the transcript'))
 
+-- A full hash (facts now keep git's whole one) shows cut to 7; an old facts file's short one as it is.
+local full = story.html(story.view(nil, workcard.view({ tickets = {}, timeline = {}, seen = {},
+  git = { root = "/r", base = "a1b2c3d4e5f6", dirtyAtStart = {} },
+  turns = { { at = 1000, endAt = 1100, files = {}, tests = { ran = 0, passed = 0, failed = 0 },
+    commits = { { hash = "e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3", subject = "Fixed the typo." } } } } },
+  { reading = true }, nil, false), 2000))
+check("a full hash shows cut to 7", has(full, '<div class="commit"><code>e4f5a6b</code> Fixed the typo.</div>'))
+
 check.done("story")

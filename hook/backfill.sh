@@ -216,7 +216,7 @@ backfill_git() {
   "$PUPPET_JQ" -r --argjson gaps "$3" '.turns[] | select(.at as $a | any($gaps[]; . == $a)) | "\(.at) \(.endAt // .at)"' "$1" |
     while read -r _backfill_at _backfill_end; do
       _backfill_head=$(facts_run_git "$_facts_git" -C "$_backfill_root" rev-list -1 --before="@$_backfill_at" HEAD)
-      facts_run_git "$_facts_git" -C "$_backfill_root" log -z --format='%h%x09%s' -n 20 --since="@$_backfill_at" \
+      facts_run_git "$_facts_git" -C "$_backfill_root" log -z --format='%H%x09%s' -n 20 --since="@$_backfill_at" \
         --until="@$_backfill_end" HEAD > "$4.log"
       "$PUPPET_JQ" -nc "$FACTS_GIT_DEFS {key: \$at, value: ({commits: (\$log | commits)}
         + (if \$head == \"\" then {} else {head: \$head} end))}" --arg at "$_backfill_at" --arg head "$_backfill_head" \

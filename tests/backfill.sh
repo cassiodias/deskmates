@@ -142,7 +142,7 @@ gitrepo() {
   done
 }
 sha_at() { git -C "$REPO" log --format=%H --grep="^$1\$"; }
-short_at() { git -C "$REPO" log --format=%h --grep="^$1\$"; }
+short_at() { git -C "$REPO" log --format=%H --grep="^$1\$"; }
 # setup_git <facts json>: case simple, its paths in the repo.
 setup_git() {
   setup simple "${1:-}"

@@ -147,7 +147,7 @@ local function turnHtml(t)
       .. "</summary><ul>" .. table.concat(lis) .. workcard.moreItem(t.more) .. "</ul></details>"
   end
   for _, c in ipairs(t.commits or {}) do
-    body[#body + 1] = '<div class="commit"><code>' .. escape(c.hash) .. "</code> " .. escape(c.subject) .. "</div>"
+    body[#body + 1] = '<div class="commit"><code>' .. escape(c.hash:sub(1, 7)) .. "</code> " .. escape(c.subject) .. "</div>"
   end
   -- A turn's end (empty while it has none) lets a step keep the turn it started in; a reply alone has none.
   local ends = t.kind == "turn" and ' data-end="' .. (t.endAt and string.format("%d", t.endAt) or "") .. '"' or ""
