@@ -156,13 +156,28 @@ hs = {
       end, folder
     end,
     mkdir = function(path) return os.execute("mkdir '" .. path:gsub("'", "'\\''") .. "' 2>/dev/null") end,
+    -- As hs.fs.attributes: size, mode ("file" or "directory") and modification (seconds), links followed.
     attributes = function(path, field)
       local file = io.open(path, "r")
       if not file then return nil end
       local size = file:seek("end")
       file:close()
       if field == "size" then return size end
-      return { size = size }
+      local p = io.popen("stat -L -f '%m %HT' '" .. path:gsub("'", "'\\''") .. "' 2>/dev/null")
+      local out = p:read("a") or ""
+      p:close()
+      local modification, kind = out:match("^(%d+) (.-)%s*$")
+      local a = { size = size, modification = tonumber(modification),
+        mode = kind == "Directory" and "directory" or "file" }
+      if field then return a[field] end
+      return a
+    end,
+    -- As hs.fs.pathToAbsolute: the real path, links resolved; nil when it is not there.
+    pathToAbsolute = function(path)
+      local p = io.popen("realpath '" .. path:gsub("'", "'\\''") .. "' 2>/dev/null")
+      local out = (p:read("a") or ""):gsub("%s+$", "")
+      p:close()
+      return out ~= "" and out or nil
     end,
   },
   application = {
