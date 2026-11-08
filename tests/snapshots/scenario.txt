@@ -242,7 +242,7 @@
   |  bb                                        bb  |
   texts: 00002 / dev-skill CON-1 / app · waiting <1m
 == tab2 plays ping pong, tabs known
-  puppet 1: tab1 at 1208,752 colour #D97757 bubble: I have a question for you
+  puppet 1: tab1 at 1004,752 colour #D97757 bubble: I have a question for you
   |                                                |
   |                 gggggggggggggggggggggggggggggg |
   |          www    g::::::::::::::::::::::::::::g |
@@ -268,7 +268,7 @@
   |  bb                                        bb  |
   |  bb                                        bb  |
   texts: 00002 / dev-skill CON-1 · tab 1 / app · waiting <1m
-  puppet 2: tab2 at 1004,752 colour #5B8DEF bubble: -
+  puppet 2: tab2 at 1208,752 colour #5B8DEF bubble: -
   |                                                |
   |                                                |
   |                                                |
@@ -295,7 +295,7 @@
   |            g                      g            |
   texts: 1 Check the contract / 1 Try to break it / qa CON-1 · tab 2 / app · <1m
 == tab3 watches the Matrix rain
-  puppet 1: tab1 at 1208,752 colour #D97757 bubble: I have a question for you
+  puppet 1: tab1 at 800,752 colour #D97757 bubble: I have a question for you
   |                                                |
   |                 gggggggggggggggggggggggggggggg |
   |          www    g::::::::::::::::::::::::::::g |
@@ -347,7 +347,7 @@
   |            g                      g            |
   |            g                      g            |
   texts: 1 Check the contract / 1 Try to break it / qa CON-1 · tab 2 / app · <1m
-  puppet 3: tab3 at 800,752 colour #A06CD5 bubble: -
+  puppet 3: tab3 at 1208,752 colour #A06CD5 bubble: -
   |                                                |
   |                 gggggggggggggggggggggggggggggg |
   |                 gn:n:::::::.:n:.:::::.:::::::g |
@@ -374,7 +374,7 @@
   |  bb                                        bb  |
   texts: 00001 / rain / other · <1m
 == tab1 done
-  puppet 1: tab1 at 1208,752 colour #D97757 bubble: Fixed the parser and added two tests. ✓
+  puppet 1: tab1 at 800,752 colour #D97757 bubble: Fixed the parser and added two tests. ✓
   |                                                |
   |                 gggggggggggggggggggggggggggggg |
   |                 g::::::::::::::::::::::::::::g |
@@ -426,7 +426,7 @@
   |            g                      g            |
   |            g                      g            |
   texts: 1 Check the contract / 1 Try to break it / qa CON-1 · tab 2 / app · <1m
-  puppet 3: tab3 at 800,752 colour #A06CD5 bubble: -
+  puppet 3: tab3 at 1208,752 colour #A06CD5 bubble: -
   |                                                |
   |                 gggggggggggggggggggggggggggggg |
   |                 g::::::n:n:::::::::n:::::::::g |
@@ -453,7 +453,7 @@
   |  bb                                        bb  |
   texts: 00001 / rain / other · <1m
 == the mouse rests on tab1: its card covers the reply
-  puppet 1: tab1 at 1208,752 colour #D97757 bubble: app · tab 1 / /dev-skill · idle <1m / 4 tool calls · last: AskUserQuestion / last reply: Fixed the parser and added two tests.
+  puppet 1: tab1 at 800,752 colour #D97757 bubble: app · tab 1 / /dev-skill · idle <1m / 4 tool calls · last: AskUserQuestion / last reply: Fixed the parser and added two tests.
   |                                                |
   |                 gggggggggggggggggggggggggggggg |
   |                 g::::::::::::::::::::::::::::g |
@@ -505,7 +505,7 @@
   |            g                      g            |
   |            g                      g            |
   texts: 1 Check the contract / 1 Try to break it / qa CON-1 · tab 2 / app · <1m
-  puppet 3: tab3 at 800,752 colour #A06CD5 bubble: -
+  puppet 3: tab3 at 1208,752 colour #A06CD5 bubble: -
   |                                                |
   |                 gggggggggggggggggggggggggggggg |
   |                 g::::::::::n:::::::.:::::n:::g |
@@ -532,7 +532,7 @@
   |  bb                                        bb  |
   texts: 00001 / rain / other · <1m
 == the mouse leaves tab1: the reply comes back
-  puppet 1: tab1 at 1208,752 colour #D97757 bubble: Fixed the parser and added two tests. ✓
+  puppet 1: tab1 at 800,752 colour #D97757 bubble: Fixed the parser and added two tests. ✓
   |                                                |
   |                 gggggggggggggggggggggggggggggg |
   |                 g::::::::::::::::::::::::::::g |
@@ -584,7 +584,7 @@
   |            g                      g            |
   |            g                      g            |
   texts: 1 Check the contract / 1 Try to break it / qa CON-1 · tab 2 / app · <1m
-  puppet 3: tab3 at 800,752 colour #A06CD5 bubble: -
+  puppet 3: tab3 at 1208,752 colour #A06CD5 bubble: -
   |                                                |
   |                 gggggggggggggggggggggggggggggg |
   |                 g::::M:::::::::::::::M:::n:::g |
@@ -611,7 +611,7 @@
   |  bb                                        bb  |
   texts: 00001 / rain / other · <1m
 == a lens is done
-  puppet 1: tab1 at 1208,752 colour #D97757 bubble: Fixed the parser and added two tests. ✓
+  puppet 1: tab1 at 800,752 colour #D97757 bubble: Fixed the parser and added two tests. ✓
   |                                                |
   |                 gggggggggggggggggggggggggggggg |
   |                 g::::::::::::::::::::::::::::g |
@@ -663,7 +663,7 @@
   |            g                      g            |
   |            g                      g            |
   texts: ✓ 1 Check the contract / 1 Try to break it / qa CON-1 · tab 2 / app · <1m
-  puppet 3: tab3 at 800,752 colour #A06CD5 bubble: -
+  puppet 3: tab3 at 1208,752 colour #A06CD5 bubble: -
   |                                                |
   |                 gggggggggggggggggggggggggggggg |
   |                 g::n:n:::::n:::::n:::n:::.:::g |
@@ -690,7 +690,7 @@
   |  bb                                        bb  |
   texts: 00001 / rain / other · <1m
 == the mouse rests on tab2: its subagents in the card
-  puppet 1: tab1 at 1208,752 colour #D97757 bubble: Fixed the parser and added two tests. ✓
+  puppet 1: tab1 at 800,752 colour #D97757 bubble: Fixed the parser and added two tests. ✓
   |                                                |
   |                 gggggggggggggggggggggggggggggg |
   |                 g::::::::::::::::::::::::::::g |
@@ -742,7 +742,7 @@
   |            g                      g            |
   |            g                      g            |
   texts: ✓ 1 Check the contract / 1 Try to break it / qa CON-1 · tab 2 / app · <1m
-  puppet 3: tab3 at 800,752 colour #A06CD5 bubble: -
+  puppet 3: tab3 at 1208,752 colour #A06CD5 bubble: -
   |                                                |
   |                 gggggggggggggggggggggggggggggg |
   |                 g::n:n:M:::.:n:M:::::.:n:::::g |
@@ -769,7 +769,7 @@
   |  bb                                        bb  |
   texts: 00001 / rain / other · <1m
 == the mouse left tab2 without a mouseExit: the card goes anyway
-  puppet 1: tab1 at 1208,752 colour #D97757 bubble: Fixed the parser and added two tests. ✓
+  puppet 1: tab1 at 800,752 colour #D97757 bubble: Fixed the parser and added two tests. ✓
   |                                                |
   |                 gggggggggggggggggggggggggggggg |
   |                 g::::::::::::::::::::::::::::g |
@@ -821,7 +821,7 @@
   |            g                      g            |
   |            g                      g            |
   texts: ✓ 1 Check the contract / 1 Try to break it / qa CON-1 · tab 2 / app · <1m
-  puppet 3: tab3 at 800,752 colour #A06CD5 bubble: -
+  puppet 3: tab3 at 1208,752 colour #A06CD5 bubble: -
   |                                                |
   |                 gggggggggggggggggggggggggggggg |
   |                 g::.:.:::::.:.:n:::::.:n:::::g |
@@ -848,7 +848,7 @@
   |  bb                                        bb  |
   texts: 00001 / rain / other · <1m
 == a while later: tab1 dozes at its desk
-  puppet 1: tab1 at 1208,752 colour #D97757 bubble: -
+  puppet 1: tab1 at 800,752 colour #D97757 bubble: -
   |                                                |
   |                 gggggggggggggggggggggggggggggg |
   |                 g::::::::::::::::::::::::::::g |
@@ -900,7 +900,7 @@
   |            g                      g            |
   |            g                      g            |
   texts: ✓ 1 Check the contract / 1 Try to break it / qa CON-1 · tab 2 / app · <1m
-  puppet 3: tab3 at 800,752 colour #A06CD5 bubble: -
+  puppet 3: tab3 at 1208,752 colour #A06CD5 bubble: -
   |                                                |
   |                 gggggggggggggggggggggggggggggg |
   |                 gn:.:::::::::.:.:::::.:::::M:g |

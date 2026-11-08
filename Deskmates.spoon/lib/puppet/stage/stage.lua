@@ -1,4 +1,4 @@
--- The puppets on screen: one floating canvas and one bubble per key, lined up leftwards from an anchor point.
+-- The puppets on screen: one floating canvas and one bubble per key, in a row that ends at an anchor point.
 
 local config = require("puppet.config")
 local pixels = require("puppet.render.pixels")
@@ -60,7 +60,9 @@ function Stage:remove(key)
   self.puppets[key] = nil
 end
 
--- Shows exactly `keys`, in order from the anchor leftwards; paletteOf(key) colours a new puppet.
+-- Shows exactly `keys` (oldest first) in a row ending at the anchor: the newest on the right, at the anchor, as a new
+-- tab opens on the right; the row grows leftwards, so it never runs off the screen's right edge. paletteOf(key)
+-- colours a new puppet.
 function Stage:sync(keys, paletteOf)
   local wanted = {}
   for _, key in ipairs(keys) do wanted[key] = true end
@@ -69,7 +71,7 @@ function Stage:sync(keys, paletteOf)
   end
   for i, key in ipairs(keys) do
     local puppet = self.puppets[key] or self:add(key, paletteOf(key))
-    puppet.canvas:topLeft({ x = self.anchor.x - (i - 1) * (config.W * self.pixel + config.GAP), y = self.anchor.y })
+    puppet.canvas:topLeft({ x = self.anchor.x - (#keys - i) * (config.W * self.pixel + config.GAP), y = self.anchor.y })
     if self.isShown then puppet.canvas:show() end
     if puppet.bubble:isShowing() then
       local f = puppet.bubble:frame()
