@@ -196,7 +196,8 @@ facts_note() {
 
 # Keeps the page of one of session $1's tickets that the payload shows: a Jira issue (https://<host>/browse/KEY)
 # or a Linear one (https://linear.app/<workspace>/issue/KEY, kept without its slug), only https, only for a ticket
-# the facts already have; the last one in the payload wins. Kept as the ticket's url. False, and nothing written,
+# the facts already have; the last one in the payload's first 64 KB wins (a global match grows with the square of
+# its hits: a big search result must not hold the hook). Kept as the ticket's url. False, and nothing written,
 # when the payload shows none, it is the url already kept, and as facts_update.
 facts_ticket_url() {
   case "$PUPPET_PAYLOAD" in *"/browse/"*|*"linear.app/"*) ;; *) return 1 ;; esac
@@ -204,8 +205,11 @@ facts_ticket_url() {
     | if (.tickets | length) == 0 then error("no tickets") else . end
     | . as $f
     | [$f.tickets | keys[] | select(. != "-")] as $keys
-    | [$payload | tojson | .[0:500000]
-        | match("https://(?:[A-Za-z0-9.-]+/browse|linear\\.app/[A-Za-z0-9_-]+/issue)/([A-Z][A-Z0-9]{1,9}-[0-9]+)(?![A-Za-z0-9])"; "g")
+    | [$keys[] | select(test("^[A-Z][A-Z0-9]{1,9}-[0-9]+$"))] as $keys
+    | if $keys == [] then error("no keys") else . end
+    | [$payload | tojson | .[0:65536]
+        | match("https://(?:[A-Za-z0-9.-]+/browse|linear\\.app/[A-Za-z0-9_-]+/issue)/(" + ($keys | join("|"))
+          + ")(?![A-Za-z0-9])"; "g")
         | {url: .string, key: .captures[0].string}
         | select(.key as $k | ($keys | index($k)) != null and ($k | tickets) == [$k])] as $seen
     | if $seen == [] then error("no url") else $seen[-1] end

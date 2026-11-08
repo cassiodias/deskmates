@@ -495,6 +495,12 @@ if [ -n "$found_jq" ]; then
     expect "dropped: $bad" "$(tu u1 "{\"prompt\":\"$bad\"}" 50)" 1
   done
   expect "dropped ones leave the file as it was" "$(cat "$FACTS/u1.json")" "$before"
+  # A tool's big result full of ticket pages (a Jira search): the hook stays quick.
+  many=$(i=0; while [ $i -lt 5000 ]; do printf 'https://acme.atlassian.net/browse/ABC-12 '; i=$((i + 1)); done)
+  t0=$(perl -MTime::HiRes=time -e 'printf "%.3f", time')
+  tu u1 "{\"tool_response\":\"$many https://linear.app/acme/issue/ABC-12\"}" 60 > /dev/null
+  t1=$(perl -MTime::HiRes=time -e 'printf "%.3f", time')
+  expect "5000 pages in a result: under a second" "$(perl -e "print(($t1 - $t0) < 1 ? 'quick' : 'slow ' . ($t1 - $t0))")" quick
   expect "a session with no facts: nothing" "$(tu u2 '{"prompt":"https://acme.atlassian.net/browse/ABC-12"}' 20)" 1
   expect "no file for it" "$(ls "$FACTS/u2.json" 2>/dev/null)" ""
 fi
