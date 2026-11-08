@@ -47,6 +47,8 @@ check("cut: 280 characters at most, at a word, with …", utf8.len(cut) <= 281 a
   and cut:sub(-4, -4) == "d")
 local accents = gist.parse("# T\n\n" .. string.rep("é", 400) .. "\n", "x.md").summary
 check("cut: UTF-8 not split", utf8.len(accents) ~= nil)
+local odd = gist.parse("# T\n\na" .. string.rep("é", 1000) .. "\n", "x.md").summary
+check("cut: UTF-8 not split at an odd byte", odd ~= nil and utf8.len(odd) ~= nil)
 
 local REVIEW = table.concat({
   "# Review ABC-12 - Round 1 (lens: break)",
@@ -81,6 +83,18 @@ check("html: the button opens it", has(html, '<button class="doc-open" title="Op
 check("html: no link", not has(html, "href"))
 local rh = gist.html(r, 5)
 check("html: the verdict and its round", has(rh, '<span class="verdict">approved · round 3</span>'))
+
+-- A long run of spaces in a line never stalls the parse (it runs on Hammerspoon's main thread).
+local spaces = string.rep(" ", 100000)
+for name, line in pairs({ ["an open verdict"] = "**Verdict:" .. spaces .. "x", ["a verdict"] = "**Verdict: a" .. spaces .. "b**",
+  ["a heading"] = "# x" .. spaces .. "y", ["a paragraph"] = "x" .. spaces .. "y",
+  ["open links"] = string.rep("[a](", 60000), ["an open link title"] = "# " .. string.rep("[a](", 60000) }) do
+  local t0 = os.clock()
+  gist.parse("# T\n\n" .. line .. "\n", "x.md")
+  check("fast: " .. name, os.clock() - t0 < 0.5)
+end
+check("trimmed: a heading's spaces", gist.parse("#   Spaced   \n", "x.md").title == "Spaced")
+check("trimmed: a verdict's spaces", gist.parse("**Verdict:  APPROVED  **\n", "x.md").verdict == "approved")
 
 -- Read from its file: at most config.DOC_BYTES, only UTF-8 text.
 local dir = os.tmpname()

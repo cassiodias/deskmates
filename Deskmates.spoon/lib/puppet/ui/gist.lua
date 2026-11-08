@@ -13,8 +13,21 @@ local escape = sessioncard.escape
 -- The headings whose first paragraph says what a document is about.
 local ABOUT = { intent = true, summary = true, goal = true, context = true, overview = true, ["what changed"] = true }
 
--- A line of markdown as plain text: a link keeps its text, emphasis and code marks go.
+-- `text` without the spaces around it. Patterns here stay linear: a document may hold a line of 256 KB of spaces,
+-- and this runs on Hammerspoon's main thread.
+local function trim(text)
+  return text:match("^%s*(.*%S)") or ""
+end
+
+-- A line of markdown as plain text: a link keeps its text, emphasis and code marks go. Only its start is read (a
+-- gist shows little of it, and a link left open makes the link pattern slow on a long text).
 local function plain(text)
+  local n = config.GIST_CHARS * 4
+  if #text > n then
+    -- Not inside a character: back to the start of the one the cut falls in.
+    while n > 0 and (text:byte(n + 1) or 0) >= 0x80 and text:byte(n + 1) < 0xC0 do n = n - 1 end
+    text = text:sub(1, n)
+  end
   text = text:gsub("!?%[([^%]]*)%]%b()", "%1")
   text = text:gsub("`", ""):gsub("%*", "")
   text = text:gsub("%f[_%w]_([^_]+)_%f[^_%w]", "%1")
@@ -26,7 +39,7 @@ local function paragraph(lines, i)
   while lines[i] and lines[i]:match("^%s*$") do i = i + 1 end
   local out = {}
   while lines[i] and not lines[i]:match("^%s*$") and not lines[i]:match("^#") do
-    out[#out + 1] = lines[i]:match("^%s*(.-)%s*$")
+    out[#out + 1] = trim(lines[i])
     i = i + 1
   end
   if #out == 0 then return nil end
@@ -50,15 +63,17 @@ function gist.parse(text, name)
   local g = { file = name }
   local titleAt, aboutAt, rounds, lastRound = nil, nil, 0, nil
   for i, line in ipairs(lines) do
-    local level, heading = line:match("^(#+)%s+(.-)%s*$")
+    local level, heading = line:match("^(#+)%s+(.*)")
     if level then
+      heading = trim(heading)
       if level == "#" and not titleAt then g.title, titleAt = plain(heading), i end
       local words = heading:lower():gsub("^[%d%.%s]+", "")
       if not aboutAt and ABOUT[words] then aboutAt = i end
       local n = heading:match("[Rr]ound%s+(%d+)")
       if n then rounds, lastRound = rounds + 1, tonumber(n) end
     end
-    local verdict = line:match("%*%*Verdict:%s*(.-)%s*%*%*")
+    local verdict = line:match("%*%*Verdict:([^*]*)%*%*")
+    verdict = verdict and trim(verdict)
     if verdict and verdict ~= "" then g.verdict = verdict:lower():gsub("_", " ") end
   end
   g.title = g.title or name
