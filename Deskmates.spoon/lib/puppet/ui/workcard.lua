@@ -169,14 +169,14 @@ local function turnRow(t, isRunning)
 end
 
 -- What the git part shows for facts `f`, git's answer `gitState` ({ reading = true }, { error = text }, or
--- terminals/git.lua's result) and `plan` (model/plans.lua's shape, or nil): { actual = actualView, turns = { turn
--- rows, newest first } }; nil when the facts know no git base. Only the newest turn, open while the session
--- `isWorking`, is working now.
-function workcard.view(f, gitState, plan, isWorking)
+-- terminals/git.lua's result), `plan` (model/plans.lua's shape, or nil) and the branch's PR in one line (`prLine`,
+-- terminals/pr.lua's, or nil): { actual = actualView, turns = { turn rows, newest first }, pr }; nil when the facts
+-- know no git base. Only the newest turn, open while the session `isWorking`, is working now.
+function workcard.view(f, gitState, plan, isWorking, prLine)
   if not facts.hasGit(f) then return nil end
   local turns = {}
   for i, t in ipairs(f.turns or {}) do turns[#turns + 1] = turnRow(t, i == 1 and isWorking == true) end
-  return { actual = actualView(f, gitState, plan), turns = turns }
+  return { actual = actualView(f, gitState, plan), turns = turns, pr = prLine }
 end
 
 workcard.counted = counted
@@ -240,9 +240,10 @@ local function actualHtml(a)
   return panel.html("actual", a.heading, escape(a.summary), table.concat(out))
 end
 
--- The plan block's panel for view `v` (workcard.view); the turns are drawn in the story (ui/story.lua).
+-- The plan block's panel for view `v` (workcard.view), then the PR's line when there is one; the turns are drawn
+-- in the story (ui/story.lua).
 function workcard.html(v)
-  return actualHtml(v.actual)
+  return actualHtml(v.actual) .. (v.pr and '<p class="pr">' .. escape(v.pr) .. "</p>" or "")
 end
 
 -- The styles for the plan block, and the colours the story shares (light, then dark on a dark page), with the
@@ -275,6 +276,7 @@ workcard.CSS = table.concat({
   ".unseen { font: 11px -apple-system, sans-serif; color: var(--muted); margin-left: 4px; }",
   ".actual .changed { list-style: none; padding: 0; margin: 0; } .actual .changed li { padding: 1px 0; }",
   ".actual .more { color: var(--muted); }",
+  ".result .pr { margin: 6px 2px 0; font-size: 12px; color: var(--muted); }",
 })
 
 return workcard

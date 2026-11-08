@@ -27,6 +27,7 @@ local facts = require("puppet.model.facts")
 local scenes = require("puppet.render.scenes")
 local Stage = require("puppet.stage.stage")
 local git = require("puppet.terminals.git")
+local pr = require("puppet.terminals.pr")
 local backfill = require("puppet.terminals.backfill")
 local Iterm = require("puppet.terminals.iterm")
 local Liveness = require("puppet.terminals.liveness")
@@ -125,6 +126,7 @@ function obj:handle(line)
   if (event.flag == "plan" or event.flag == "facts" or event.flag == "test") and self.planCard.key == event.session then
     self:refreshCard(event.session)
     self:readGit(event.session)
+    self:readPr(event.session)
   end
   for _, intent in ipairs(intents) do self:say(intent.key, intent.text, intent.seconds) end
 end
@@ -226,7 +228,8 @@ function obj:cardContent(key)
   local now = os.time()
   local session = facts.hasContent(s.facts) and sessioncard.view(s.facts, now, s.isWorking) or nil
   local state = self:gitState(key)
-  local work = workcard.view(s.facts, state, s.plan, s.isWorking)
+  local prLine = self:prLine(key)
+  local work = workcard.view(s.facts, state, s.plan, s.isWorking, prLine)
   local told = story.view(session, work, now)
   if not plan and not session and not work then
     -- Nothing yet, but the transcript is being read (or could not be): the card says so.
@@ -239,7 +242,7 @@ function obj:cardContent(key)
   local version
   if (not plan or plan.updatedAt) and (not (session or work) or s.facts.updatedAt) then
     version = tostring(plan and plan.updatedAt) .. "|" .. tostring((session or work) and s.facts.updatedAt)
-      .. (work and "|" .. tostring(s.isWorking) .. "|" .. gitVersion(state) or "")
+      .. (work and "|" .. tostring(s.isWorking) .. "|" .. gitVersion(state) .. "|" .. tostring(prLine) or "")
   end
   return plan, { title = (s.title and s.title ~= "") and s.title or s.tag, color = puppet.color, session = session,
     work = work and workcard.html(work), story = told and story.html(told) }, version
@@ -289,6 +292,35 @@ function obj:readGit(key)
       self:readGit(key)
     end
   end, own)
+end
+
+-- The line gh last gave for session `key`'s card (terminals/pr.lua), or nil.
+function obj:prLine(key)
+  local kept = self.cardPr
+  return kept and kept.key == key and kept.line or nil
+end
+
+-- Asks gh, off the main thread, for the PR of session `key`'s branch, for the card open on it; the line is kept in
+-- self.cardPr and shown, unless the card no longer shows that session (a card opened again starts afresh). One read
+-- at a time per card, and none within config.PR_EVERY of the last (gh asks GitHub; a busy session writes lines
+-- every few seconds). Nothing for a session not in a git repo.
+function obj:readPr(key)
+  local s = self.sessions.all[key]
+  if not (s and facts.hasGit(s.facts)) then return end
+  local kept = self.cardPr
+  if not (kept and kept.key == key) then
+    kept = { key = key }
+    self.cardPr = kept
+  end
+  local now = hs.timer.secondsSinceEpoch()
+  if kept.busy or (kept.at and now - kept.at < config.PR_EVERY) then return end
+  kept.busy, kept.at = true, now
+  pr.read(s.facts.git.root, function(line)
+    kept.busy = false
+    if self.cardPr ~= kept or self.planCard.key ~= key then return end
+    kept.line = line
+    self:refreshCard(key)
+  end)
 end
 
 -- What the transcript backfill of session `key`'s card is doing: { reading = true }, { error = why },
@@ -353,7 +385,7 @@ function obj:click(key)
     -- The facts as they are now, the hooks may have written them since the last line said so; git not read yet.
     local path = facts.path(self.factsDir, key)
     self.sessions:setFacts(key, path and facts.load(path))
-    self.cardGit = nil
+    self.cardGit, self.cardPr = nil, nil
     self:backfill(key)
     plan, meta, version = self:cardContent(key)
   end
@@ -361,6 +393,7 @@ function obj:click(key)
     self.cardVersion = version
     self.planCard:show(key, plan, meta)
     self:readGit(key)
+    self:readPr(key)
     self:runBackfill(key)
   else
     self:focus(key)

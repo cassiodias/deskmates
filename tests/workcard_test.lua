@@ -289,4 +289,12 @@ local ownHtml = workcard.html(workcard.view(factsWith({}), ownGit, nil, false))
 check("own commits: their file is seen", has(ownHtml, "<li><code>README.md</code></li>"))
 check("own commits: not marked no edit seen", not has(ownHtml, '<code>README.md</code> <span class="unseen">'))
 
+-- The PR's line, under the panel: escaped; none without one.
+local withPr = workcard.html(workcard.view(factsWith(), GIT, PLAN, false, "PR #5 · merged · checks passed"))
+local panelEnd = withPr:find("</details>", 1, true)
+local prAt = withPr:find('<p class="pr">PR #5 · merged · checks passed</p>', 1, true)
+check("PR: its line after the panel", panelEnd ~= nil and prAt ~= nil and prAt > panelEnd)
+check("PR: none, no line", not has(workcard.html(workcard.view(factsWith(), GIT, PLAN, false)), 'class="pr"'))
+check("PR: escaped", has(workcard.html(workcard.view(factsWith(), GIT, PLAN, false, "PR #5 <b>")), "PR #5 &lt;b&gt;"))
+
 check.done("work card")

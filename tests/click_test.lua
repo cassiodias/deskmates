@@ -351,6 +351,8 @@ local attributes = hs.fs.attributes
 hs.fs.attributes = function(path, field)
   if path == "/opt/homebrew/bin/git" then return { mode = "file" } end
   if path:find("git", 1, true) then return nil end
+  -- No gh in this part, whatever this machine has (the PR's own part below has one).
+  if path:match("/gh$") then return nil end
   return attributes(path, field)
 end
 local REPO, BASE = "/Users/me/my-app", "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
@@ -529,6 +531,69 @@ local reopened = doubleClickOn("git1")
 answer(tasks, ANSWER)
 check("another session's card opened since: all open", reopened.html_:find(TURNS_OPEN, 1, true) ~= nil)
 closeCard(reopened)
+
+-- The PR: with gh there, the card also asks gh, in the repo, beside git; its answer is one line under what
+-- changed. A busy session's lines do not ask GitHub again within config.PR_EVERY.
+local withoutGh = hs.fs.attributes
+hs.fs.attributes = function(path, field)
+  if path == "/opt/homebrew/bin/gh" then return { mode = "file" } end
+  return withoutGh(path, field)
+end
+local MERGED = '{"number":5,"state":"MERGED","isDraft":false,"statusCheckRollup":[]}'
+local function ghTasks(from)
+  local out = {}
+  for i = from + 1, #stub.tasks do
+    if stub.tasks[i].path == "/opt/homebrew/bin/gh" then out[#out + 1] = i end
+  end
+  return out
+end
+tasks = #stub.tasks
+local prCard = doubleClickOn("git1")
+local gh = ghTasks(tasks)
+check("PR: one gh read on open", #gh == 1 and stub.tasks[gh[1]].cwd == REPO and stub.tasks[gh[1]].args[1] == "pr"
+  and stub.tasks[gh[1]].args[2] == "view")
+check("PR: git starts first", stub.tasks[tasks + 1].path == "/opt/homebrew/bin/git")
+-- The git read: its commands are the tasks after the gh one.
+local i = tasks + 1
+for k = 1, 4 do
+  stub.finishTask(i, 0, ANSWER[k], "")
+  i = #stub.tasks
+end
+if not stub.tasks[i].finished then stub.finishTask(i, 0, "", "") end
+check("PR: no line before gh answers", not prCard.html_:find('class="pr"', 1, true))
+stub.finishTask(gh[1], 0, MERGED, "")
+check("PR: its line on the card", prCard.html_:find('<p class="pr">PR #5 · merged</p>', 1, true) ~= nil
+  and prCard.html_:find("1 commit, 1 not committed.", 1, true) ~= nil)
+local before = #stub.tasks
+write("PostToolUse|git1||Bash|||my-app|iTerm.app|test|/dev/ttys009|claude|")
+stub.advance(0.2)
+check("PR: a facts line soon after asks no gh", #ghTasks(before) == 0)
+answer(before, ANSWER)
+stub.advance(61)
+before = #stub.tasks
+write("PostToolUse|git1||Bash|||my-app|iTerm.app|test|/dev/ttys009|claude|")
+stub.advance(0.2)
+gh = ghTasks(before)
+check("PR: a minute later, one more gh read", #gh == 1)
+answer(before, ANSWER)
+stub.finishTask(gh[1], 1, "", "no pull requests found")
+check("PR: none any more, no line, the rest as before", not prCard.html_:find('class="pr"', 1, true)
+  and prCard.html_:find("1 commit, 1 not committed.", 1, true) ~= nil)
+closeCard(prCard)
+-- A card closed before gh answers gets nothing.
+tasks = #stub.tasks
+local closedPr = doubleClickOn("git1")
+gh = ghTasks(tasks)
+answer(tasks, ANSWER)
+local closedPage = closedPr.html_
+closeCard(closedPr)
+stub.finishTask(gh[1], 0, MERGED, "")
+check("PR: a card closed before gh answers: no update", closedPr.html_ == closedPage)
+-- A session with no git asks no gh.
+tasks = #stub.tasks
+local noGit = doubleClickOn("tab1")
+check("PR: a session with no git: no gh", #ghTasks(tasks) == 0)
+closeCard(noGit)
 hs.fs.attributes = attributes
 os.execute("rm -rf '" .. plansDir .. "' '" .. factsDir .. "'")
 
