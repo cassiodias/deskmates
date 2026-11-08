@@ -74,13 +74,14 @@ local function webview(frame, _, content)
   return v
 end
 
--- Programs the Spoon starts are kept in stub.tasks as { path, args, env, started, terminated }; a test ends one
+-- Programs the Spoon starts are kept in stub.tasks as { path, args, env, cwd, started, terminated }; a test ends one
 -- with stub.finishTask(i, code, stdout, stderr), which calls its callback as Hammerspoon would (even once it
 -- was terminated).
 stub.tasks = {}
 local function task(path, fn, args)
   local t = { path = path, fn = fn, args = args or {}, env = nil, started = false, terminated = false }
   function t:setEnvironment(env) self.env = env return self end
+  function t:setWorkingDirectory(dir) self.cwd = dir return self end
   function t:start() self.started = true return self end
   function t:terminate() self.terminated = true return self end
   function t:isRunning() return self.started and not self.terminated and not self.finished end
