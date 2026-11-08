@@ -143,6 +143,20 @@ expect "git: the second turn" "$(q '.turns[0] | [.head, .commits]')" \
 setup_git '{"tickets": {}, "timeline": [], "git": {"root": "/kept", "base": "k1", "dirtyAtStart": [], "folder": "/kept", "prefix": "", "top": null}}'
 run > /dev/null
 expect "git: the hooks' git facts kept" "$(q '.git.base')" '"k1"'
+# The hooks' base is newer than turns the backfill fills: the base moves back to when the session started.
+hookgit() { printf '{"root": "%s", "base": "%s", "dirtyAtStart": ["README.md"], "folder": "%s", "prefix": "", "top": null%s}' \
+  "$REPO" "$(sha_at Docs)" "$REPO" "${1:-}"; }
+setup_git "{\"tickets\": {}, \"timeline\": [], \"git\": $(hookgit), \"turns\": [$(turn 200)]}"
+expect "older: the answer" "$(run)" "ok 1"
+expect "older: the base when the session started, read from the transcript" \
+  "$(q '.git | [.base, .fromTranscript, .dirtyAtStart, .root == "'"$REPO"'"]')" "[\"$(sha_at Start)\",true,[],true]"
+setup_git "{\"tickets\": {}, \"timeline\": [], \"git\": $(hookgit), \"turns\": [$(turn 100)]}"
+run > /dev/null
+expect "newer gap: the hooks' base stays" "$(q '.git | [.base, .fromTranscript]')" "[\"$(sha_at Docs)\",null]"
+setup_git "{\"tickets\": {}, \"timeline\": [], \"git\": $(hookgit ', "fromTranscript": true'), \"turns\": [$(turn 200)]}"
+run > /dev/null
+expect "from the transcript already: kept" "$(q '.git.base')" "\"$(sha_at Docs)\""
+
 # A folder that is no repo: no git facts, the turns still added.
 setup simple
 expect "nogit: the answer" "$(run)" "ok 2"

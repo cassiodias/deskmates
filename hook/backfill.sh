@@ -154,7 +154,7 @@ def apply_at($now; $n): '"$FACTS_DEFS"' facts_apply($n);
       + (if .endAt then {endAt} else {} end) + (if $g.head then {head: $g.head} else {} end)] as $turns
 | {tickets: $replay.tickets, current: $replay.current, timeline: $replay.timeline, turns: $turns,
    lastAt: ([$r.prompts[].at, $r.notes[].at, ($r.turns[] | .endAt // .at)] | max), upTo: $to,
-   git: (if $git and $git.fromTranscript then $git else null end)}
+   git: (if $git and $git.fromTranscript then $git else null end), moveBase: $move}
 '
 
 # The facts after a backfill $b: tickets and steps from the replay (when it found any), its timeline lines and
@@ -165,7 +165,7 @@ def backfill_merge($b; $now):
   | .timeline = (($b.timeline + [(.timeline // [])[] | select(.at > $b.lastAt)]) | sort_by(-.at) | .[0:30])
   | .turns = (((.turns // []) + $b.turns) | sort_by(-.at) | .[0:30])
   | if .turns == [] then del(.turns) else . end
-  | if $b.git and (.git | not) then .git = $b.git else . end
+  | if $b.git and ((.git | not) or $b.moveBase) then .git = $b.git else . end
   | .backfill = {upTo: $b.upTo, at: $now};
 '
 
@@ -176,11 +176,26 @@ def backfill_merge($b; $now):
 backfill_git() {
   printf 'null' > "$4.git"
   printf '{}' > "$4.turns"
+  printf 'false' > "$4.move"
   facts_git_ready || return 0
   _backfill_g=$(printf '%s' "$2" | "$PUPPET_JQ" -c '.git // empty')
+  # The hooks' base is newer than the session (they started watching late): when the transcript's first prompt
+  # comes more than 5 s before the hooks' oldest turn, the base moves back to the commit at that prompt; what was
+  # dirty then is not known.
+  _backfill_first=$("$PUPPET_JQ" -r '.prompts[0].at // empty' "$1")
+  _backfill_oldest=$(printf '%s' "$2" | "$PUPPET_JQ" -r 'if .git and (.git.fromTranscript != true) then ([.turns[]?.at] | min // empty) else empty end')
+  if [ -n "$_backfill_g" ] && [ -n "$_backfill_first" ] && [ -n "$_backfill_oldest" ] &&
+      [ "$_backfill_first" -lt $((_backfill_oldest - 5)) ]; then
+    _backfill_root=$(printf '%s' "$_backfill_g" | "$PUPPET_JQ" -r .root)
+    _backfill_base=$(facts_run_git "$_facts_git" -C "$_backfill_root" rev-list -1 --before="@$_backfill_first" HEAD)
+    if [ -n "$_backfill_base" ]; then
+      _backfill_g=$(printf '%s' "$_backfill_g" | "$PUPPET_JQ" -c --arg base "$_backfill_base" \
+        '.base = $base | .dirtyAtStart = [] | .fromTranscript = true')
+      printf 'true' > "$4.move"
+    fi
+  fi
   if [ -z "$_backfill_g" ]; then
     _backfill_cwd=$("$PUPPET_JQ" -r '.cwd // empty' "$1")
-    _backfill_first=$("$PUPPET_JQ" -r '.prompts[0].at // empty' "$1")
     [ -n "$_backfill_cwd" ] && [ -n "$_backfill_first" ] || return 0
     _backfill_out=$(facts_run_git "$_facts_git" -C "$_backfill_cwd" rev-parse --show-toplevel --show-prefix) || return 0
     _backfill_root=${_backfill_out%%"$FACTS_NL"*}
@@ -247,6 +262,7 @@ backfill_main() {
   backfill_git "$_backfill_work/full" "$_backfill_cur" "$_backfill_gaps" "$_backfill_work/g"
   "$PUPPET_JQ" -c --argjson real "$_backfill_real" --argjson to "$_backfill_to" --argjson gaps "$_backfill_gaps" \
     --slurpfile gitf "$_backfill_work/g.git" --slurpfile gitturnsf "$_backfill_work/g.turns" \
+    --argjson move "$(cat "$_backfill_work/g.move")" \
     "$FACTS_DEFS $FACTS_CLAUDE_DEFS $FACTS_GIT_DEFS \$gitf[0] as \$git | \$gitturnsf[0] as \$gitturns | $BACKFILL_BUILD" \
     "$_backfill_work/full" > "$_backfill_work/b" ||
     { rm -rf "$_backfill_work"; echo "error transcript not readable"; return 1; }
