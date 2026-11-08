@@ -262,6 +262,10 @@ plancard.SCRIPT = "function send(m){window.webkit.messageHandlers.deskmates.post
   .. "document.getElementById('focus').onclick=function(){send('focus')};"
   .. "document.getElementById('close').onclick=function(){send('close')};"
   .. "document.querySelectorAll('button.pr-open').forEach(function(b){b.onclick=function(){send('open:pr')}});"
+  -- The ticket's line and a step's document: the Spoon opens what it found (the page names only the step).
+  .. "document.querySelectorAll('button.ticket-open').forEach(function(b){b.onclick=function(){send('open:ticket')}});"
+  .. "document.querySelectorAll('button.doc-open').forEach(function(b){b.onclick=function(){"
+  .. "send('open:doc:'+b.closest('.gist').getAttribute('data-from'))}});"
   .. "document.addEventListener('keydown',function(e){if(e.key==='Escape')send('close')});"
   .. "document.querySelectorAll('button[data-to]:not(.phase)').forEach(function(b){b.onclick=function(){"
   .. "var t=document.getElementById(b.getAttribute('data-to'));if(!t)return;t.scrollIntoView({block:'start'});"
@@ -275,13 +279,14 @@ plancard.SCRIPT = "function send(m){window.webkit.messageHandlers.deskmates.post
   -- stays when it happened during the step: from its start (data-from) up to the next step's (data-to, none for the
   -- last). A turn stays while it overlaps the step: it started before the step's end and ended (data-end, empty
   -- while it has no end) after its start, since a step mostly starts inside a turn. A step not reached yet (no
-  -- data-from) leaves no row. A folded panel stays folded: folds are the reader's alone.
+  -- data-from) leaves no row; the step's gist (its data-from) shows, the others hide. A folded panel stays folded: folds are the reader's alone.
   -- The panels stay where the reader left them: nothing is brought into view, and their scroll position is put
   -- back after the rows change. With a plan, a Plan step not reached yet clears it and takes the plan's article
   -- (what scrolls: the body never does) back to its top. The Spoon is told the step picked (its start, or none),
   -- to draw it picked again next time.
   .. "function only(b){document.body.classList.toggle('lane',!!b);"
   .. "var f=b&&b.getAttribute('data-from'),t=b&&b.getAttribute('data-to');"
+  .. "document.querySelectorAll('.gist').forEach(function(g){g.hidden=!b||g.getAttribute('data-from')!==f});"
   .. "document.querySelectorAll('.storylist>li').forEach(function(li){var a=Number(li.getAttribute('data-at')),"
   .. "e=li.getAttribute('data-end'),s=e===null?a:e===''?Infinity:Number(e);"
   .. "li.classList.toggle('out',!!b&&(f===null||s<Number(f)||(t!==null&&a>=Number(t))))})}"
@@ -321,10 +326,13 @@ function plancard.fitSize(saved)
 end
 
 -- opts.onFocus(key): the card's "Go to terminal". opts.onOpenPr(key) (optional): its PR line clicked.
+-- opts.onOpenTicket(key), opts.onOpenDoc(key, from) (optional): its ticket line, a step's document (the step's
+-- start) clicked.
 -- opts.frameFor(key, w, h): where the card goes, beside its puppet.
 -- opts.loadSize() and opts.saveSize({ w, h }) (optional): the size the card was last left at.
 function plancard.new(opts)
-  return setmetatable({ onFocus = opts.onFocus, onOpenPr = opts.onOpenPr, frameFor = opts.frameFor, loadSize = opts.loadSize,
+  return setmetatable({ onFocus = opts.onFocus, onOpenPr = opts.onOpenPr, onOpenTicket = opts.onOpenTicket,
+    onOpenDoc = opts.onOpenDoc, frameFor = opts.frameFor, loadSize = opts.loadSize,
     saveSize = opts.saveSize }, PlanCard)
 end
 
@@ -344,6 +352,11 @@ function PlanCard:show(key, plan, meta)
       self:hide()
     elseif message.body == "open:pr" then
       if self.key == key and self.onOpenPr then self.onOpenPr(key) end
+    elseif message.body == "open:ticket" then
+      if self.key == key and self.onOpenTicket then self.onOpenTicket(key) end
+    elseif type(message.body) == "string" and message.body:match("^open:doc:%d+$") then
+      local digits = message.body:match("(%d+)$")
+      if #digits <= 15 and self.key == key and self.onOpenDoc then self.onOpenDoc(key, tonumber(digits)) end
     elseif self.key == key then
       local id, isFolded = panel.message(message.body)
       if id then self.folded[id] = isFolded or nil end

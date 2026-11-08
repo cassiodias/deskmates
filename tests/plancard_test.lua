@@ -3,6 +3,7 @@
 
 local root = arg[0]:match("^(.*)/tests/") or "."
 package.path = root .. "/Deskmates.spoon/lib/?.lua;" .. root .. "/Deskmates.spoon/lib/?/init.lua;" .. package.path
+local stub = dofile(root .. "/tests/support/hs_stub.lua")
 local check = dofile(root .. "/tests/support/check.lua")
 local plancard = require("puppet.ui.plancard")
 
@@ -335,5 +336,28 @@ local foldedPage = plancard.html({ steps = STEPS, markdown = "# Add a flag\n\n##
 check("folded: drawn closed", has(foldedPage, '<details class="panel story" data-panel="story"><summary>')
   and has(foldedPage, '<details class="panel actual" data-panel="actual" open>'))
 check("folded: nothing folded, all open", count(workAll, '" open><summary>') == 2)
+
+-- A gist's button and the ticket's line ask the Spoon to open what it found; a step picked shows its gist only.
+check("script: a gist's button sends its step", has(plancard.SCRIPT, "button.doc-open")
+  and has(plancard.SCRIPT, "send('open:doc:'+"))
+check("script: the ticket's button", has(plancard.SCRIPT, "button.ticket-open") and has(plancard.SCRIPT, "send('open:ticket')"))
+check("script: a step shows its gist, hides the others", has(plancard.SCRIPT, "querySelectorAll('.gist')")
+  and has(plancard.SCRIPT, "g.hidden=!b||g.getAttribute('data-from')!==f"))
+
+-- The card's messages: open:doc with a step's start, open:ticket; anything else opens nothing.
+local opened = {}
+local card = plancard.new({ onFocus = function() end, frameFor = function() return { x = 0, y = 0, w = 400, h = 300 } end,
+  onOpenDoc = function(key, from) opened[#opened + 1] = "doc " .. key .. " " .. tostring(from) end,
+  onOpenTicket = function(key) opened[#opened + 1] = "ticket " .. key end })
+card:show("s1", nil, { title = "my-app", session = view, story = STORY })
+local page = stub.webviews[#stub.webviews]
+page.content.callback({ body = "open:doc:100" })
+page.content.callback({ body = "open:ticket" })
+for _, junk in ipairs({ "open:doc:abc", "open:doc:", "open:doc:" .. string.rep("1", 16), "open:doc:/etc/passwd",
+  "open:ticket:x", 7 }) do page.content.callback({ body = junk }) end
+check("messages: a step's document and the ticket, nothing else", table.concat(opened, ",") == "doc s1 100,ticket s1")
+card:show("s2", nil, { title = "my-app", session = view, story = STORY })
+page.content.callback({ body = "open:doc:100" })
+check("messages: an old page of another session opens nothing", #opened == 2)
 
 check.done("plan card")

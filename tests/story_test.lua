@@ -197,4 +197,17 @@ local full = story.html(story.view(nil, workcard.view({ tickets = {}, timeline =
   { reading = true }, nil, false), 2000))
 check("a full hash shows cut to 7", has(full, '<div class="commit"><code>e4f5a6b</code> Fixed the typo.</div>'))
 
+-- A step's document: its gist in the ticket's list, before the rows, hidden until the page shows it.
+local gist = require("puppet.ui.gist")
+local g = gist.parse("# Contract ABC-12\n\n## Intent\nCap exports.\n", "contract.md")
+local gh = story.html(story.view(session, work, now, { ["ABC-12"] = { { from = 100, gist = g } } }))
+local listAt = gh:find('<ol class="storylist">', 1, true)
+local gistAt = gh:find('<div class="gist" data-from="100" hidden>', 1, true)
+check("gist: in its ticket's list, before the rows", gistAt ~= nil and listAt ~= nil and gistAt < listAt
+  and gistAt > gh:find('<div class="storyticket" data-key="ABC-12">', 1, true))
+check("gist: none, no block", not has(html, 'class="gist"'))
+check("gist: another ticket's are not drawn", not has(story.html(story.view(session, work, now,
+  { ["XYZ-9"] = { { from = 100, gist = g } } })), 'class="gist"'))
+check("gist: its styles", has(story.CSS, ".gist "))
+
 check.done("story")

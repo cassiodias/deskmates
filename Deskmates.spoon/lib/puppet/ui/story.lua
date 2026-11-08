@@ -7,6 +7,7 @@
 local panel = require("puppet.ui.panel")
 local sessioncard = require("puppet.ui.sessioncard")
 local workcard = require("puppet.ui.workcard")
+local gist = require("puppet.ui.gist")
 
 local story = {}
 
@@ -107,16 +108,18 @@ local function list(turns, rows, now)
 end
 
 -- What the story shows for the session's view `session` (sessioncard.view, or nil) and git part `work`
--- (workcard.view, or nil) at time `now`: { tickets = { { key, rows, summary } } }, one list per ticket in the
--- header's order (the session's turns in each), or one list of turns with no tickets; nil when there are no tickets
--- and no turn says anything.
-function story.view(session, work, now)
+-- (workcard.view, or nil) at time `now`, with the gists of its steps' documents (`gists`: { [ticket key] = { {
+-- from = the step's start, gist = gist.parse's } } }, or nil): { tickets = { { key, rows, summary, gists } } },
+-- one list per ticket in the header's order (the session's turns in each), or one list of turns with no tickets;
+-- nil when there are no tickets and no turn says anything.
+function story.view(session, work, now, gists)
   local turns = work and work.turns or {}
   local v = { tickets = {} }
   if session then
     for _, t in ipairs(session.tickets) do
       local rows, summary = list(turns, t.rows, now)
-      v.tickets[#v.tickets + 1] = { key = t.key or "-", keyed = true, rows = rows, summary = summary }
+      v.tickets[#v.tickets + 1] = { key = t.key or "-", keyed = true, rows = rows, summary = summary,
+        gists = gists and gists[t.key or "-"] or nil }
     end
     return v
   end
@@ -164,8 +167,9 @@ local function markerHtml(m)
     .. (m.text and ' · <span class="text">' .. escape(m.text) .. "</span>" or "") .. "</div></li>"
 end
 
--- The story's panel for view `v`: each ticket's list (all but the first hidden, switched by Also through data-key)
--- and its summary, and the words a step with nothing in it shows.
+-- The story's panel for view `v`: each ticket's list (all but the first hidden, switched by Also through data-key),
+-- its steps' gists before it (each hidden until its step is picked), its summary, and the words a step with
+-- nothing in it shows.
 function story.html(v)
   local sums, lists = {}, {}
   for i, t in ipairs(v.tickets) do
@@ -175,7 +179,10 @@ function story.html(v)
       items[#items + 1] = r.kind == "marker" and markerHtml(r) or turnHtml(r)
     end
     sums[#sums + 1] = "<span" .. key .. ">" .. escape(t.summary) .. "</span>"
-    lists[#lists + 1] = '<div class="storyticket"' .. key .. '><ol class="storylist">' .. table.concat(items)
+    local docs = {}
+    for _, d in ipairs(t.gists or {}) do docs[#docs + 1] = gist.html(d.gist, d.from) end
+    lists[#lists + 1] = '<div class="storyticket"' .. key .. ">" .. table.concat(docs) .. '<ol class="storylist">'
+      .. table.concat(items)
       .. '</ol><p class="nolane">Nothing happened in this step.</p></div>'
   end
   return panel.html("story", "What happened?", table.concat(sums), table.concat(lists))
@@ -218,6 +225,7 @@ story.CSS = table.concat({
   -- A step picked (body.lane, set by the page's script): the rows outside it hidden, a word when none is left.
   ".storylist > li.out { display: none; } .nolane { display: none; color: var(--muted); margin: 0; }",
   "body.lane .storylist:not(:has(> li:not(.out))) + .nolane { display: block; }",
+  gist.CSS,
 })
 
 return story
