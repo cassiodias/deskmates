@@ -679,5 +679,75 @@ doubleClickOn("cx1")
 check("backfill: a Codex session reads none and, with no facts, opens no card", #stub.tasks == tasks
   and #stub.webviews == views0)
 
+-- Ticket docs: a session in a repo whose ticket has a folder beside it. The card searches once on open; each
+-- step's document shows as a gist, opens on a click, and a changed document redraws the card. The ticket's page
+-- the hooks kept is a line that opens it.
+local wrap = os.tmpname()
+os.remove(wrap)
+local docsRepo, docsFolder = wrap .. "/my-app", wrap .. "/docs/ABC-12"
+os.execute("mkdir -p '" .. docsRepo .. "/.git' '" .. docsFolder .. "' '" .. wrap .. "/other/.git'")
+io.open(docsRepo .. "/.git/HEAD", "w"):write("ref: refs/heads/main\n"):close()
+io.open(wrap .. "/other/.git/HEAD", "w"):write("ref: refs/heads/ABC-12-export\n"):close()
+local contract = docsFolder .. "/contract.md"
+io.open(contract, "w"):write("# Contract ABC-12\n\n## Intent\nCap exports.\n"):close()
+local made = hs.fs.attributes(contract, "modification")
+local function writeDocFacts(sid, root, ticket, url)
+  local file = io.open(factsDir .. "/" .. sid .. ".json", "w")
+  file:write('{"git": {"base": "' .. BASE .. '", "dirtyAtStart": [], "prefix": "", "root": "' .. root .. '"}, '
+    .. '"current": ' .. (ticket ~= "-" and '"' .. ticket .. '"' or "null") .. ', "tickets": {"' .. ticket .. '": {"phase": "plan", '
+    .. '"phases": {"plan": ' .. (made - 10) .. '}, "seen": ' .. (made + 10) .. ', "passes": [{"phase": "plan", "at": '
+    .. (made - 10) .. ', "endAt": ' .. (made + 10) .. '}]' .. (url and ', "url": "' .. url .. '"' or "") .. '}}, '
+    .. '"timeline": [], "turns": [], "updatedAt": 1}')
+  file:close()
+end
+stub.tabs = stub.tabs .. "/dev/ttys031=4/1;/dev/ttys032=4/2;"
+writeDocFacts("d1", docsRepo, "ABC-12", "https://acme.atlassian.net/browse/ABC-12")
+writeDocFacts("d2", wrap .. "/other", "-")
+write("UserPromptSubmit|d1||||Plan it|my-app|iTerm.app||/dev/ttys031|claude|")
+write("UserPromptSubmit|d2||||Plan it|my-app|iTerm.app||/dev/ttys032|claude|")
+stub.advance(0.2)
+local function findTasks(from)
+  local out = {}
+  for i = from + 1, #stub.tasks do
+    if stub.tasks[i].path == "/usr/bin/find" then out[#out + 1] = i end
+  end
+  return out
+end
+tasks = #stub.tasks
+local docCard = doubleClickOn("d1")
+local finds = findTasks(tasks)
+check("docs: one search on open, for the ticket", #finds == 1 and stub.tasks[finds[1]].args[2] == wrap
+  and table.concat(stub.tasks[finds[1]].args, " "):find("-name ABC-12 ) -print", 1, true) ~= nil)
+check("docs: no gist before it answers", not docCard.html_:find('class="gist"', 1, true))
+check("docs: the ticket's line, a button", docCard.html_:find('<button class="ticket-open"', 1, true) ~= nil
+  and docCard.html_:find(">ABC-12 · open in Jira</button>", 1, true) ~= nil)
+stub.finishTask(finds[1], 0, docsFolder .. "\n", "")
+check("docs: the step's gist on the card", docCard.html_:find('<div class="gist" data-from="' .. (made - 10) .. '" hidden>', 1, true) ~= nil
+  and docCard.html_:find("Cap exports.", 1, true) ~= nil)
+stub.opened = {}
+docCard.content.callback({ body = "open:doc:" .. (made - 10) })
+check("docs: a click opens the document", stub.opened[1] == hs.fs.pathToAbsolute(contract))
+docCard.content.callback({ body = "open:doc:5" })
+check("docs: another step's opens nothing", #stub.opened == 1)
+docCard.content.callback({ body = "open:ticket" })
+check("docs: the ticket's line opens its page", stub.openedURLs[#stub.openedURLs] == "https://acme.atlassian.net/browse/ABC-12")
+io.open(contract, "w"):write("# Contract ABC-12\n\n## Intent\nCap exports at 10 000 rows.\n"):close()
+write("PreToolUse|d1||Read|||my-app|iTerm.app||/dev/ttys031|claude|")
+stub.advance(0.2)
+check("docs: a changed document redraws with any line", docCard.html_:find("Cap exports at 10 000 rows.", 1, true) ~= nil)
+-- Another card opens before a search answers: the late answer changes nothing.
+tasks = #stub.tasks
+doubleClickOn("d1")
+local lateFind = findTasks(tasks)[1]
+local waiting = doubleClickOn("d2")
+local d2find = findTasks(tasks)[2]
+check("docs: the waiting ticket searches for the branch's key", d2find ~= nil
+  and table.concat(stub.tasks[d2find].args, " "):find("-name ABC-12 )", 1, true) ~= nil)
+check("docs: no ticket page, no line", not waiting.html_:find('class="ticket-open"', 1, true))
+stub.finishTask(lateFind, 0, docsFolder .. "\n", "")
+check("docs: a late answer for another card changes nothing", P.cardDocs.key == "d2" and not next(P.cardDocs.folders))
+closeCard(waiting)
+os.execute("rm -rf '" .. wrap .. "'")
+
 os.remove(eventsFile)
 check.done("click")

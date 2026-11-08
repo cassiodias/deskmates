@@ -29,6 +29,7 @@ local Stage = require("puppet.stage.stage")
 local git = require("puppet.terminals.git")
 local pr = require("puppet.terminals.pr")
 local backfill = require("puppet.terminals.backfill")
+local ticketdocs = require("puppet.terminals.ticketdocs")
 local Iterm = require("puppet.terminals.iterm")
 local Liveness = require("puppet.terminals.liveness")
 local newTerminals = require("puppet.terminals.focus")
@@ -37,6 +38,7 @@ local plancard = require("puppet.ui.plancard")
 local sessioncard = require("puppet.ui.sessioncard")
 local story = require("puppet.ui.story")
 local workcard = require("puppet.ui.workcard")
+local gist = require("puppet.ui.gist")
 local bubble = require("puppet.stage.bubble")
 
 local obj = {}
@@ -134,6 +136,9 @@ function obj:handle(line)
     self.sessions:setFacts(event.session, path and facts.load(path))
     self:refreshCard(event.session)
     self:readGit(event.session)
+  elseif self.planCard.key == event.session and self:cardHasDocs(event.session) then
+    -- A step's document may have changed: the card's version holds the documents' stamps, so only a change redraws.
+    self:refreshCard(event.session)
   end
   for _, intent in ipairs(intents) do self:say(intent.key, intent.text, intent.seconds) end
 end
@@ -248,8 +253,10 @@ function obj:cardContent(key)
   local session = facts.hasContent(s.facts) and sessioncard.view(s.facts, now, s.isWorking) or nil
   local state = self:gitState(key)
   local prLine, prUrl = self:prLine(key)
-  local work = workcard.view(s.facts, state, s.plan, s.isWorking, prLine, prUrl ~= nil)
-  local told = story.view(session, work, now)
+  local ticketLine = self:ticketLine(key)
+  local work = workcard.view(s.facts, state, s.plan, s.isWorking, prLine, prUrl ~= nil, ticketLine)
+  local gists, _, docsVersion = self:cardGists(key)
+  local told = story.view(session, work, now, gists)
   if not plan and not session and not work then
     -- Nothing yet, but the transcript is being read (or could not be): the card says so.
     local filling = self:backfillState(key)
@@ -262,6 +269,7 @@ function obj:cardContent(key)
   if (not plan or plan.updatedAt) and (not (session or work) or s.facts.updatedAt) then
     version = tostring(plan and plan.updatedAt) .. "|" .. tostring((session or work) and s.facts.updatedAt)
       .. (work and "|" .. tostring(s.isWorking) .. "|" .. gitVersion(state) .. "|" .. tostring(prLine) .. "|" .. tostring(prUrl) or "")
+      .. "|" .. tostring(ticketLine) .. "|" .. docsVersion
   end
   return plan, { title = (s.title and s.title ~= "") and s.title or s.tag, color = puppet.color, session = session,
     work = work and workcard.html(work), story = told and story.html(told) }, version
@@ -349,6 +357,114 @@ function obj:readPr(key)
   end)
 end
 
+-- The line of session `key`'s current ticket page the hooks kept ("ABC-12 · open in Jira") and the page, or nil.
+function obj:ticketLine(key)
+  local s = self.sessions.all[key]
+  local current = s and s.facts and s.facts.current
+  local t = current and s.facts.tickets[current]
+  local url, kind = facts.ticketUrl(current, t and t.url)
+  if not url then return nil end
+  return current .. " · open in " .. kind, url
+end
+
+-- Opens the page of session `key`'s current ticket in the browser: the one the hooks kept, never one the card names.
+function obj:openTicket(key)
+  local _, url = self:ticketLine(key)
+  if url then hs.urlevent.openURL(url) end
+end
+
+-- The tickets whose folders session `s`'s card looks for: { [ticket key as in the facts] = the key searched },
+-- three at most, the current one first; the ticket waiting for a key ("-") searches for the key its branch names.
+local function docKeys(s)
+  local order, out, n = {}, {}, 0
+  for k in pairs(s.facts.tickets) do
+    if k ~= s.facts.current then order[#order + 1] = k end
+  end
+  table.sort(order)
+  if s.facts.current then table.insert(order, 1, s.facts.current) end
+  for _, k in ipairs(order) do
+    local search = k == "-" and ticketdocs.branchKey(s.facts.git.root) or (k ~= "-" and k or nil)
+    if search and n < 3 then out[k], n = search, n + 1 end
+  end
+  return out
+end
+
+-- Searches, off the main thread, for the folders of session `key`'s tickets beside its repo, for the card open on
+-- it; the folders are kept in self.cardDocs and the card drawn again with its steps' gists, unless the card no
+-- longer shows that session. Once per opening; nothing for a session not in a git repo.
+function obj:readDocs(key)
+  local s = self.sessions.all[key]
+  if not (s and facts.hasGit(s.facts)) then return end
+  local kept = { key = key, keys = docKeys(s), folders = {} }
+  self.cardDocs = kept
+  local search = {}
+  for _, k in pairs(kept.keys) do search[#search + 1] = k end
+  table.sort(search)
+  ticketdocs.find(s.facts.git.root, search, function(found)
+    if self.cardDocs ~= kept or self.planCard.key ~= key then return end
+    kept.folders = found
+    self:refreshCard(key)
+  end)
+end
+
+-- Whether the card open on session `key` found a ticket folder.
+function obj:cardHasDocs(key)
+  local kept = self.cardDocs
+  return kept ~= nil and kept.key == key and next(kept.folders) ~= nil
+end
+
+-- The gist of the document at `path`, read again only when its time or size changed (kept per card), and its stamp.
+function obj:readGist(path)
+  local a = hs.fs.attributes(path)
+  if not a then return nil end
+  local stamp = tostring(a.modification) .. ":" .. tostring(a.size)
+  self.gistCache = self.gistCache or {}
+  local kept = self.gistCache[path]
+  if not (kept and kept.stamp == stamp) then
+    kept = { stamp = stamp, gist = gist.read(path) }
+    self.gistCache[path] = kept
+  end
+  return kept.gist, stamp
+end
+
+-- What session `key`'s card shows of its steps' documents: the gists per ticket (story.view's `gists`, nil when
+-- none), each step's document by its start ({ [start] = path }), and the version they make (their paths and
+-- stamps, "" when none).
+function obj:cardGists(key)
+  local s, kept = self.sessions.all[key], self.cardDocs
+  if not (s and s.facts and kept and kept.key == key) then return nil, {}, "" end
+  local gists, paths, parts = nil, {}, {}
+  local now = os.time()
+  for ticketKey, search in pairs(kept.keys) do
+    local folder, t = kept.folders[search], s.facts.tickets[ticketKey]
+    if folder and t then
+      local files = ticketdocs.files(folder)
+      for _, p in ipairs(t.passes or {}) do
+        local path = ticketdocs.docFor(p, files, now)
+        local g, stamp
+        if path then g, stamp = self:readGist(path) end
+        if g then
+          gists = gists or {}
+          gists[ticketKey] = gists[ticketKey] or {}
+          table.insert(gists[ticketKey], { from = p.at, gist = g })
+          paths[p.at] = path
+          parts[#parts + 1] = ticketKey .. "@" .. string.format("%d", p.at) .. "=" .. path .. "#" .. stamp
+        end
+      end
+    end
+  end
+  table.sort(parts)
+  return gists, paths, table.concat(parts, "|")
+end
+
+-- Opens the document of session `key`'s step that started at `from`, in its app: the file the card found, never one
+-- the page names; nothing when the step has none or it is gone.
+function obj:openDoc(key, from)
+  local _, paths = self:cardGists(key)
+  local path = paths[from]
+  if path and hs.fs.attributes(path) then hs.open(path) end
+end
+
 -- What the transcript backfill of session `key`'s card is doing: { reading = true }, { error = why },
 -- { done = true }, or nil when none ran for it.
 function obj:backfillState(key)
@@ -414,7 +530,7 @@ function obj:click(key)
     local path = facts.path(self.factsDir, key)
     self.sessions:setFacts(key, path and facts.load(path))
     self:cardFactsChanged(key)
-    self.cardGit, self.cardPr = nil, nil
+    self.cardGit, self.cardPr, self.cardDocs, self.gistCache = nil, nil, nil, {}
     self:backfill(key)
     plan, meta, version = self:cardContent(key)
   end
@@ -423,6 +539,7 @@ function obj:click(key)
     self.planCard:show(key, plan, meta)
     self:readGit(key)
     self:readPr(key)
+    self:readDocs(key)
     self:runBackfill(key)
   else
     self:focus(key)
@@ -620,6 +737,8 @@ function obj:start()
   self.planCard = plancard.new({
     onFocus = function(key) self:focus(key) end,
     onOpenPr = function(key) self:openPr(key) end,
+    onOpenTicket = function(key) self:openTicket(key) end,
+    onOpenDoc = function(key, from) self:openDoc(key, from) end,
     frameFor = function(key, w, h) return self:cardFrame(key, w, h) end,
     loadSize = function() return hs.settings.get(config.CARD_SIZE_KEY) end,
     saveSize = function(size) hs.settings.set(config.CARD_SIZE_KEY, size) end,

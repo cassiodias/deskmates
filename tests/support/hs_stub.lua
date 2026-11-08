@@ -101,8 +101,9 @@ local mainScreen = { frame = function() return screen end, name = function() ret
 stub.tabs = ""         -- what iTerm answers to the tab listing, "tty=window/tab;..."
 stub.itermRunning = false
 
--- URLs the Spoon asked macOS to open in the default browser.
+-- URLs the Spoon asked macOS to open in the default browser, and files it asked to open in their app.
 stub.openedURLs = {}
+stub.opened = {}
 
 hs = {
   urlevent = { openURL = function(url) stub.openedURLs[#stub.openedURLs + 1] = url return true end },
@@ -237,6 +238,7 @@ hs = {
   processInfo = { processID = 4242 },
   dialog = { textPrompt = function() return "Cancel", "" end },
   -- hs.focus makes Hammerspoon the active app; counted.
+  open = function(path) stub.opened[#stub.opened + 1] = path return true end,
   focus = function() stub.activated = (stub.activated or 0) + 1 end,
   -- A shell command's output: only `ps` is run; stub.ps holds what it prints (nil: it failed).
   execute = function() return stub.ps, stub.ps ~= nil end,
