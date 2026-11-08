@@ -31,17 +31,9 @@ expect "an id with a slash is refused" "$(plan_file ../evil; echo "|$?")" "|1"
 expect "an id of two dots is refused" "$(plan_file ..; echo "|$?")" "|1"
 expect "an empty id is refused" "$(plan_file ''; echo "|$?")" "|1"
 
-# deskmates_on: the marker the Spoon writes, naming a process that still runs.
+# Deskmates runs (hook/puppet-lib.sh's deskmates_on, tested there): the marker names this process.
 mkdir -p "$HOME/.deskmates"
-expect "no marker: off" "$(deskmates_on && echo on)" ""
-sh -c 'exit 0' & dead=$!
-wait "$dead"
-echo "$dead" > "$HOME/.deskmates/on"
-expect "a marker of a process that ended: off" "$(deskmates_on && echo on)" ""
-echo "not a pid" > "$HOME/.deskmates/on"
-expect "a marker with no pid: off" "$(deskmates_on && echo on)" ""
 echo "$$" > "$HOME/.deskmates/on"
-expect "a marker of a running process: on" "$(deskmates_on && echo on)" on
 
 if [ -n "$found_jq" ]; then
   # plan_update: writes the whole new plan, readable by its owner only.
@@ -118,7 +110,6 @@ leaks() {
     grep -Ev '^(_plan_|(nothing))' | tr '\n' ' '
 }
 expect "leak: plan_file" "$(leaks plan_file s30)" ""
-expect "leak: deskmates_on" "$(leaks deskmates_on)" ""
 if [ -n "$found_jq" ]; then
   expect "leak: plan_update" "$(leaks plan_update s30 claude "$ADD_STEP")" ""
   expect "leak: deskmates_json_update" "$(leaks deskmates_json_update "$PLANS/s31.json" '{}' 'type == "object"' '$cur')" ""

@@ -5,9 +5,14 @@ cd "$(dirname "$0")/.." || exit 1
 f=harnesses/cursor/fixtures
 failed=0
 
+# A fresh home where Deskmates runs: its marker names a live process (this test).
+home_on() {
+  _home=$(mktemp -d) && mkdir -p "$_home/.deskmates" && echo "$$" > "$_home/.deskmates/on" && echo "$_home"
+}
+
 # play name… : the events lines (without time) after feeding these fixtures in order to a fresh home.
 play() {
-  work=$(mktemp -d)
+  work=$(home_on)
   for name in "$@"; do
     HOME="$work" PUPPET_NOW=0 PUPPET_TTY=/dev/ttys009 TERM_PROGRAM=iTerm.app harnesses/cursor/translate.sh \
       < "$f/$name.json" > /dev/null
@@ -45,7 +50,7 @@ expect "after the session ends, nothing is left behind" \
   "prompt reply-first stop-aborted session-end" "UserPromptSubmit| Stop| SessionEnd| "
 
 # Cursor's own chat runs the hooks with no terminal and no TERM_PROGRAM: its lines name the app Cursor.
-work=$(mktemp -d)
+work=$(home_on)
 app=$(env -u TERM_PROGRAM HOME="$work" PUPPET_NOW=0 PUPPET_TTY='' harnesses/cursor/translate.sh < "$f/prompt.json" > /dev/null;
   cut -d'|' -f9 "$work/.deskmates/events")
 if [ "$app" != "Cursor" ]; then
@@ -56,7 +61,7 @@ rm -rf "$work"
 
 # Cursor started from a terminal (cursor .) passes that terminal's TERM_PROGRAM on to its chat: with no tty, the
 # line still names Cursor.
-work=$(mktemp -d)
+work=$(home_on)
 app=$(TERM_PROGRAM=ghostty HOME="$work" PUPPET_NOW=0 PUPPET_TTY='' harnesses/cursor/translate.sh < "$f/prompt.json" \
   > /dev/null; cut -d'|' -f9 "$work/.deskmates/events")
 if [ "$app" != "Cursor" ]; then
@@ -66,7 +71,7 @@ fi
 rm -rf "$work"
 
 # Cursor's CLI in a terminal that sets no TERM_PROGRAM (Alacritty): it has a terminal, so it is not the app.
-work=$(mktemp -d)
+work=$(home_on)
 app=$(env -u TERM_PROGRAM HOME="$work" PUPPET_NOW=0 PUPPET_TTY=/dev/ttys009 harnesses/cursor/translate.sh \
   < "$f/prompt.json" > /dev/null; cut -d'|' -f9 "$work/.deskmates/events")
 if [ -n "$app" ]; then
@@ -75,7 +80,7 @@ if [ -n "$app" ]; then
 fi
 rm -rf "$work"
 
-work=$(mktemp -d)
+work=$(home_on)
 for name in prompt reply-first stop-first stop-aborted session-end; do
   HOME="$work" PUPPET_NOW=0 PUPPET_TTY=/dev/ttys009 harnesses/cursor/translate.sh < "$f/$name.json" > /dev/null
 done

@@ -346,6 +346,22 @@ claimed_by_other() {
   return 1
 }
 
+# True while Deskmates runs: the marker the Spoon writes at start names a process that is still there. A
+# marker left by a Hammerspoon that crashed names none.
+deskmates_on() {
+  [ -f "$PUPPET_DIR/on" ] || return 1
+  _puppet_on_pid=$(head -n 1 "$PUPPET_DIR/on" 2>/dev/null)
+  case "$_puppet_on_pid" in ""|*[!0-9]*) return 1 ;; esac
+  kill -0 "$_puppet_on_pid" 2>/dev/null
+}
+
+# Ends the translator at once while Deskmates is off: nothing is written (no line, facts, plan or terminal), about
+# 60 ms less per hook. What respond set is still printed. A session started while off gets its puppet with its
+# first event after Deskmates starts.
+puppet_exit_if_off() {
+  deskmates_on || exit 0
+}
+
 # Prints JSON $1 for the agent when the translator exits, however it exits: for agents that wait for an answer
 # on some events (Codex wants {} after Stop). Call it before anything that could fail.
 respond() {

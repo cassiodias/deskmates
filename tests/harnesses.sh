@@ -147,5 +147,31 @@ for parser in $parsers; do
     rm -rf "$work" "$work.payload"
   done
 done
+# Deskmates off (no marker naming a live process): a translator stops right after reading the payload. Nothing is
+# written; Codex still gets the {} it waits for after Stop.
+for case in claude/stop:'' codex/stop:'{}' cursor/prompt:''; do
+  payload="harnesses/${case%%/*}/fixtures/${case#*/}"
+  payload="${payload%%:*}.json"
+  want=${case#*:}
+  want=${want#\'}; want=${want%\'}
+  work=$(mktemp -d)
+  for marker in none dead; do
+    rm -rf "$work/.deskmates"
+    # A marker left by a Hammerspoon that crashed names no live process.
+    [ "$marker" = dead ] && mkdir -p "$work/.deskmates" && echo 999999 > "$work/.deskmates/on"
+    stdout=$(sed "s|@HOME@|$work|g" "$payload" | LC_ALL=C HOME="$work" PUPPET_NOW=0 PUPPET_TTY=/dev/ttys009 \
+      TERM_PROGRAM=iTerm.app "harnesses/${case%%/*}/translate.sh")
+    if [ -e "$work/.deskmates/events" ] || [ -e "$work/.deskmates/facts" ] || [ -e "$work/.deskmates/plans" ] ||
+      [ -n "$(ls "$work/.deskmates" 2>/dev/null | grep -vx on)" ]; then
+      echo "harness off ($marker marker): ${case%%:*} wrote: $(ls "$work/.deskmates")"
+      failed=1
+    fi
+    if [ "$stdout" != "$want" ]; then
+      echo "harness off ($marker marker): ${case%%:*} printed '$stdout', expected '$want'"
+      failed=1
+    fi
+  done
+  rm -rf "$work"
+done
 [ "$failed" = 0 ] && echo "harnesses: ok"
 exit "$failed"

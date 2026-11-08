@@ -16,6 +16,22 @@ expect() {
   fi
 }
 
+# deskmates_on: the marker the Spoon writes, naming a process that still runs.
+mkdir -p "$HOME/.deskmates"
+expect "no marker: off" "$(deskmates_on && echo on)" ""
+sh -c 'exit 0' & dead=$!
+wait "$dead"
+echo "$dead" > "$HOME/.deskmates/on"
+expect "a marker of a process that ended: off" "$(deskmates_on && echo on)" ""
+echo "not a pid" > "$HOME/.deskmates/on"
+expect "a marker with no pid: off" "$(deskmates_on && echo on)" ""
+# puppet_exit_if_off: ends the shell while off, still printing what respond set; goes on while on.
+expect "off: exits, respond still printed" "$(respond '{}'; puppet_exit_if_off; echo after)" "{}"
+echo "$$" > "$HOME/.deskmates/on"
+expect "a marker of a running process: on" "$(deskmates_on && echo on)" on
+expect "on: goes on" "$(puppet_exit_if_off; echo after)" after
+rm "$HOME/.deskmates/on"
+
 # leading_command: a /command's name only, never a path or anything after it.
 expect "a /command" "$(leading_command "/review the docs")" "/review"
 expect "a /command alone" "$(leading_command "/my-coding-skill")" "/my-coding-skill"
@@ -121,6 +137,8 @@ if [ -n "$found_jq" ]; then
     hook_event_name: "PostToolUse", tool_name: "Read", tool_input: {file_path: "/Users/dev/my-app/big.txt"},
     tool_response: {type: "text", file: {filePath: "/Users/dev/my-app/big.txt", content: ., numLines: 37000}}}' \
     > "$HOME/big.json"
+  # Deskmates runs: off, the translator would stop before writing.
+  echo "$$" > "$HOME/.deskmates/on"
   PATH="$HOME/bin:$PATH" PUPPET_JQ="$HOME/bin/jq" PUPPET_NOW=0 PUPPET_TTY=/dev/ttys009 \
     harnesses/claude/translate.sh < "$HOME/big.json"
   expect "a 5 MB payload: no plutil" "$(runs plutil)" 0
@@ -260,6 +278,7 @@ leaks() {
 }
 printf '{"cwd":"%s","text":"Fixed the typo. Then more.","session_id":"s1"}' "$HOME" > "$HOME/payload.json"
 expect "leak: puppet_find_jq" "$(leaks puppet_find_jq)" ""
+expect "leak: deskmates_on" "$(leaks deskmates_on)" ""
 expect "leak: puppet_read_payload" "$(leaks puppet_read_payload < "$HOME/payload.json")" ""
 puppet_read_payload < "$HOME/payload.json"
 expect "leak: payload_value" "$(leaks payload_value cwd)" ""

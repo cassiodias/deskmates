@@ -8,6 +8,8 @@ failed=0
 work=$(mktemp -d)
 folder=$(cd "$work" && pwd -P)
 mkdir -p "$work/bin" "$work/home/.deskmates"
+# Deskmates runs: its marker names a live process (this test).
+echo "$$" > "$work/home/.deskmates/on"
 # pgrep finds the codex processes, or none while the file "none" is there (then only a remembered terminal can
 # give the session its own).
 cat > "$work/bin/pgrep" <<X
@@ -85,6 +87,8 @@ for name in tty-gone cursor-gone.turn cursor-gone.g1.reply myagent-gone.state ev
   echo /dev/ttys011 > "$work/home/.deskmates/$name"
   touch -t "$old" "$work/home/.deskmates/$name"
 done
+echo "$$" > "$work/home/.deskmates/on"
+touch -t "$old" "$work/home/.deskmates/on"
 # The source copy in ~/.deskmates/src is never touched, however old its files.
 mkdir -p "$work/home/.deskmates/src/bin"
 echo old > "$work/home/.deskmates/src/bin/deskmates"
@@ -98,7 +102,7 @@ check "a recent cache stays" "$(cat "$work/home/.deskmates/tty-recent")" /dev/tt
 check "the events file stays, however old" "$(head -n 1 "$work/home/.deskmates/events")" /dev/ttys011
 # Found 7 Nov: the Spoon writes its marker once, at start; two hours on, a hook deleted it and every hook after
 # took Deskmates for off (no facts, no plans, no card on a double click).
-check "the marker that says Deskmates runs stays, however old" "$(cat "$work/home/.deskmates/on" 2>/dev/null)" /dev/ttys011
+check "the marker that says Deskmates runs stays, however old" "$(cat "$work/home/.deskmates/on" 2>/dev/null)" "$$"
 check "a file inside src stays" "$(cat "$work/home/.deskmates/src/bin/deskmates")" old
 check "a file at the top of src stays" "$(ls "$work/home/.deskmates/src/README.md")" "$work/home/.deskmates/src/README.md"
 
@@ -106,6 +110,7 @@ check "a file at the top of src stays" "$(ls "$work/home/.deskmates/src/README.m
 mkdir -p "$work/clone" "$work/linked/.deskmates"
 ln -s "$work/clone" "$work/linked/.deskmates/src"
 touch -h -t "$old" "$work/linked/.deskmates/src"
+echo "$$" > "$work/linked/.deskmates/on"
 printf '{"session_id":"s9","cwd":"%s","hook_event_name":"UserPromptSubmit","prompt":"hello"}' "$folder" |
   HOME="$work/linked" PATH="$work/bin:/usr/bin:/bin" PUPPET_NOW=0 harnesses/codex/translate.sh
 check "a linked src stays" "$([ -L "$work/linked/.deskmates/src" ] && echo link)" link

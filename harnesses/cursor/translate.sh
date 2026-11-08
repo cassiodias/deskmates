@@ -7,6 +7,7 @@
 . "$(dirname "$0")/../../hook/plan-lib.sh"
 . "$(dirname "$0")/../../hook/facts-lib.sh"
 puppet_read_payload
+puppet_exit_if_off
 
 # Its CLI runs as agent or cursor-agent: a terminal remembered for a session counts while it runs one of them.
 puppet_program agent cursor-agent

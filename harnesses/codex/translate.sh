@@ -57,6 +57,8 @@ case "$event" in
   PreToolUse|PermissionRequest|SubagentStart|SessionEnd) ;;
   *) exit 0 ;;
 esac
+# Off: stop here, once Stop's {} is set to be printed (Codex waits for it).
+puppet_exit_if_off
 # The subagent's message is encrypted; its task name says what it is for.
 case "$tool" in collaborationspawn_agent|spawn_agent) text=$(field tool_input.task_name) ;; esac
 flag=""

@@ -18,15 +18,6 @@ plan_file() {
   printf '%s/%s.json\n' "$PUPPET_PLANS" "$1"
 }
 
-# True while Deskmates runs: the marker the Spoon writes at start names a process that is still there. A
-# marker left by a Hammerspoon that crashed names none.
-deskmates_on() {
-  [ -f "$PUPPET_DIR/on" ] || return 1
-  _plan_pid=$(head -n 1 "$PUPPET_DIR/on" 2>/dev/null)
-  case "$_plan_pid" in ""|*[!0-9]*) return 1 ;; esac
-  kill -0 "$_plan_pid" 2>/dev/null
-}
-
 # Changes session $1's plan (harness $2) with jq filter $3, given the payload as `.` and the current plan as
 # $cur (a new one when there is none, or the file is broken); more jq arguments may follow (--arg, --rawfile).
 # The filter makes the whole new plan. Written atomically, readable by its owner only. False, and nothing

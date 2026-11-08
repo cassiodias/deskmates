@@ -6,6 +6,7 @@
 . "$(dirname "$0")/../../hook/plan-lib.sh"
 . "$(dirname "$0")/../../hook/facts-lib.sh"
 puppet_read_payload
+puppet_exit_if_off
 
 # Cursor runs Claude Code's hooks too, with its own payloads: its own harness writes those.
 [ -n "$(field cursor_version)" ] && exit 0
