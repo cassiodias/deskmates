@@ -636,6 +636,13 @@ local failing = doubleClickOn("bf2")
 stub.finishTask(tasks + 1, 1, "error transcript not readable\n", "")
 check("backfill: an error says so", failing.html_:find("transcript not readable", 1, true) ~= nil)
 closeCard(failing)
+-- The transcript then vanishes: the old answer is not shown again; with no facts, no card opens.
+os.remove(stub.home .. "/.claude/projects/-work-my-app/bf2.jsonl")
+tasks = #stub.tasks
+views0 = #stub.webviews
+doubleClickOn("bf2")
+check("backfill: a transcript gone: no old answer, no card", P:backfillState("bf2") == nil and #stub.webviews == views0
+  and #stub.tasks == tasks)
 tasks = #stub.tasks
 local gone = doubleClickOn("bf3")
 local page = gone.html_

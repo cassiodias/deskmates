@@ -340,6 +340,8 @@ function obj:backfill(key)
   if kept and kept.key == key and kept.busy then return false end
   local home = os.getenv("HOME") or ""
   if not backfill.find(home, key, hs.fs.dir, function(p) return hs.fs.attributes(p, "mode") ~= nil end) then
+    -- The transcript is gone: what an earlier run said of it no longer holds.
+    if kept and kept.key == key then self.cardBackfill = nil end
     return false
   end
   kept = { key = key, busy = true, state = { reading = true } }
