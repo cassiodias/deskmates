@@ -7,7 +7,6 @@
 . "$(dirname "$0")/../../hook/plan-lib.sh"
 . "$(dirname "$0")/../../hook/facts-lib.sh"
 puppet_read_payload
-puppet_exit_if_off
 
 # Its CLI runs as agent or cursor-agent: a terminal remembered for a session counts while it runs one of them.
 puppet_program agent cursor-agent
@@ -35,6 +34,9 @@ case "$event" in sessionEnd) ;; *)
   [ "$turn" = "$session" ] && exit 0
   case "$(path_field transcript_path)" in */subagents/*) exit 0 ;; esac ;;
 esac
+# Off: stop here (a subagent's own events are left out above). Any stop, even Ctrl-C's second, ends the turn.
+case "$event" in stop) puppet_exit_if_off cursor Stop "$session" ;; sessionEnd) puppet_exit_if_off cursor SessionEnd "$session" ;;
+  *) puppet_exit_if_off cursor "" "$session" ;; esac
 
 # The session's git facts (hook/facts-lib.sh): facts_track handles the repo, the turns and the test runs for every
 # agent; here only what is Cursor's. Cursor's postToolUseFailure is a real failure, so its exit codes count. A

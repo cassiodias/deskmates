@@ -362,11 +362,20 @@ deskmates_on() {
   kill -0 "$_puppet_on_pid" 2>/dev/null
 }
 
-# Ends the translator at once while Deskmates is off: nothing is written (no line, facts, plan or terminal), about
-# 60 ms less per hook. What respond set is still printed. A session started while off gets its puppet with its
-# first event after Deskmates starts.
+# Ends the translator at once while Deskmates is off, for harness $1's event $2 (in the common vocabulary) of
+# session $3: about 60 ms less per hook. Nothing is written (no terminal looked up, no facts, no plan), but a
+# turn's end (Stop, SessionEnd): one bare line, so the Spoon's replay at its next start finds that turn over
+# instead of leaving its puppet at work for hours. What respond set is still printed. A session started while off
+# gets its puppet with its first event after Deskmates starts.
 puppet_exit_if_off() {
-  deskmates_on || exit 0
+  deskmates_on && return 0
+  case "$2" in
+    Stop|SessionEnd)
+      [ -n "$3" ] || exit 0
+      mkdir -p "$PUPPET_DIR"
+      printf '%s|%s|%s|||||||||%s|\n' "${PUPPET_NOW:-$(date +%s)}" "$2" "$3" "$1" >> "$PUPPET_EVENTS" ;;
+  esac
+  exit 0
 }
 
 # Prints JSON $1 for the agent when the translator exits, however it exits: for agents that wait for an answer
