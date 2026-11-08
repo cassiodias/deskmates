@@ -309,9 +309,16 @@ puppet_tty() {
   if [ -n "$_puppet_tty" ] && is_daemon_pty "$_puppet_tty"; then
     if daemon_continues_tab "$_puppet_tty"; then _puppet_tty=$(daemon_owner_tty); else _puppet_tty=""; fi
   fi
-  [ -z "$_puppet_tty" ] && command -v puppet_tty_fallback > /dev/null && _puppet_tty=$(puppet_tty_fallback)
+  _puppet_guess=""
+  if [ -z "$_puppet_tty" ] && command -v puppet_tty_fallback > /dev/null; then
+    _puppet_tty=$(puppet_tty_fallback)
+    # A terminal another session already has is a guess for now (its own may not show yet): not remembered, so
+    # the next event looks again. Remembered, it would hold while that terminal runs the agent, and the two
+    # sessions' puppets would take turns hiding each other.
+    [ -n "$_puppet_tty" ] && claimed_by_other "$_puppet_tty" && _puppet_guess=1
+  fi
   # Written each time, so the cache of a session still at work never expires.
-  [ -n "$1" ] && [ -n "$_puppet_tty" ] && printf '%s' "$_puppet_tty" > "$_puppet_cache"
+  [ -n "$1" ] && [ -n "$_puppet_tty" ] && [ -z "$_puppet_guess" ] && printf '%s' "$_puppet_tty" > "$_puppet_cache"
   printf '%s' "$_puppet_tty"
 }
 
@@ -340,8 +347,8 @@ tty_from_program() {
 
 # Whether a session other than the payload's already has terminal $1.
 claimed_by_other() {
-  for _puppet_cache in "$PUPPET_DIR"/tty-*; do
-    [ -f "$_puppet_cache" ] && [ "$_puppet_cache" != "$PUPPET_DIR/tty-$(field session_id)" ] && [ "$(cat "$_puppet_cache")" = "$1" ] && return 0
+  for _puppet_claim in "$PUPPET_DIR"/tty-*; do
+    [ -f "$_puppet_claim" ] && [ "$_puppet_claim" != "$PUPPET_DIR/tty-$(field session_id)" ] && [ "$(cat "$_puppet_claim")" = "$1" ] && return 0
   done
   return 1
 }

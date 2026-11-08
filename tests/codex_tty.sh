@@ -15,6 +15,7 @@ echo "$$" > "$work/home/.deskmates/on"
 cat > "$work/bin/pgrep" <<X
 #!/bin/sh
 [ -e "$work/none" ] && exit 1
+[ -e "$work/only11" ] && { printf '11\\n'; exit 0; }
 printf '11\\n12\\n13\\n'
 X
 cat > "$work/bin/ps" <<'X'
@@ -46,6 +47,19 @@ rm "$work/home/.deskmates/tty-"*
 echo /dev/ttys011 > "$work/home/.deskmates/tty-s1"
 echo /dev/ttys012 > "$work/home/.deskmates/tty-s2"
 check "all claimed: the first match" "$(run s3)" /dev/ttys011
+check "all claimed: the first match is not remembered (it is another session's)" \
+  "$(ls "$work/home/.deskmates/tty-s3" 2>/dev/null)" ""
+
+# Two sessions in one folder, the second seen while only the first's codex shows: it gets that terminal for now,
+# not for good; once its own codex shows, it gets its own.
+rm "$work/home/.deskmates/tty-"*
+touch "$work/only11"
+check "race: first session" "$(run s1)" /dev/ttys011
+check "race: second, only the first's codex seen" "$(run s2)" /dev/ttys011
+check "race: not remembered" "$(ls "$work/home/.deskmates/tty-s2" 2>/dev/null)" ""
+rm "$work/only11"
+check "race: its own codex seen, its own terminal" "$(run s2)" /dev/ttys012
+check "race: and that is remembered" "$(cat "$work/home/.deskmates/tty-s2" 2>/dev/null)" /dev/ttys012
 
 # A remembered terminal with nothing running in it any more is not trusted: the hook looks again.
 rm "$work/home/.deskmates/tty-"*
