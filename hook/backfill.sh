@@ -188,7 +188,11 @@ backfill_git() {
       [ "$_backfill_first" -lt $((_backfill_oldest - 5)) ]; then
     _backfill_root=$(printf '%s' "$_backfill_g" | "$PUPPET_JQ" -r .root)
     _backfill_base=$(facts_run_git "$_facts_git" -C "$_backfill_root" rev-list -1 --before="@$_backfill_first" HEAD)
-    if [ -n "$_backfill_base" ]; then
+    _backfill_old=$(printf '%s' "$_backfill_g" | "$PUPPET_JQ" -r .base)
+    # Only when the hooks really started late: the commit at the first prompt comes before theirs. Hooks that
+    # watched from the start but kept only their newest 30 turns already have that commit, and what was dirty then.
+    if [ -n "$_backfill_base" ] && [ "$_backfill_base" != "$_backfill_old" ] &&
+        facts_run_git "$_facts_git" -C "$_backfill_root" merge-base --is-ancestor "$_backfill_base" "$_backfill_old"; then
       _backfill_g=$(printf '%s' "$_backfill_g" | "$PUPPET_JQ" -c --arg base "$_backfill_base" \
         '.base = $base | .dirtyAtStart = [] | .fromTranscript = true')
       printf 'true' > "$4.move"

@@ -153,6 +153,14 @@ expect "older: the base when the session started, read from the transcript" \
 setup_git "{\"tickets\": {}, \"timeline\": [], \"git\": $(hookgit), \"turns\": [$(turn 100)]}"
 run > /dev/null
 expect "newer gap: the hooks' base stays" "$(q '.git | [.base, .fromTranscript]')" "[\"$(sha_at Docs)\",null]"
+# Final review: hooks that watched from the start keep only their newest 30 turns, so the transcript's first prompt
+# looks older; their base is the commit at that prompt already: it stays, with what was dirty then.
+hookgitAt() { printf '{"root": "%s", "base": "%s", "dirtyAtStart": ["README.md"], "folder": "%s", "prefix": "", "top": null}' \
+  "$REPO" "$(sha_at "$1")" "$REPO"; }
+setup_git "{\"tickets\": {}, \"timeline\": [], \"git\": $(hookgitAt Start), \"turns\": [$(turn 200)]}"
+run > /dev/null
+expect "dropped turns: the hooks' base and dirty files stay" "$(q '.git | [.base, .fromTranscript, .dirtyAtStart]')" \
+  "[\"$(sha_at Start)\",null,[\"README.md\"]]"
 setup_git "{\"tickets\": {}, \"timeline\": [], \"git\": $(hookgit ', "fromTranscript": true'), \"turns\": [$(turn 200)]}"
 run > /dev/null
 expect "from the transcript already: kept" "$(q '.git.base')" "\"$(sha_at Docs)\""
