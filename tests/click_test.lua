@@ -539,7 +539,7 @@ hs.fs.attributes = function(path, field)
   if path == "/opt/homebrew/bin/gh" then return { mode = "file" } end
   return withoutGh(path, field)
 end
-local MERGED = '{"number":5,"state":"MERGED","isDraft":false,"statusCheckRollup":[]}'
+local MERGED = '{"number":5,"state":"MERGED","isDraft":false,"url":"https://github.com/me/my-app/pull/5","statusCheckRollup":[]}'
 local function ghTasks(from)
   local out = {}
   for i = from + 1, #stub.tasks do
@@ -562,8 +562,14 @@ end
 if not stub.tasks[i].finished then stub.finishTask(i, 0, "", "") end
 check("PR: no line before gh answers", not prCard.html_:find('class="pr"', 1, true))
 stub.finishTask(gh[1], 0, MERGED, "")
-check("PR: its line on the card", prCard.html_:find('<p class="pr">PR #5 · merged</p>', 1, true) ~= nil
+check("PR: its line on the card, a button to its page", prCard.html_:find('<button class="pr-open"', 1, true) ~= nil
+  and prCard.html_:find(">PR #5 · merged</button>", 1, true) ~= nil
   and prCard.html_:find("1 commit, 1 not committed.", 1, true) ~= nil)
+prCard.content.callback({ body = "open:pr" })
+check("PR: a click opens its page in the browser", stub.openedURLs[#stub.openedURLs] == "https://github.com/me/my-app/pull/5")
+local opened = #stub.openedURLs
+for _, junk in ipairs({ "open:PR", "open:pr:x", "open:https://evil.example", 7 }) do prCard.content.callback({ body = junk }) end
+check("PR: other messages open nothing", #stub.openedURLs == opened)
 local before = #stub.tasks
 write("PostToolUse|git1||Bash|||my-app|iTerm.app|test|/dev/ttys009|claude|")
 stub.advance(0.2)

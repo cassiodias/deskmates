@@ -170,13 +170,14 @@ end
 
 -- What the git part shows for facts `f`, git's answer `gitState` ({ reading = true }, { error = text }, or
 -- terminals/git.lua's result), `plan` (model/plans.lua's shape, or nil) and the branch's PR in one line (`prLine`,
--- terminals/pr.lua's, or nil): { actual = actualView, turns = { turn rows, newest first }, pr }; nil when the facts
--- know no git base. Only the newest turn, open while the session `isWorking`, is working now.
-function workcard.view(f, gitState, plan, isWorking, prLine)
+-- terminals/pr.lua's, or nil; `prOpens` when the Spoon can open its page): { actual = actualView, turns = { turn
+-- rows, newest first }, pr, prOpens }; nil when the facts know no git base. Only the newest turn, open while the
+-- session `isWorking`, is working now.
+function workcard.view(f, gitState, plan, isWorking, prLine, prOpens)
   if not facts.hasGit(f) then return nil end
   local turns = {}
   for i, t in ipairs(f.turns or {}) do turns[#turns + 1] = turnRow(t, i == 1 and isWorking == true) end
-  return { actual = actualView(f, gitState, plan), turns = turns, pr = prLine }
+  return { actual = actualView(f, gitState, plan), turns = turns, pr = prLine, prOpens = prLine and prOpens or nil }
 end
 
 workcard.counted = counted
@@ -240,10 +241,20 @@ local function actualHtml(a)
   return panel.html("actual", a.heading, escape(a.summary), table.concat(out))
 end
 
+-- The PR's line: a button when its page can be opened (the page asks the Spoon, which opens the page it keeps: the
+-- card never navigates), else plain text; nothing without a PR.
+local function prHtml(v)
+  if not v.pr then return "" end
+  if v.prOpens then
+    return '<p class="pr"><button class="pr-open" title="Open the PR in the browser">' .. escape(v.pr) .. "</button></p>"
+  end
+  return '<p class="pr">' .. escape(v.pr) .. "</p>"
+end
+
 -- The plan block's panel for view `v` (workcard.view), then the PR's line when there is one; the turns are drawn
 -- in the story (ui/story.lua).
 function workcard.html(v)
-  return actualHtml(v.actual) .. (v.pr and '<p class="pr">' .. escape(v.pr) .. "</p>" or "")
+  return actualHtml(v.actual) .. prHtml(v)
 end
 
 -- The styles for the plan block, and the colours the story shares (light, then dark on a dark page), with the
@@ -277,6 +288,8 @@ workcard.CSS = table.concat({
   ".actual .changed { list-style: none; padding: 0; margin: 0; } .actual .changed li { padding: 1px 0; }",
   ".actual .more { color: var(--muted); }",
   ".result .pr { margin: 6px 2px 0; font-size: 12px; color: var(--muted); }",
+  ".result .pr-open { all: unset; cursor: pointer; color: LinkText; text-decoration: underline; }",
+  ".result .pr-open:focus-visible { outline: 2px solid Highlight; outline-offset: 2px; }",
 })
 
 return workcard

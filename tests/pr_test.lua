@@ -20,8 +20,12 @@ local function lineOf(json)
   local p = pr.parse(json)
   return p and pr.line(p)
 end
-local MERGED = '{"number":5,"state":"MERGED","isDraft":false,"statusCheckRollup":'
-  .. '[{"__typename":"CheckRun","status":"COMPLETED","conclusion":"SUCCESS"}]}'
+local MERGED = '{"number":5,"state":"MERGED","isDraft":false,"url":"https://github.com/me/my-app/pull/5",'
+  .. '"statusCheckRollup":[{"__typename":"CheckRun","status":"COMPLETED","conclusion":"SUCCESS"}]}'
+check("the PR's page", pr.parse(MERGED).url == "https://github.com/me/my-app/pull/5")
+check("a page that is not https is not kept", pr.parse('{"number":5,"state":"OPEN","url":"file:///etc/passwd"}').url == nil
+  and pr.parse('{"number":5,"state":"OPEN","url":"javascript:alert(1)"}').url == nil)
+check("no page: none", pr.parse('{"number":5,"state":"OPEN"}').url == nil)
 check("merged, checks passed", lineOf(MERGED) == "PR #5 · merged · checks passed")
 check("one check failing", lineOf('{"number":7,"state":"OPEN","isDraft":false,"statusCheckRollup":['
   .. '{"__typename":"CheckRun","status":"COMPLETED","conclusion":"FAILURE"},'
@@ -60,20 +64,21 @@ local calls
 local function start()
   stub.tasks = {}
   calls = {}
-  pr.read("/build/my-app", function(line) calls[#calls + 1] = { line = line } end)
+  pr.read("/build/my-app", function(line, url) calls[#calls + 1] = { line = line, url = url } end)
 end
 start()
 local t = stub.tasks[1]
 check("one command", #stub.tasks == 1 and t.started)
 check("Homebrew's gh", t and t.path == "/opt/homebrew/bin/gh")
 local args = t and table.concat(t.args, " ")
-check("pr view with the fields", args == "pr view --json number,state,isDraft,statusCheckRollup")
+check("pr view with the fields", args == "pr view --json number,state,isDraft,url,statusCheckRollup")
 check("run in the repo", t and t.cwd == "/build/my-app")
 check("env: gh's folder first on PATH, HOME, no prompt, no colour", t and t.env
   and t.env.PATH == "/opt/homebrew/bin:" .. os.getenv("PATH") and t.env.HOME == os.getenv("HOME")
   and t.env.GH_PROMPT_DISABLED == "1" and t.env.NO_COLOR == "1")
 stub.finishTask(1, 0, MERGED, "")
-check("the line, once", #calls == 1 and calls[1].line == "PR #5 · merged · checks passed")
+check("the line and its page, once", #calls == 1 and calls[1].line == "PR #5 · merged · checks passed"
+  and calls[1].url == "https://github.com/me/my-app/pull/5")
 stub.advance(20)
 check("the time limit says nothing after done", #calls == 1)
 

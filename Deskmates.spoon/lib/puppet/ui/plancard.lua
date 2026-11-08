@@ -261,6 +261,7 @@ end
 plancard.SCRIPT = "function send(m){window.webkit.messageHandlers.deskmates.postMessage(m)}"
   .. "document.getElementById('focus').onclick=function(){send('focus')};"
   .. "document.getElementById('close').onclick=function(){send('close')};"
+  .. "document.querySelectorAll('button.pr-open').forEach(function(b){b.onclick=function(){send('open:pr')}});"
   .. "document.addEventListener('keydown',function(e){if(e.key==='Escape')send('close')});"
   .. "document.querySelectorAll('button[data-to]:not(.phase)').forEach(function(b){b.onclick=function(){"
   .. "var t=document.getElementById(b.getAttribute('data-to'));if(!t)return;t.scrollIntoView({block:'start'});"
@@ -319,10 +320,11 @@ function plancard.fitSize(saved)
   return { w = math.max(MIN_WIDTH, math.floor(saved.w)), h = math.max(MIN_HEIGHT, math.floor(saved.h)) }
 end
 
--- opts.onFocus(key): the card's "Go to terminal". opts.frameFor(key, w, h): where the card goes, beside its puppet.
+-- opts.onFocus(key): the card's "Go to terminal". opts.onOpenPr(key) (optional): its PR line clicked.
+-- opts.frameFor(key, w, h): where the card goes, beside its puppet.
 -- opts.loadSize() and opts.saveSize({ w, h }) (optional): the size the card was last left at.
 function plancard.new(opts)
-  return setmetatable({ onFocus = opts.onFocus, frameFor = opts.frameFor, loadSize = opts.loadSize,
+  return setmetatable({ onFocus = opts.onFocus, onOpenPr = opts.onOpenPr, frameFor = opts.frameFor, loadSize = opts.loadSize,
     saveSize = opts.saveSize }, PlanCard)
 end
 
@@ -340,6 +342,8 @@ function PlanCard:show(key, plan, meta)
       if shown then self.focusTimer = hs.timer.doAfter(0, function() self.onFocus(shown) end) end
     elseif message.body == "close" then
       self:hide()
+    elseif message.body == "open:pr" then
+      if self.key == key and self.onOpenPr then self.onOpenPr(key) end
     elseif self.key == key then
       local id, isFolded = panel.message(message.body)
       if id then self.folded[id] = isFolded or nil end

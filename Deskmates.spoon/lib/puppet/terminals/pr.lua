@@ -7,7 +7,7 @@ local plans = require("puppet.model.plans")
 
 local pr = {}
 
-local FIELDS = "number,state,isDraft,statusCheckRollup"
+local FIELDS = "number,state,isDraft,url,statusCheckRollup"
 
 -- The gh to run: the first of config.GH_PATHS for which exists(path) holds, or nil.
 function pr.find(exists)
@@ -23,13 +23,13 @@ local FAILED = { FAILURE = true, TIMED_OUT = true, CANCELLED = true, ACTION_REQU
   ERROR = true }
 local WAITING = { PENDING = true, EXPECTED = true }
 
--- gh's JSON as { number, state ("open", "merged" or "closed"), draft, failing, pending, passed } (the counts of
--- its checks); nil when it is not a PR.
+-- gh's JSON as { number, state ("open", "merged" or "closed"), draft, failing, pending, passed (the counts of
+-- its checks), url (its page; only an https one) }; nil when it is not a PR.
 function pr.parse(text)
   local data = plans.decode(text)
   if type(data) ~= "table" or math.type(data.number) ~= "integer" or not STATES[data.state] then return nil end
   local p = { number = data.number, state = STATES[data.state], draft = data.isDraft == true, failing = 0,
-    pending = 0, passed = 0 }
+    pending = 0, passed = 0, url = type(data.url) == "string" and data.url:match("^https://[^%s]+$") or nil }
   for _, c in ipairs(type(data.statusCheckRollup) == "table" and data.statusCheckRollup or {}) do
     if type(c) == "table" then
       if c.__typename == "StatusContext" or (c.status == nil and c.state ~= nil) then
@@ -59,24 +59,25 @@ function pr.line(p)
   return out
 end
 
--- Asks gh for the PR of the branch checked out at `root`. Calls done exactly once: done(line), or done(nil) when
--- there is no gh, no PR, an error, or config.PR_SECONDS pass (gh is then stopped).
+-- Asks gh for the PR of the branch checked out at `root`. Calls done exactly once: done(line, url) (url nil when
+-- gh gave no https page), or done(nil) when there is no gh, no PR, an error, or config.PR_SECONDS pass (gh is
+-- then stopped).
 function pr.read(root, done)
   local path = pr.find(function(p) return hs.fs.attributes(p) ~= nil end)
   if not path then return done(nil) end
 
   local finished, task, timer = false, nil, nil
-  local function finish(line)
+  local function finish(line, url)
     if finished then return end
     finished = true
     if timer then timer:stop() end
-    done(line)
+    done(line, url)
   end
 
   task = hs.task.new(path, function(code, stdout)
     if finished then return end
     local p = code == 0 and pr.parse(stdout) or nil
-    finish(p and pr.line(p) or nil)
+    if p then finish(pr.line(p), p.url) else finish(nil) end
   end, { "pr", "view", "--json", FIELDS })
   if not task then return finish(nil) end
   -- hs.task's environment replaces the whole of it: gh's folder first on PATH (gh runs git), then Hammerspoon's.

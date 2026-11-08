@@ -101,7 +101,11 @@ local mainScreen = { frame = function() return screen end, name = function() ret
 stub.tabs = ""         -- what iTerm answers to the tab listing, "tty=window/tab;..."
 stub.itermRunning = false
 
+-- URLs the Spoon asked macOS to open in the default browser.
+stub.openedURLs = {}
+
 hs = {
+  urlevent = { openURL = function(url) stub.openedURLs[#stub.openedURLs + 1] = url return true end },
   canvas = { new = canvas, windowLevels = { floating = 3 } },
   drawing = { windowLevels = { floating = 3 } },
   webview = {

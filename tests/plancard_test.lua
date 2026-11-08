@@ -192,6 +192,8 @@ check("session: escaped on the page", count(evilPage, "<script") == 1 and has(ev
 check("pick: the current step drawn picked", has(onlyHeader, 'class="phase current on" data-phase="dev"'))
 local keptNone = plancard.html(nil, { title = "my-app", session = view, story = STORY }, nil, "none")
 check("pick: the reader's none drawn as none", not has(keptNone, 'class="phase current on"') and has(keptNone, 'class="phase current"'))
+check("script: the PR's button asks the Spoon to open it", has(plancard.SCRIPT, "button.pr-open")
+  and has(plancard.SCRIPT, "send('open:pr')"))
 check("script: Also switches tickets", has(plancard.SCRIPT, "select.also") and has(plancard.SCRIPT, "data-key"))
 -- Live (6 Nov): Review, Dev, then Review again moved the page: each phase click brought the activity panel into view.
 -- A phase click now filters in place: the panels stay where the reader left them.

@@ -228,8 +228,8 @@ function obj:cardContent(key)
   local now = os.time()
   local session = facts.hasContent(s.facts) and sessioncard.view(s.facts, now, s.isWorking) or nil
   local state = self:gitState(key)
-  local prLine = self:prLine(key)
-  local work = workcard.view(s.facts, state, s.plan, s.isWorking, prLine)
+  local prLine, prUrl = self:prLine(key)
+  local work = workcard.view(s.facts, state, s.plan, s.isWorking, prLine, prUrl ~= nil)
   local told = story.view(session, work, now)
   if not plan and not session and not work then
     -- Nothing yet, but the transcript is being read (or could not be): the card says so.
@@ -242,7 +242,7 @@ function obj:cardContent(key)
   local version
   if (not plan or plan.updatedAt) and (not (session or work) or s.facts.updatedAt) then
     version = tostring(plan and plan.updatedAt) .. "|" .. tostring((session or work) and s.facts.updatedAt)
-      .. (work and "|" .. tostring(s.isWorking) .. "|" .. gitVersion(state) .. "|" .. tostring(prLine) or "")
+      .. (work and "|" .. tostring(s.isWorking) .. "|" .. gitVersion(state) .. "|" .. tostring(prLine) .. "|" .. tostring(prUrl) or "")
   end
   return plan, { title = (s.title and s.title ~= "") and s.title or s.tag, color = puppet.color, session = session,
     work = work and workcard.html(work), story = told and story.html(told) }, version
@@ -294,10 +294,17 @@ function obj:readGit(key)
   end, own)
 end
 
--- The line gh last gave for session `key`'s card (terminals/pr.lua), or nil.
+-- The line gh last gave for session `key`'s card (terminals/pr.lua) and the PR's page, or nil.
 function obj:prLine(key)
   local kept = self.cardPr
-  return kept and kept.key == key and kept.line or nil
+  if not (kept and kept.key == key and kept.line) then return nil end
+  return kept.line, kept.url
+end
+
+-- Opens the PR of session `key`'s card in the browser: the page gh gave (https only), never one the card names.
+function obj:openPr(key)
+  local _, url = self:prLine(key)
+  if url then hs.urlevent.openURL(url) end
 end
 
 -- Asks gh, off the main thread, for the PR of session `key`'s branch, for the card open on it; the line is kept in
@@ -315,10 +322,10 @@ function obj:readPr(key)
   local now = hs.timer.secondsSinceEpoch()
   if kept.busy or (kept.at and now - kept.at < config.PR_EVERY) then return end
   kept.busy, kept.at = true, now
-  pr.read(s.facts.git.root, function(line)
+  pr.read(s.facts.git.root, function(line, url)
     kept.busy = false
     if self.cardPr ~= kept or self.planCard.key ~= key then return end
-    kept.line = line
+    kept.line, kept.url = line, url
     self:refreshCard(key)
   end)
 end
@@ -592,6 +599,7 @@ function obj:start()
   })
   self.planCard = plancard.new({
     onFocus = function(key) self:focus(key) end,
+    onOpenPr = function(key) self:openPr(key) end,
     frameFor = function(key, w, h) return self:cardFrame(key, w, h) end,
     loadSize = function() return hs.settings.get(config.CARD_SIZE_KEY) end,
     saveSize = function(size) hs.settings.set(config.CARD_SIZE_KEY, size) end,

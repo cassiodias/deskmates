@@ -295,6 +295,10 @@ local panelEnd = withPr:find("</details>", 1, true)
 local prAt = withPr:find('<p class="pr">PR #5 · merged · checks passed</p>', 1, true)
 check("PR: its line after the panel", panelEnd ~= nil and prAt ~= nil and prAt > panelEnd)
 check("PR: none, no line", not has(workcard.html(workcard.view(factsWith(), GIT, PLAN, false)), 'class="pr"'))
+local linked = workcard.html(workcard.view(factsWith(), GIT, PLAN, false, "PR #5 · merged", true))
+check("PR: with a page, the line is a button that opens it (no href: the card never navigates)",
+  has(linked, '<p class="pr"><button class="pr-open" title="Open the PR in the browser">PR #5 · merged</button></p>')
+  and not has(linked, "href"))
 check("PR: escaped", has(workcard.html(workcard.view(factsWith(), GIT, PLAN, false, "PR #5 <b>")), "PR #5 &lt;b&gt;"))
 
 check.done("work card")
