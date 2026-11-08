@@ -184,8 +184,8 @@ runs each script by name).
 
 ### 3. translate.sh
 
-The agent runs it with the payload on stdin. Source the library, read the payload, map the event, call
-`write_event`, exit 0:
+The agent runs it with the payload on stdin. Source the library, read the payload, map the event, stop there
+while Deskmates is off (`puppet_exit_if_off`), call `write_event`, exit 0:
 
 ```sh
 #!/bin/sh
@@ -197,6 +197,7 @@ case "$event" in
   turn_done) event=Stop; text=$(first_sentence reply) ;;
   *) exit 0 ;;     # events with no counterpart are dropped
 esac
+puppet_exit_if_off myagent "$event" "$(field session_id)"
 write_event myagent "$event" "$(field session_id)" "" "$(field tool_name)" "" "$text" "$(path_field cwd)" "" ""
 exit 0
 ```
@@ -240,6 +241,10 @@ Helpers in `hook/puppet-lib.sh`:
   answer (Codex wants `{}` after `Stop`). Call it before anything that may exit, including the `exit 0` that
   drops an event, when the agent waits on that event. Print nothing otherwise: the tests expect no output
   without a `.stdout` file.
+- `puppet_exit_if_off harness event session`: ends the translator while Deskmates is off (the Spoon's
+  `~/.deskmates/on` names no running process), so a hook costs next to nothing then. It writes nothing but a
+  bare line for a `Stop` or `SessionEnd` (so a restart finds that turn over), and what `respond` set is still
+  printed. Call it once the event has its common name, and after `respond` for events the agent waits on.
 - `puppet_tty_fallback`: define it when the agent runs hooks in a background process with no terminal; it
   prints the session's terminal. `puppet_tty_fallback() { tty_from_program codex; }` finds the agent's
   process working in the session's folder. The terminal found is remembered per session; also call
