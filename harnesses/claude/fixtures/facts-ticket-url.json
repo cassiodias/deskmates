@@ -1,0 +1,19 @@
+{
+  "session_id": "s1",
+  "cwd": "/Users/dev/workspace/my-app",
+  "transcript_path": "/tmp/t.jsonl",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "mcp__my-jira__getJiraIssue",
+  "tool_input": {
+    "cloudId": "my-site",
+    "issueIdOrKey": "ABC-12"
+  },
+  "tool_response": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"key\": \"ABC-12\", \"url\": \"https://acme.atlassian.net/browse/ABC-12\"}"
+      }
+    ]
+  }
+}

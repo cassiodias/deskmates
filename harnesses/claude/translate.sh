@@ -113,6 +113,10 @@ case "$event:$tool" in
     [ -n "$description" ] && facts_change "$FACTS_CLAUDE_DEFS claude_done_note(\$d; \$s)" \
       --arg d "$description" --arg s "$(first_sentence last_assistant_message)" ;;
 esac
+# A ticket's Jira or Linear page seen in a prompt or a tool's result: the card links to it.
+case "$event" in
+  UserPromptSubmit|PostToolUse) facts_ticket_url "$session" 2>/dev/null && [ "$flag" != test ] && flag="facts" ;;
+esac
 
 # The session's git facts (hook/facts-lib.sh): facts_track handles the repo, the turns and the test runs for every
 # agent; here only what is Claude Code's: the edit tools and the path each names. A subagent's events count in the

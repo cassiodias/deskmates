@@ -474,6 +474,29 @@ if [ -n "$found_jq" ] && command -v git > /dev/null; then
   expect "leak: facts_turn_end" "$(leaks facts_turn_end s21)" ""
   expect "leak: facts_track" "$(leaks facts_track s21 "$lrepo/src/" UserPromptSubmit "" yes)" ""
   expect "leak: facts_delete" "$(leaks facts_delete s21)" ""
+  PUPPET_PAYLOAD='{"prompt":"https://acme.atlassian.net/browse/ABC-12"}'
+  expect "leak: facts_ticket_url" "$(leaks facts_ticket_url s20)" ""
+fi
+
+# Ticket URLs (facts_ticket_url): a Jira or Linear page of one of the session's tickets, seen in the payload.
+if [ -n "$found_jq" ]; then
+  tu() { PUPPET_NOW=$3 PUPPET_PAYLOAD=$2 facts_ticket_url "$1"; echo "$?"; }
+  turl() { "$found_jq" -r '.tickets["ABC-12"].url // "none"' "$FACTS/$1.json" 2>/dev/null; }
+  note u1 '{"kind":"skill","text":"my-developer","from":"my-developer ABC-12","moves":true}' 10 > /dev/null
+  expect "a Jira URL in a prompt is kept" "$(tu u1 '{"prompt":"see https://acme.atlassian.net/browse/ABC-12 please"}' 20)" 0
+  expect "the Jira URL" "$(turl u1)" "https://acme.atlassian.net/browse/ABC-12"
+  expect "a Linear URL in a tool result is kept" \
+    "$(tu u1 '{"tool_response":{"text":"https://linear.app/acme/issue/ABC-12/export-limit"}}' 30)" 0
+  expect "the last one wins, without its slug" "$(turl u1)" "https://linear.app/acme/issue/ABC-12"
+  expect "the same URL again writes nothing" "$(tu u1 '{"prompt":"https://linear.app/acme/issue/ABC-12"}' 40)" 1
+  before=$(cat "$FACTS/u1.json")
+  for bad in 'http://acme.atlassian.net/browse/ABC-12' 'https://acme.atlassian.net/browse/XYZ-9' \
+      'https://linear.app.evil.com/acme/issue/ABC-12' 'https://acme.atlassian.net/browse/ABC-123' 'no link at all'; do
+    expect "dropped: $bad" "$(tu u1 "{\"prompt\":\"$bad\"}" 50)" 1
+  done
+  expect "dropped ones leave the file as it was" "$(cat "$FACTS/u1.json")" "$before"
+  expect "a session with no facts: nothing" "$(tu u2 '{"prompt":"https://acme.atlassian.net/browse/ABC-12"}' 20)" 1
+  expect "no file for it" "$(ls "$FACTS/u2.json" 2>/dev/null)" ""
 fi
 
 # Claude's note filters as named defs (FACTS_CLAUDE_DEFS), for the translator and the backfill: each on a
