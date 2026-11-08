@@ -289,11 +289,12 @@ local ownHtml = workcard.html(workcard.view(factsWith({}), ownGit, nil, false))
 check("own commits: their file is seen", has(ownHtml, "<li><code>README.md</code></li>"))
 check("own commits: not marked no edit seen", not has(ownHtml, '<code>README.md</code> <span class="unseen">'))
 
--- The PR's line, under the panel: escaped; none without one.
+-- The PR's line, above the panel (the block scrolls: below a long list it would be out of sight): escaped; none
+-- without one.
 local withPr = workcard.html(workcard.view(factsWith(), GIT, PLAN, false, "PR #5 · merged · checks passed"))
-local panelEnd = withPr:find("</details>", 1, true)
+local panelAt = withPr:find("<details", 1, true)
 local prAt = withPr:find('<p class="pr">PR #5 · merged · checks passed</p>', 1, true)
-check("PR: its line after the panel", panelEnd ~= nil and prAt ~= nil and prAt > panelEnd)
+check("PR: its line first, before the panel", panelAt ~= nil and prAt == 1)
 check("PR: none, no line", not has(workcard.html(workcard.view(factsWith(), GIT, PLAN, false)), 'class="pr"'))
 local linked = workcard.html(workcard.view(factsWith(), GIT, PLAN, false, "PR #5 · merged", true))
 check("PR: with a page, the line is a button that opens it (no href: the card never navigates)",

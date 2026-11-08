@@ -251,10 +251,10 @@ local function prHtml(v)
   return '<p class="pr">' .. escape(v.pr) .. "</p>"
 end
 
--- The plan block's panel for view `v` (workcard.view), then the PR's line when there is one; the turns are drawn
--- in the story (ui/story.lua).
+-- The PR's line when there is one, then the plan block's panel for view `v` (workcard.view): the line first, as
+-- the block scrolls and a long list would push it out of sight. The turns are drawn in the story (ui/story.lua).
 function workcard.html(v)
-  return actualHtml(v.actual) .. prHtml(v)
+  return prHtml(v) .. actualHtml(v.actual)
 end
 
 -- The styles for the plan block, and the colours the story shares (light, then dark on a dark page), with the
@@ -287,7 +287,7 @@ workcard.CSS = table.concat({
   ".unseen { font: 11px -apple-system, sans-serif; color: var(--muted); margin-left: 4px; }",
   ".actual .changed { list-style: none; padding: 0; margin: 0; } .actual .changed li { padding: 1px 0; }",
   ".actual .more { color: var(--muted); }",
-  ".result .pr { margin: 6px 2px 0; font-size: 12px; color: var(--muted); }",
+  ".result .pr { margin: 0 2px 8px; font-size: 12px; color: var(--muted); }",
   ".result .pr-open { all: unset; cursor: pointer; color: LinkText; text-decoration: underline; }",
   ".result .pr-open:focus-visible { outline: 2px solid Highlight; outline-offset: 2px; }",
 })
