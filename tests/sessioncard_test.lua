@@ -60,7 +60,7 @@ check("view: what started each step", t and t.strip[1].by == nil and t.strip[2].
   and t.strip[3].by == "QA ABC-12 lens break")
 check("view: how long, on the current step only", t and t.strip[3].took == "12 min" and t.strip[1].took == nil)
 check("view: where steps come from", t and t.source == "Steps come from the names of the agent's skills and subagents: "
-  .. "plan is Plan; build, implement or dev is Dev; review, test or QA is Review.")
+  .. "plan or brainstorm is Plan; build, implement, execute, debug or dev is Dev; review, test, verify or QA is Review.")
 check("view: each row's time, for the filter", t and t.rows[1].at == at(15, 52) and t.rows[5].at == at(15, 10))
 check("view: NOW is the ticket's latest reply", t and t.now == "ABC-12 is built and committed locally.")
 check("view: the ticket's rows, newest first", t and #t.rows == 5 and t.rows[1].time == "15:52" and t.rows[5].time == "15:10")
@@ -101,7 +101,7 @@ check("again: each step drawn with its span and what started it", idleHead:find(
 check("again: the last step has no end to its span", idleHead:find('<button class="phase current on" data-phase="review" data-from="'
   .. at(10, 22) .. '" title="my-reviewer">', 1, true) ~= nil)
 check("again: where steps come from, under the strip", idleHead:find('</div><p class="source">Steps come from the names of the '
-  .. "agent&#39;s skills and subagents: plan is Plan; build, implement or dev is Dev; review, test or QA is Review.</p>", 1, true) ~= nil)
+  .. "agent&#39;s skills and subagents: plan or brainstorm is Plan; build, implement, execute, debug or dev is Dev; review, test, verify or QA is Review.</p>", 1, true) ~= nil)
 -- A step still open when the next started elsewhere (its end was never seen): reached, up to the next start; an
 -- open step that is the last but not the ticket's phase is reached too.
 local stray = sessioncard.view({ current = "ABC-1", tickets = { ["ABC-1"] = { phase = "dev", seen = 50,

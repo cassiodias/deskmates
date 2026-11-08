@@ -46,8 +46,8 @@ local function verdictOf(t, e)
 end
 
 -- What the strip says under it once a ticket has steps: where they come from.
-sessioncard.SOURCE = "Steps come from the names of the agent's skills and subagents: plan is Plan; build, implement "
-  .. "or dev is Dev; review, test or QA is Review."
+sessioncard.SOURCE = "Steps come from the names of the agent's skills and subagents: plan or brainstorm is Plan; "
+  .. "build, implement, execute, debug or dev is Dev; review, test, verify or QA is Review."
 
 -- The strip: ticket `t`'s passes in the order they happened, each { phase, time, ended, state, took, verdict, by,
 -- from, to } (from and to: its start and the next one's, what the page filters by). A pass with an end is done; the

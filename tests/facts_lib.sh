@@ -498,6 +498,20 @@ if [ -n "$found_jq" ]; then
     '{"kind":"done","text":"Done.","from":"QA ABC-12","phaseFrom":"QA ABC-12","ends":true,"moves":false,"verdict":"CHANGES_REQUESTED"}'
 fi
 
+# Phase words for the superpowers skills' names (Cassio, 8 Nov).
+if [ -n "$found_jq" ]; then
+  ph() { "$found_jq" -nr --arg n "$1" "$FACTS_DEFS"' $n | phase // "none"'; }
+  expect "phase: brainstorming" "$(ph "superpowers:brainstorming")" plan
+  expect "phase: writing-plans" "$(ph "superpowers:writing-plans")" plan
+  expect "phase: executing-plans" "$(ph "superpowers:executing-plans")" dev
+  expect "phase: test-driven-development" "$(ph "superpowers:test-driven-development")" dev
+  expect "phase: systematic-debugging" "$(ph "superpowers:systematic-debugging")" dev
+  expect "phase: verification-before-completion" "$(ph "superpowers:verification-before-completion")" review
+  expect "phase: requesting-code-review" "$(ph "superpowers:requesting-code-review")" review
+  expect "phase: a test run, still review" "$(ph "Run the tests")" review
+  expect "phase: test after driven is not the test word" "$(ph "driven test")" review
+fi
+
 rm -rf "$HOME"
 [ "$failed" = 0 ] && echo "facts-lib: ok"
 exit "$failed"

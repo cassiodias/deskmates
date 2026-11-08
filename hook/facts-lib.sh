@@ -58,10 +58,13 @@ FACTS_DEFS='
 def tickets: [match("(?<![A-Za-z0-9])[A-Z][A-Z0-9]{1,9}-[0-9]+(?![A-Za-z0-9])"; "g").string
   | select(split("-")[0] as $k | ["UTF", "SHA", "ISO", "RFC", "CVE", "HTTP", "TLS", "AES", "RSA", "MD"]
     | any(.[]; . == $k) | not)];
-def phase: (ascii_downcase | [scan("[a-z0-9]+")]) as $w
-  | if any($w[]; IN("qa", "review", "reviewer", "test", "tests", "testing", "tester")) then "review"
-    elif any($w[]; IN("dev", "developer", "develop", "implement", "implementation", "build", "builder")) then "dev"
-    elif any($w[]; IN("plan", "planner", "planning", "engineer", "architect")) then "plan"
+def phase: (ascii_downcase | [scan("[a-z0-9]+")]) as $all
+  # "test-driven" names a way of building, not a review: that "test" does not count.
+  | [range(0; $all | length) as $i | select(($all[$i] == "test" and $all[$i + 1] == "driven") | not) | $all[$i]] as $w
+  | if any($w[]; IN("qa", "review", "reviewer", "test", "tests", "testing", "tester", "verify", "verification")) then "review"
+    elif any($w[]; IN("dev", "developer", "develop", "development", "implement", "implementation", "build", "builder",
+      "execute", "executing", "debug", "debugging")) then "dev"
+    elif any($w[]; IN("plan", "plans", "planner", "planning", "engineer", "architect", "brainstorm", "brainstorming")) then "plan"
     else null end;
 def clean: tostring | gsub("[[:cntrl:]]"; "") | .[0:200];
 def facts_line($ticket; $kind; $text): .timeline = [{at: $now, ticket: $ticket, kind: $kind, text: ($text | clean),
