@@ -26,6 +26,24 @@ for case in tests/backfill/*/; do
 done
 expect "size: stops before a line still being written" "$(backfill_size tests/backfill/cut/transcript.jsonl)" \
   "$(head -n 2 tests/backfill/cut/transcript.jsonl | wc -c | tr -d ' ')"
+# The transcript grows while its size is read (Claude Code writes on): a line finished meanwhile must not move the
+# end into the middle of the line that was cut.
+grow=$(mktemp)
+cp tests/backfill/cut/transcript.jsonl "$grow"
+tail() {
+  [ -e "$grow.grown" ] || { printf '{"x":1}\n' >> "$grow"; : > "$grow.grown"; }
+  command tail "$@"
+}
+expect "size: a transcript growing meanwhile" "$(backfill_size "$grow")" \
+  "$(head -n 2 tests/backfill/cut/transcript.jsonl | wc -c | tr -d ' ')"
+unset -f tail
+rm -f "$grow" "$grow.grown"
+# python -m unittest is a test run too (the reading's tests are a prefilter: hook/puppet-lib.sh's
+# is_test_command decides later).
+sed 's/"npm test"/"python -m unittest discover"/' tests/backfill/tests/transcript.jsonl > "$HOME/unittest.jsonl"
+expect "read: python -m unittest counts as a test run" \
+  "$(backfill_read "$HOME/unittest.jsonl" 0 "$(backfill_size "$HOME/unittest.jsonl")" | "$PUPPET_JQ" -c '[.tests[].command | select(test("unittest"))]')" \
+  '["python -m unittest discover"]'
 
 # The script: a home with the session's transcript where Claude Code keeps it, Deskmates on, a fixed clock.
 B=1767225600

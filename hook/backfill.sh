@@ -17,10 +17,11 @@ backfill_size() {
   _backfill_total=$(wc -c < "$1" 2>/dev/null | tr -d ' ') || return 1
   [ -n "$_backfill_total" ] || return 1
   [ "$_backfill_total" -gt 0 ] || { echo 0; return 0; }
-  _backfill_tail=$(tail -c 1 "$1" | od -An -c | tr -d ' ')
+  # Only the first _backfill_total bytes are read: the transcript may grow meanwhile.
+  _backfill_tail=$(head -c "$_backfill_total" "$1" | tail -c 1 | od -An -c | tr -d ' ')
   if [ "$_backfill_tail" = '\n' ]; then echo "$_backfill_total"; return 0; fi
   # The last newline: the size minus the length of the cut line after it.
-  _backfill_cut=$(tail -n 1 "$1" | wc -c | tr -d ' ')
+  _backfill_cut=$(head -c "$_backfill_total" "$1" | tail -n 1 | wc -c | tr -d ' ')
   echo $((_backfill_total - _backfill_cut))
 }
 
@@ -104,7 +105,7 @@ def prompt_text: (.message.content | text_of) as $t
      ($turns[] | select(.reply != null and .endAt != null) | . as $t | {at: $t.endAt, note: ({} | claude_reply_note($t.reply))})
    ] | map(select(.note != null and .at != null)) | sort_by(.at)),
    tests: [$uses[] | select(.name == "Bash") | (.input.command // "" | tostring) as $c
-     | select($c | test("(^|[^A-Za-z])(test|pytest|jest|vitest|mocha|rspec|tox|phpunit)")) | $results[.id] as $r
+     | select($c | test("(^|[^A-Za-z])(test|pytest|unittest|jest|vitest|mocha|rspec|tox|phpunit)")) | $results[.id] as $r
      | {at: ($r.at // .at), command: $c, failed: ($r.error // false)}]}
 '
 
