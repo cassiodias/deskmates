@@ -82,6 +82,14 @@ end
 -- The plan block for facts `f`, git's answer `gitState` and `plan`: { heading, line, summary } while git reads or
 -- when it cannot answer; otherwise { heading, summary, base, footer } and, with a plan's file map, `rows` (KINDS,
 -- in order: matched, missing, unchecked, unplanned), or without one `list` ({ rows = { path, unseen }, more }).
+-- The paths a session is known to have touched: those its hooks saw it edit, and those its own commits name.
+local function seenWith(seen, committed)
+  local all = {}
+  for path in pairs(seen or {}) do all[path] = true end
+  for _, path in ipairs(committed or {}) do all[path] = true end
+  return all
+end
+
 local function actualView(f, gitState, plan)
   local maps = filemaps(plan)
   local heading = maps and ASKS_PLAN or ASKS_CHANGED
@@ -98,7 +106,7 @@ local function actualView(f, gitState, plan)
     untracked = actual.parseList(gitState.untracked),
     uncommitted = actual.parseList(gitState.uncommitted),
     dirtyAtStart = f.git.dirtyAtStart,
-    seen = f.seen,
+    seen = seenWith(f.seen, actual.parseList(gitState.committed)),
   })
   local out = { base = f.git.base:sub(1, 7), baseFromTranscript = f.git.fromTranscript == true or nil,
     footer = counted(commits, "commit") .. ", " .. c.uncommitted .. " not committed." }

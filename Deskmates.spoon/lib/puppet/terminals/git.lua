@@ -38,7 +38,7 @@ end
 -- not track, in the repo at `root`. Calls done exactly once: done({ commits, diff, uncommitted, untracked }) with
 -- git's -z texts; done(nil, "base a1b2c3d no longer exists") when base is gone; done(nil, "git did not answer")
 -- when there is no git, a command fails, or config.GIT_SECONDS pass (the running command is then stopped).
-function git.read(root, base, done)
+function git.read(root, base, done, own)
   local path = git.find(function(p) return hs.fs.attributes(p) ~= nil end)
   if not path then return done(nil, DID_NOT_ANSWER) end
 
@@ -81,7 +81,15 @@ function git.read(root, base, done)
         result.uncommitted = uncommitted
         run({ "ls-files", "--others", "--exclude-standard", "-z" }, function(untracked)
           result.untracked = untracked
-          finish(result)
+          if not own or #own == 0 then return finish(result) end
+          -- The files the session's own commits touched; a commit gone (rebased away) leaves them out.
+          local args = { "show", "--name-only", "-z", "--format=" }
+          for _, hash in ipairs(own) do args[#args + 1] = hash end
+          args[#args + 1] = "--"
+          run(args, function(committed)
+            result.committed = committed
+            finish(result)
+          end, function() finish(result) end)
         end)
       end)
     end)

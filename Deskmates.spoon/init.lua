@@ -272,6 +272,13 @@ function obj:readGit(key)
     return
   end
   kept.busy = true
+  -- The session's own commits (hex hashes from its turns, 50 at most): the files they touched count as seen.
+  local own = {}
+  for _, t in ipairs(s.facts.turns or {}) do
+    for _, c in ipairs(t.commits or {}) do
+      if #own < 50 and type(c.hash) == "string" and c.hash:match("^%x+$") then own[#own + 1] = c.hash end
+    end
+  end
   git.read(s.facts.git.root, s.facts.git.base, function(result, message)
     kept.busy = false
     if self.cardGit ~= kept or self.planCard.key ~= key then return end
@@ -281,7 +288,7 @@ function obj:readGit(key)
       kept.again = false
       self:readGit(key)
     end
-  end)
+  end, own)
 end
 
 -- What the transcript backfill of session `key`'s card is doing: { reading = true }, { error = why },

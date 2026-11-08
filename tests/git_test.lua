@@ -112,4 +112,29 @@ check("no git: did not answer, nothing run", #calls == 1 and calls[1].err == "gi
 stub.advance(5)
 check("no git: said once", #calls == 1)
 
+-- The session's own commits: a fifth command names the files they touched (they count as seen on the card).
+hs.fs.attributes = function(p) if p == "/opt/homebrew/bin/git" then return { mode = "file" } end end
+local function startOwn(own)
+  stub.tasks = {}
+  calls = {}
+  git.read("/build/my-app", BASE, function(result, err) calls[#calls + 1] = { result = result, err = err } end, own)
+end
+startOwn({ "e4f5a6b", "b2c3d4e" })
+stub.finishTask(1, 0, "3\n", "")
+stub.finishTask(2, 0, "M\0src/app.js\0", "")
+stub.finishTask(3, 0, "", "")
+stub.finishTask(4, 0, "", "")
+check("own: a fifth command, the files of the session's commits", #stub.tasks == 5 and same(stub.tasks[5].args,
+  { "-C", "/build/my-app", "show", "--name-only", "-z", "--format=", "e4f5a6b", "b2c3d4e", "--" }))
+stub.finishTask(5, 0, "src/app.js\0README.md\0", "")
+check("own: handed back as committed", calls[1] and calls[1].result and calls[1].result.committed == "src/app.js\0README.md\0")
+startOwn({ "e4f5a6b" })
+for i = 1, 4 do stub.finishTask(i, 0, i == 1 and "1\n" or "", "") end
+stub.finishTask(5, 128, "", "fatal: bad object e4f5a6b")
+check("own: a commit gone, the rest still answers", calls[1] and calls[1].result and calls[1].result.committed == nil
+  and calls[1].result.commits == 1)
+startOwn({})
+for i = 1, 4 do stub.finishTask(i, 0, i == 1 and "1\n" or "", "") end
+check("own: none, four commands as before", #stub.tasks == 4 and calls[1] and calls[1].result ~= nil)
+
 check.done("git")

@@ -282,4 +282,11 @@ check("transcript: the base says where it came from", has(workcard.html(workcard
 check("hooks: a base the hooks recorded says nothing more", not has(workcard.html(workcard.view(factsWith({}), GIT, nil, false)),
   "read from the transcript"))
 
+-- Files in the session's own commits count as seen: no "no edit seen" on them.
+local ownGit = { commits = "1\n", diff = "M\0src/app.js\0M\0README.md\0", uncommitted = "", untracked = "",
+  committed = "README.md\0" }
+local ownHtml = workcard.html(workcard.view(factsWith({}), ownGit, nil, false))
+check("own commits: their file is seen", has(ownHtml, "<li><code>README.md</code></li>"))
+check("own commits: not marked no edit seen", not has(ownHtml, '<code>README.md</code> <span class="unseen">'))
+
 check.done("work card")

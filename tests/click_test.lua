@@ -386,12 +386,15 @@ local function doubleClickOn(key)
 end
 -- Answers the git read whose first command is task `from` + 1; each next command is the newest task.
 local ANSWER = { "1\n", "M\0src/app.js\0", "", "scratch.sh\0" }
+-- A session with commits in its turns gets a fifth command (the files of its own commits): answered with
+-- outputs[5], or nothing.
 local function answer(from, outputs)
   local i = from + 1
   for k = 1, 4 do
     stub.finishTask(i, 0, outputs[k], "")
     i = #stub.tasks
   end
+  if i > from + 4 and not stub.tasks[i].finished then stub.finishTask(i, 0, outputs[5] or "", "") end
 end
 
 local tasks = #stub.tasks
@@ -431,7 +434,8 @@ stub.advance(0.2)
 draws = 0
 answer(tasks, { "2\n", "M\0src/app.js\0", "src/app.js\0", "" })
 check("a new answer redraws", draws == 1 and gitCard.html_:find("2 commits, 1 not committed.", 1, true) ~= nil)
--- One read at a time: lines while git reads start none; one more read follows it, and shows the newest state.
+-- One read at a time (five commands: this session has commits of its own): lines while git reads start none; one
+-- more read follows it, and shows the newest state.
 local inFlight = #stub.tasks
 write("PreToolUse|git1||Bash|||my-app|iTerm.app|test|/dev/ttys009|claude|")
 stub.advance(0.2)
@@ -442,10 +446,10 @@ stub.advance(0.2)
 check("one read at a time: lines meanwhile start no git", #stub.tasks == inFlight + 1)
 answer(inFlight, ANSWER)
 local again = #stub.tasks
-check("one read at a time: one more read after it", again == inFlight + 5 and stub.tasks[again].args[3] == "rev-list")
+check("one read at a time: one more read after it", again == inFlight + 6 and stub.tasks[again].args[3] == "rev-list")
 answer(again - 1, { "3\n", "M\0src/app.js\0", "", "" })
 check("one read at a time: the read after shows the newest", gitCard.html_:find("3 commits, 0 not committed.", 1, true) ~= nil)
-check("one read at a time: then nothing more", #stub.tasks == again + 3)
+check("one read at a time: then nothing more", #stub.tasks == again + 4)
 -- A read that fails still lets the one waiting run.
 local failing = #stub.tasks
 write("PostToolUse|git1||Bash|||my-app|iTerm.app|test|/dev/ttys009|claude|")
@@ -506,7 +510,7 @@ stub.advance(0.2)
 closeCard(closed)
 answer(tasks, ANSWER)
 check("a card closed before git answers: no update", closed.html_:find("Reading git…", 1, true) ~= nil)
-check("a card closed before git answers: the read waiting is dropped", #stub.tasks == tasks + 4)
+check("a card closed before git answers: the read waiting is dropped", #stub.tasks == tasks + 5)
 tasks = #stub.tasks
 local left = doubleClickOn("git1")
 writeFacts("Fixed the typo.")
