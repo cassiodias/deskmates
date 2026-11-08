@@ -170,14 +170,16 @@ end
 
 -- What the git part shows for facts `f`, git's answer `gitState` ({ reading = true }, { error = text }, or
 -- terminals/git.lua's result), `plan` (model/plans.lua's shape, or nil) and the branch's PR in one line (`prLine`,
--- terminals/pr.lua's, or nil; `prOpens` when the Spoon can open its page): { actual = actualView, turns = { turn
--- rows, newest first }, pr, prOpens }; nil when the facts know no git base. Only the newest turn, open while the
+-- terminals/pr.lua's, or nil; `prOpens` when the Spoon can open its page), and the ticket's page in one line
+-- (`ticketLine`, "ABC-12 · open in Jira", or nil): { actual = actualView, turns = { turn rows, newest first }, pr,
+-- prOpens, ticket }; nil when the facts know no git base. Only the newest turn, open while the
 -- session `isWorking`, is working now.
-function workcard.view(f, gitState, plan, isWorking, prLine, prOpens)
+function workcard.view(f, gitState, plan, isWorking, prLine, prOpens, ticketLine)
   if not facts.hasGit(f) then return nil end
   local turns = {}
   for i, t in ipairs(f.turns or {}) do turns[#turns + 1] = turnRow(t, i == 1 and isWorking == true) end
-  return { actual = actualView(f, gitState, plan), turns = turns, pr = prLine, prOpens = prLine and prOpens or nil }
+  return { actual = actualView(f, gitState, plan), turns = turns, pr = prLine, prOpens = prLine and prOpens or nil,
+    ticket = ticketLine }
 end
 
 workcard.counted = counted
@@ -244,11 +246,13 @@ end
 -- The PR's line: a button when its page can be opened (the page asks the Spoon, which opens the page it keeps: the
 -- card never navigates), else plain text; nothing without a PR.
 local function prHtml(v)
-  if not v.pr then return "" end
+  local ticket = v.ticket and '<p class="pr"><button class="ticket-open" title="Open the ticket in the browser">'
+    .. escape(v.ticket) .. "</button></p>" or ""
+  if not v.pr then return ticket end
   if v.prOpens then
-    return '<p class="pr"><button class="pr-open" title="Open the PR in the browser">' .. escape(v.pr) .. "</button></p>"
+    return ticket .. '<p class="pr"><button class="pr-open" title="Open the PR in the browser">' .. escape(v.pr) .. "</button></p>"
   end
-  return '<p class="pr">' .. escape(v.pr) .. "</p>"
+  return ticket .. '<p class="pr">' .. escape(v.pr) .. "</p>"
 end
 
 -- The PR's line when there is one, then the plan block's panel for view `v` (workcard.view): the line first, as
@@ -288,8 +292,8 @@ workcard.CSS = table.concat({
   ".actual .changed { list-style: none; padding: 0; margin: 0; } .actual .changed li { padding: 1px 0; }",
   ".actual .more { color: var(--muted); }",
   ".result .pr { margin: 0 2px 8px; font-size: 12px; color: var(--muted); }",
-  ".result .pr-open { all: unset; cursor: pointer; color: LinkText; text-decoration: underline; }",
-  ".result .pr-open:focus-visible { outline: 2px solid Highlight; outline-offset: 2px; }",
+  ".result .pr-open, .result .ticket-open { all: unset; cursor: pointer; color: LinkText; text-decoration: underline; }",
+  ".result .pr-open:focus-visible, .result .ticket-open:focus-visible { outline: 2px solid Highlight; outline-offset: 2px; }",
 })
 
 return workcard

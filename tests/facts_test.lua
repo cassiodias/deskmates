@@ -312,5 +312,21 @@ check("sweep: a broken file goes", not exists("half.json"))
 check("sweep: a kept session's stays", exists("kept.json"))
 check("sweep: a fresh one stays", exists("fresh.json"))
 
+-- A ticket's page (the hooks keep it): only a Jira or Linear https page of that very ticket.
+local function page(key, url) local u, kind = facts.ticketUrl(key, url) return tostring(u) .. "|" .. tostring(kind) end
+check("ticketUrl: Jira", page("ABC-12", "https://acme.atlassian.net/browse/ABC-12")
+  == "https://acme.atlassian.net/browse/ABC-12|Jira")
+check("ticketUrl: Linear", page("ABC-12", "https://linear.app/acme/issue/ABC-12") == "https://linear.app/acme/issue/ABC-12|Linear")
+for _, bad in ipairs({ "http://acme.atlassian.net/browse/ABC-12", "https://acme.atlassian.net/browse/ABC-123",
+  "https://acme.atlassian.net/browse/XYZ-9", "https://linear.app.evil.com/acme/issue/ABC-12",
+  "https://acme.atlassian.net/browse/ABC-12 x", 'https://acme.atlassian.net/browse/ABC-12"', "javascript:alert(1)" }) do
+  check("ticketUrl: refused " .. bad, page("ABC-12", bad) == "nil|nil")
+end
+check("ticketUrl: not a string", page("ABC-12", 12) == "nil|nil" and page(nil, "https://linear.app/acme/issue/ABC-12") == "nil|nil")
+local withUrl = facts.load(file("url.json", '{"tickets":{"ABC-12":{"url":"https://acme.atlassian.net/browse/ABC-12"},'
+  .. '"ABC-34":{"url":"https://evil.example/browse/ABC-12"}},"timeline":[]}'))
+check("load: a ticket's page kept", withUrl.tickets["ABC-12"].url == "https://acme.atlassian.net/browse/ABC-12")
+check("load: a page of another ticket dropped", withUrl.tickets["ABC-34"].url == nil)
+
 os.execute("rm -rf '" .. dir .. "'")
 check.done("facts")

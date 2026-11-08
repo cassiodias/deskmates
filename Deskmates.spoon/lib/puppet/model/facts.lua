@@ -162,7 +162,16 @@ local function derivedPasses(t, lines)
   return before
 end
 
-local function ticket(t, lines)
+-- The page of ticket `key` that url `url` is, checked: url and "Jira" for https://<host>/browse/<key>, url and
+-- "Linear" for https://linear.app/<workspace>/issue/<key>; nil for anything else (another ticket, not https).
+function facts.ticketUrl(key, url)
+  if type(key) ~= "string" or type(url) ~= "string" then return nil end
+  if url:match("^https://[%w.-]+/browse/([%w-]+)$") == key then return url, "Jira" end
+  if url:match("^https://linear%.app/[%w_-]+/issue/([%w-]+)$") == key then return url, "Linear" end
+  return nil
+end
+
+local function ticket(t, lines, key)
   if type(t) ~= "table" then return nil end
   local out = { phase = IS_PHASE[t.phase] and t.phase or nil, phaseAt = num(t.phaseAt), seen = num(t.seen) or 0,
     phases = {} }
@@ -181,6 +190,7 @@ local function ticket(t, lines)
   if type(t.jira) == "table" and str(t.jira.status) then
     out.jira = { status = t.jira.status, at = num(t.jira.at) }
   end
+  out.url = facts.ticketUrl(key, t.url)
   out.passes = passes(t.passes)
   if #out.passes == 0 then out.passes = derivedPasses(out, lines) end
   return out
@@ -265,7 +275,7 @@ function facts.load(path)
         if f.timeline[i].ticket == key then lines[#lines + 1] = f.timeline[i] end
       end
       byStart(lines)
-      f.tickets[key] = ticket(t, lines)
+      f.tickets[key] = ticket(t, lines, key)
     end
   end
   if str(data.current) and f.tickets[data.current] then f.current = data.current end

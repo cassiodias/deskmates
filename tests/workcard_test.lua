@@ -302,4 +302,13 @@ check("PR: with a page, the line is a button that opens it (no href: the card ne
   and not has(linked, "href"))
 check("PR: escaped", has(workcard.html(workcard.view(factsWith(), GIT, PLAN, false, "PR #5 <b>")), "PR #5 &lt;b&gt;"))
 
+-- The ticket's line (its Jira or Linear page), above the PR's: a button; escaped; none without one.
+local ticketed = workcard.html(workcard.view(factsWith(), GIT, PLAN, false, "PR #5 · merged", true, "ABC-12 · open in Jira"))
+local ticketAt = ticketed:find('<p class="pr"><button class="ticket-open" title="Open the ticket in the browser">'
+  .. "ABC-12 · open in Jira</button></p>", 1, true)
+check("ticket: its line, a button, before the PR's", ticketAt == 1 and ticketed:find("pr-open", 1, true) > ticketAt)
+check("ticket: none, no line", not has(linked, "ticket-open"))
+check("ticket: escaped", has(workcard.html(workcard.view(factsWith(), GIT, PLAN, false, nil, nil, "ABC-12 <b>")),
+  "ABC-12 &lt;b&gt;"))
+
 check.done("work card")
